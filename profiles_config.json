@@ -6,16 +6,16 @@
             "config_path": "config.json"
         },
         "Krish mehta": {
-            "excel_path": "profiles\\krish_mehta\\portfolio.xlsx",
-            "config_path": "profiles\\krish_mehta\\config.json"
+            "excel_path": "profiles/krish_mehta/portfolio.xlsx",
+            "config_path": "profiles/krish_mehta/config.json"
         },
         "ABC": {
-            "excel_path": "profiles\\abc\\portfolio.xlsx",
-            "config_path": "profiles\\abc\\config.json"
+            "excel_path": "profiles/abc/portfolio.xlsx",
+            "config_path": "profiles/abc/config.json"
         },
         "sheehan": {
-            "excel_path": "profiles\\sheehan\\portfolio.xlsx",
-            "config_path": "profiles\\sheehan\\config.json"
+            "excel_path": "profiles/sheehan/portfolio.xlsx",
+            "config_path": "profiles/sheehan/config.json"
         }
     }
 }

@@ -45,7 +45,13 @@ def get_profile_files():
             "excel_path": "Stocks & MF Analysis_V3.xlsx",
             "config_path": "config.json"
         })
-        return profile_info.get("excel_path"), profile_info.get("config_path"), active
+        excel_path = profile_info.get("excel_path")
+        config_path = profile_info.get("config_path")
+        if excel_path:
+            excel_path = os.path.normpath(excel_path)
+        if config_path:
+            config_path = os.path.normpath(config_path)
+        return excel_path, config_path, active
     except Exception as e:
         print("Error resolving profile path:", e)
         return "Stocks & MF Analysis_V3.xlsx", "config.json", "Default Portfolio"
