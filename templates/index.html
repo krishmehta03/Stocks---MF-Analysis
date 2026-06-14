@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio Analysis</title>
+  
+  <!-- FontAwesome for Premium Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js for Gorgeous Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Custom Premium Style -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body class="theme-emerald">
+
+  <div class="app-container">
+    
+    <!-- Top Premium Navigation -->
+    <header>
+      <div class="logo-section">
+        <h1><i class="fa-solid fa-chart-line"></i> Portfolio Analysis</h1>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-profile-manager" onclick="openProfileModal()">
+          <i class="fa-solid fa-user-circle"></i> <span id="active-profile-name">Loading...</span>
+        </button>
+        <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Quick Theme Toggle">
+          <i class="fa-solid fa-palette"></i> Theme
+        </button>
+        <button class="btn btn-sm" id="btn-update-prices-trigger">
+          <i class="fa-solid fa-rotate"></i> Update Live Prices
+        </button>
+      </div>
+    </header>
+
+    <!-- Real-Time Progress Bar for Scraper -->
+    <div class="updater-widget card" id="price-updater-container" style="display: none;">
+      <div class="updater-info">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong id="updater-status-title"><i class="fa-solid fa-spinner fa-spin"></i> Updating Stock Prices...</strong>
+          <span id="updater-progress-pct" style="font-weight: 700;">0%</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem;" id="updater-current-ticker">Active scrip: None</p>
+        <div class="updater-progress-bg">
+          <div class="updater-progress-bar" id="updater-progress-bar"></div>
+        </div>
+        <div class="updater-logs" id="updater-logs" style="display: none;">
+          <!-- Live console prints -->
+        </div>
+      </div>
+      <div>
+        <button class="btn btn-secondary btn-sm" id="btn-updater-close" style="display: none;">Dismiss</button>
+      </div>
+    </div>
+
+    <!-- Alert Banners for concentration and loss -->
+    <div id="alerts-container"></div>
+
+    <!-- Nav Tabs Navigation -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('dashboard')">
+        <i class="fa-solid fa-grip"></i> Dashboard
+      </button>
+      <button class="tab-btn" onclick="switchTab('stocks')">
+        <i class="fa-solid fa-chart-simple"></i> Stocks Holdings
+      </button>
+      <button class="tab-btn" onclick="switchTab('mfs')">
+        <i class="fa-solid fa-wallet"></i> Mutual Funds
+      </button>
+      <button class="tab-btn" onclick="switchTab('signals')">
+        <i class="fa-solid fa-triangle-exclamation"></i> Risk & Signals
+      </button>
+      <button class="tab-btn" onclick="switchTab('advisor')">
+        <i class="fa-solid fa-user-tie"></i> AI Advisor
+      </button>
+      <button class="tab-btn" onclick="switchTab('settings')">
+        <i class="fa-solid fa-sliders"></i> Visual Settings
+      </button>
+    </div>
+
+    <!-- TAB 1: EXECUTIVE DASHBOARD -->
+    <div id="tab-dashboard" class="tab-content active">
+
+      <!-- ── Portfolio Performance Chart ─────────────────────────────── -->
+      <div class="card" id="widget-performance-chart" style="margin-bottom:1.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
+          <div>
+            <h2 style="font-size:1.2rem;font-weight:700;">
+              <i class="fa-solid fa-chart-line" style="color:var(--accent);"></i> Portfolio Performance
+            </h2>
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.3rem;">
+              <span id="perf-outperf-badge" style="
+                display:inline-block;padding:0.2rem 0.65rem;border-radius:20px;font-size:0.78rem;
+                font-weight:700;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);
+              ">vs Nifty 50</span>
+              <span id="perf-subtitle" style="font-size:0.8rem;color:var(--text-secondary);">Indexed to 100 at start</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+            <!-- Benchmark selector -->
+            <select id="perf-benchmark-select" onchange="setBenchmark(this.value)" style="
+              background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+              color:var(--text-primary);border-radius:8px;padding:0.35rem 0.6rem;
+              font-size:0.8rem;cursor:pointer;
+            ">
+              <option value="nifty50">Nifty 50</option>
+              <option value="sensex">BSE Sensex</option>
+              <option value="bse500">BSE 500</option>
+              <option value="crisil_hybrid">CRISIL Hybrid Index</option>
+            </select>
+            <!-- Period toggle buttons -->
+            <div style="display:flex;gap:0.3rem;background:rgba(255,255,255,0.04);border-radius:10px;padding:0.25rem;">
+              <button id="perf-btn-1W"  onclick="setPeriod('1W')"  class="perf-period-btn">1W</button>
+              <button id="perf-btn-1M"  onclick="setPeriod('1M')"  class="perf-period-btn active">1M</button>
+              <button id="perf-btn-3M"  onclick="setPeriod('3M')"  class="perf-period-btn">3M</button>
+              <button id="perf-btn-1Y"  onclick="setPeriod('1Y')"  class="perf-period-btn">1Y</button>
+              <button id="perf-btn-All" onclick="setPeriod('All')" class="perf-period-btn">All</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart area -->
+        <div style="position:relative;height:300px;">
+          <div id="perf-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:0.5rem;color:var(--text-secondary);font-size:0.9rem;">
+            <i class="fa-solid fa-spinner fa-spin"></i> Loading performance data...
+          </div>
+          <canvas id="chart-performance" style="display:none;"></canvas>
+        </div>
+
+        <!-- Legend row -->
+        <div id="perf-chart-legend-row" style="display:flex;gap:1.5rem;margin-top:0.75rem;font-size:0.8rem;">
+          <div style="display:flex;align-items:center;gap:0.4rem;">
+            <div style="width:24px;height:3px;background:var(--accent);border-radius:2px;"></div>
+            <span style="color:var(--text-secondary);">Your Portfolio</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.4rem;">
+            <div style="width:24px;height:2px;background:rgba(148,163,184,0.6);border-radius:2px;border-top:2px dashed rgba(148,163,184,0.6);"></div>
+            <span id="perf-bench-legend" style="color:var(--text-secondary);">Nifty 50</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Sector Contribution to Returns Chart ──────────────────── -->
+      <div class="card" id="widget-sector-contribution-chart" style="margin-bottom:1.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
+          <div>
+            <h2 style="font-size:1.2rem;font-weight:700;">
+              <i class="fa-solid fa-chart-bar" style="color:var(--accent);"></i> Sector Contribution to Returns
+            </h2>
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.3rem;">
+              <span id="contrib-outperf-badge" style="
+                display:inline-block;padding:0.2rem 0.65rem;border-radius:20px;font-size:0.78rem;
+                font-weight:700;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);
+              ">Attribution Model</span>
+              <span id="contrib-subtitle" style="font-size:0.8rem;color:var(--text-secondary);">Waterfall return split for the selected period</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+            <!-- Sorting selector/toggle -->
+            <button id="contrib-sort-btn" onclick="toggleContribSorting()" style="
+              background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+              color:var(--text-primary);border-radius:8px;padding:0.35rem 0.6rem;
+              font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;
+            ">
+              <i class="fa-solid fa-sort"></i> Sort: Contribution
+            </button>
+            
+            <!-- Period toggle buttons -->
+            <div style="display:flex;gap:0.3rem;background:rgba(255,255,255,0.04);border-radius:10px;padding:0.25rem;">
+              <button id="contrib-btn-1W"  onclick="setContribPeriod('1W')"  class="perf-period-btn">1W</button>
+              <button id="contrib-btn-1M"  onclick="setContribPeriod('1M')"  class="perf-period-btn active">1M</button>
+              <button id="contrib-btn-3M"  onclick="setContribPeriod('3M')"  class="perf-period-btn">3M</button>
+              <button id="contrib-btn-1Y"  onclick="setContribPeriod('1Y')"  class="perf-period-btn">1Y</button>
+              <button id="contrib-btn-All" onclick="setContribPeriod('All')" class="perf-period-btn">All</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart area / Empty state -->
+        <div style="position:relative;min-height:120px;">
+          <div id="contrib-loading" style="display:flex;align-items:center;justify-content:center;gap:0.5rem;color:var(--text-secondary);font-size:0.9rem;min-height:100px;">
+            <i class="fa-solid fa-spinner fa-spin"></i> Loading sector attribution...
+          </div>
+          <div id="contrib-empty-state" style="display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;color:var(--text-secondary);font-size:0.9rem;">
+            <i class="fa-solid fa-circle-info" style="color:var(--warning);font-size:1.5rem;margin-bottom:0.5rem;display:block;"></i>
+            <span>Hold stocks from multiple sectors to see contribution breakdown</span>
+          </div>
+          <div id="contrib-chart-container" style="display:none;height:120px;">
+            <canvas id="chart-sector-contribution"></canvas>
+          </div>
+          <div id="contrib-legend" style="display:none; flex-wrap:wrap; justify-content:center; gap:1.2rem; margin-top:0.75rem; font-size:0.8rem; padding: 0.5rem 1rem; border-top: 1px solid rgba(255,255,255,0.03);"></div>
+        </div>
+
+        <!-- Summary Row / Attribution Details at Bottom -->
+        <div id="contrib-summary-row" style="
+          display:grid;grid-template-columns:repeat(3, 1fr);gap:1rem;margin-top:1.25rem;
+          padding-top:1rem;border-top:1px solid rgba(255,255,255,0.06);font-size:0.85rem;text-align:center;
+        ">
+          <div>
+            <span style="color:var(--text-secondary);display:block;margin-bottom:0.2rem;">Portfolio Return</span>
+            <strong id="contrib-summary-portfolio" class="value" style="font-size:1.1rem;font-family:'Outfit';">0.00%</strong>
+          </div>
+          <div>
+            <span style="color:var(--text-secondary);display:block;margin-bottom:0.2rem;" id="contrib-summary-bench-name">Nifty 50 Return</span>
+            <strong id="contrib-summary-bench" class="value" style="font-size:1.1rem;font-family:'Outfit';">0.00%</strong>
+          </div>
+          <div>
+            <span style="color:var(--text-secondary);display:block;margin-bottom:0.2rem;">Generated Alpha</span>
+            <strong id="contrib-summary-alpha" class="value" style="font-size:1.1rem;font-family:'Outfit';">0.00%</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics Cards -->
+      <div class="summary-grid">
+        <div class="card summary-card" id="card-total-value" style="position: relative;">
+          <h3>Combined Portfolio</h3>
+          <div class="value" id="val-total-portfolio">₹0.00</div>
+          <div class="sub-value" id="sub-total-portfolio">Invested: ₹0.00</div>
+          <!-- Hover breakdown tooltip -->
+          <div id="portfolio-breakdown-tooltip" class="breakdown-tooltip">
+            <div class="tooltip-title">Asset Breakdown</div>
+            <div class="tooltip-row">
+              <span class="dot stocks-dot"></span>
+              <span class="label">Stocks:</span>
+              <span class="val" id="tooltip-stocks-val">₹0.00</span>
+            </div>
+            <div class="tooltip-row">
+              <span class="dot mfs-dot"></span>
+              <span class="label">Mutual Funds:</span>
+              <span class="val" id="tooltip-mfs-val">₹0.00</span>
+            </div>
+          </div>
+        </div>
+        <div class="card summary-card" id="card-total-pnl">
+          <h3>Unrealised P&L</h3>
+          <div class="value" id="val-total-pnl">₹0.00</div>
+          <div class="sub-value" id="sub-total-pnl">Return: 0.00%</div>
+        </div>
+        <div class="card summary-card" id="card-portfolio-beta">
+          <h3>Portfolio Beta</h3>
+          <div class="value" id="val-portfolio-beta">1.00</div>
+          <div class="sub-value text-secondary" id="sub-portfolio-beta">Weighted sensitivity relative to Nifty 50</div>
+        </div>
+        <div class="card summary-card" id="card-mf-value" style="display: flex; flex-direction: column; justify-content: center; min-height: 110px;">
+          <!-- JS will dynamically populate this container -->
+          <div id="mf-card-content" style="width: 100%;">
+            <h3>Mutual Fund Allocation</h3>
+            <div class="value" id="val-mf-value">₹0.00</div>
+            <div class="sub-value text-secondary" id="sub-mf-value">P&L: ₹0.00 (0.00%)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail widgets: charts and leaders -->
+      <div class="dashboard-details">
+        
+        <!-- Left: Sector Allocation Chart -->
+        <div class="card" id="widget-sector-chart-box">
+          <h2 style="font-size: 1.25rem; margin-bottom: 1rem;"><i class="fa-solid fa-pie-chart"></i> Sector Allocation</h2>
+          <div style="position: relative; height: 300px; display: flex; justify-content: center;">
+            <canvas id="chart-sector-allocation"></canvas>
+          </div>
+        </div>
+
+        <!-- Right: Leaders and Widgets -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          
+          <div class="card" id="widget-asset-chart-box">
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;"><i class="fa-solid fa-chart-pie"></i> Asset Allocation Split</h3>
+            <div id="asset-chart-container" style="position: relative; height: 160px; display: flex; justify-content: center;">
+              <canvas id="chart-asset-allocation"></canvas>
+            </div>
+            <div id="asset-empty-state" style="display: none; flex-direction: column; align-items: center; justify-content: center; height: 160px; text-align: center;">
+              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.75rem;">Add mutual funds to see allocation split</p>
+              <button class="btn btn-secondary btn-sm" onclick="switchTab('mfs'); openAddMfModal();" style="font-size: 0.8rem; border-radius: 4px; padding: 0.3rem 0.75rem;"><i class="fa-solid fa-plus"></i> Add Mutual Funds</button>
+            </div>
+          </div>
+          
+          <div class="card" id="widget-leaders-box">
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;"><i class="fa-solid fa-trophy" style="color: #f59e0b;"></i> Top Stock Performers</h3>
+            <div class="performance-leaders" id="dashboard-leaders-list">
+              <!-- JS updates -->
+            </div>
+          </div>
+
+          <div class="card" id="widget-underperformers-box">
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;"><i class="fa-solid fa-arrow-trend-down" style="color: #ef4444;"></i> Top Underperformers</h3>
+            <div class="performance-leaders" id="dashboard-underperformers-list">
+              <!-- JS updates -->
+            </div>
+          </div>
+          
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- TAB 2: STOCKS HOLDINGS -->
+    <div id="tab-stocks" class="tab-content" style="display: none;">
+      <div class="card" style="margin-bottom: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.4rem;"><i class="fa-solid fa-chart-column"></i> Equity Holdings</h2>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.2rem;">Live updates will auto-synchronise with Row A-R in the Excel input sheet.</p>
+          </div>
+          <div style="display: flex; gap: 0.75rem;">
+            <input type="text" class="form-control" id="stock-search" placeholder="Search scrip..." style="max-width: 200px;">
+            <button class="btn btn-secondary" onclick="openImportCsvModal()"><i class="fa-solid fa-file-csv"></i> Import CSV</button>
+            <button class="btn" onclick="openAddStockModal()"><i class="fa-solid fa-plus"></i> Add New Stock</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table id="stocks-table">
+            <thead>
+              <tr id="stocks-table-headers">
+                <!-- Dynamically populated -->
+              </tr>
+            </thead>
+            <tbody id="stocks-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: MUTUAL FUNDS -->
+    <div id="tab-mfs" class="tab-content" style="display: none;">
+      <div class="card" style="margin-bottom: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.4rem;"><i class="fa-solid fa-folder-open"></i> Mutual Funds Holdings</h2>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.2rem;">Track your SIP and lumpsum investments, returns, and tax exposure across all funds.</p>
+          </div>
+          <div style="display: flex; gap: 0.75rem;">
+            <button class="btn" onclick="openAddMfModal()"><i class="fa-solid fa-plus"></i> Add New Fund</button>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="mf-filter-bar" style="margin-bottom: 1.25rem;">
+          <input type="text" class="form-control" id="mf-search" placeholder="Search fund, category, LTCG..." style="max-width: 240px; font-size: 0.85rem;">
+          <select class="mf-filter-select" id="mf-category-filter" onchange="filterMfsTable()">
+            <option value="">All Categories</option>
+            <option value="Equity">Equity</option>
+            <option value="Debt">Debt</option>
+            <option value="Hybrid">Hybrid</option>
+            <option value="Thematic">Thematic</option>
+            <option value="ELSS">ELSS</option>
+            <option value="Index">Index</option>
+          </select>
+          <select class="mf-filter-select" id="mf-tax-filter" onchange="filterMfsTable()">
+            <option value="">All Tax Types</option>
+            <option value="STCG">ST — Short Term</option>
+            <option value="LTCG">LT — Long Term</option>
+          </select>
+        </div>
+
+        <div class="table-container">
+          <table id="mfs-table">
+            <thead>
+              <tr id="mfs-table-headers">
+                <!-- Dynamically populated -->
+              </tr>
+            </thead>
+            <tbody id="mfs-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Summary Footer -->
+        <div class="mf-summary-footer" id="mf-summary-footer" style="display: none;">
+          <div class="footer-item"><i class="fa-solid fa-money-bill-wave" style="color: var(--text-secondary);"></i> Invested: <strong id="mf-sum-invested">₹0</strong></div>
+          <div class="footer-divider"></div>
+          <div class="footer-item"><i class="fa-solid fa-chart-line" style="color: var(--text-secondary);"></i> Current Value: <strong id="mf-sum-value">₹0</strong></div>
+          <div class="footer-divider"></div>
+          <div class="footer-item">Unrealised P&amp;L: <strong id="mf-sum-pnl">₹0</strong></div>
+          <div class="footer-divider"></div>
+          <div class="footer-item" title="Estimated tax if all STCG holdings redeemed today"><i class="fa-solid fa-receipt" style="color: #fb923c;"></i> Est. STCG Tax: <strong id="mf-sum-stcg" style="color:#fb923c;">₹0</strong></div>
+          <div class="footer-divider"></div>
+          <div class="footer-item" title="Estimated tax if all LTCG holdings redeemed today (above ₹1.25L exemption)"><i class="fa-solid fa-receipt" style="color: #34d399;"></i> Est. LTCG Tax: <strong id="mf-sum-ltcg" style="color:#34d399;">₹0</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: RISK & SIGNALS -->
+    <div id="tab-signals" class="tab-content" style="display: none;">
+      <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="font-size: 1.4rem; margin-bottom: 1.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Risk Flags & Action Signals</h2>
+        
+        <div class="summary-grid" style="margin-bottom: 2rem;">
+          <div class="card summary-card positive" style="padding: 1.25rem;">
+            <h3>Strong Performers (>20% gain)</h3>
+            <div class="value" id="signal-cnt-gainers">0</div>
+          </div>
+          <div class="card summary-card negative" style="padding: 1.25rem;">
+            <h3>Positions in Loss (<0%)</h3>
+            <div class="value" id="signal-cnt-losers">0</div>
+          </div>
+          <div class="card summary-card warning" style="padding: 1.25rem;">
+            <h3>Underperforming Benchmarks</h3>
+            <div class="value" id="signal-cnt-under">0</div>
+          </div>
+        </div>
+
+        <div class="card" style="background: rgba(255, 255, 255, 0.01); border: 1px solid rgba(var(--accent-rgb), 0.1); margin-top: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+            <h3 style="font-size: 1.15rem; color: var(--text-primary); font-family: 'Outfit', sans-serif;"><i class="fa-solid fa-tower-broadcast" style="color: var(--accent);"></i> Portfolio Action Radar</h3>
+            <input type="text" class="form-control" id="signal-search" placeholder="Filter action signals..." style="max-width: 220px; font-size: 0.85rem;">
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Scrip Name</th>
+                  <th>Current Value</th>
+                  <th>Return %</th>
+                  <th>Signal Type</th>
+                  <th>Priority Level</th>
+                  <th>Recommended Strategic Action</th>
+                </tr>
+              </thead>
+              <tbody id="signals-table-body">
+                <!-- Dynamically populated from Risk & Signals Excel Sheet -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: VISUAL SETTINGS PANEL -->
+    <div id="tab-settings" class="tab-content" style="display: none;">
+      <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="font-size: 1.4rem; margin-bottom: 1.5rem;"><i class="fa-solid fa-sliders"></i> Dashboard Visual Customisation</h2>
+        
+        <form id="settings-form" onsubmit="saveCustomSettings(event)">
+          
+          <!-- 1. Select Active Theme -->
+          <div class="form-group" style="margin-bottom: 2rem;">
+            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">1. Select Custom Colour Theme</label>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Swaps the visual style immediately by modifying CSS custom root variables.</p>
+            <div class="theme-picker-group">
+              <div class="theme-option" id="theme-opt-emerald" onclick="selectThemeOption('emerald')">
+                <div class="theme-swatch" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"></div>
+                <strong>Emerald Forest</strong>
+              </div>
+              <div class="theme-option" id="theme-opt-ocean" onclick="selectThemeOption('ocean')">
+                <div class="theme-swatch" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);"></div>
+                <strong>Deep Blue Ocean</strong>
+              </div>
+              <div class="theme-option" id="theme-opt-cyberpunk" onclick="selectThemeOption('cyberpunk')">
+                <div class="theme-swatch" style="background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);"></div>
+                <strong>Cyberpunk Dark</strong>
+              </div>
+              <div class="theme-option" id="theme-opt-rose-gold" onclick="selectThemeOption('rose-gold')">
+                <div class="theme-swatch" style="background: linear-gradient(135deg, #e0b1cb 0%, #9f86c0 100%);"></div>
+                <strong>Rose Gold Premium</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Customize Visible Columns -->
+          <div class="form-group" style="margin-bottom: 2rem;">
+            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">2. Show/Hide Portfolio Columns</label>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Choose which data columns are rendered in the visual grids. Changes apply to the UI instantly.</p>
+            
+            <h4 style="font-size: 0.9rem; margin-top: 1rem; color: var(--accent);">Stock Columns:</h4>
+            <div class="column-selection-grid" id="settings-stock-columns-checks">
+              <!-- Dynamically loaded -->
+            </div>
+            
+            <h4 style="font-size: 0.9rem; margin-top: 1rem; color: var(--accent);">Mutual Fund Columns:</h4>
+            <div class="column-selection-grid" id="settings-mf-columns-checks">
+              <!-- Dynamically loaded -->
+            </div>
+          </div>
+
+          <!-- 3. Toggle Dashboard Widgets -->
+          <div class="form-group" style="margin-bottom: 2rem;">
+            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">3. Select Active Dashboard Widgets</label>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Enable or disable layout widgets on the main overview card.</p>
+            
+            <div class="widget-toggle-list">
+              <div class="widget-toggle-item">
+                <div>
+                  <strong>Sector Allocation Chart</strong>
+                  <p style="font-size: 0.75rem; color: var(--text-secondary);">Renders a dynamic visual doughnut chart of your equity allocation.</p>
+                </div>
+                <input type="checkbox" id="widget-check-sector" style="accent-color: var(--accent); width: 18px; height: 18px;">
+              </div>
+              <div class="widget-toggle-item">
+                <div>
+                  <strong>Asset Allocation Chart</strong>
+                  <p style="font-size: 0.75rem; color: var(--text-secondary);">Shows comparison split between Equity Stocks and Mutual Funds.</p>
+                </div>
+                <input type="checkbox" id="widget-check-asset" style="accent-color: var(--accent); width: 18px; height: 18px;">
+              </div>
+              <div class="widget-toggle-item">
+                <div>
+                  <strong>Top Performers Leaderboard</strong>
+                  <p style="font-size: 0.75rem; color: var(--text-secondary);">Highlights your top 3 gaining stock items directly on dashboard.</p>
+                </div>
+                <input type="checkbox" id="widget-check-leaders" style="accent-color: var(--accent); width: 18px; height: 18px;">
+              </div>
+              <div class="widget-toggle-item">
+                <div>
+                  <strong>Top Underperformers</strong>
+                  <p style="font-size: 0.75rem; color: var(--text-secondary);">Highlights the 3 worst-performing stocks so you can review losing positions.</p>
+                </div>
+                <input type="checkbox" id="widget-check-underperformers" style="accent-color: var(--accent); width: 18px; height: 18px;">
+              </div>
+              <div class="widget-toggle-item">
+                <div>
+                  <strong>Risk Alerts Banner</strong>
+                  <p style="font-size: 0.75rem; color: var(--text-secondary);">Displays real-time concentration and high drawdown warnings at the top of the dashboard.</p>
+                </div>
+                <input type="checkbox" id="widget-check-alerts" style="accent-color: var(--accent); width: 18px; height: 18px;">
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Customize Rules and Limits -->
+          <div class="form-group" style="margin-bottom: 2rem;">
+            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">4. Rules, Limits & Alerts</label>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Customise tax boundaries and thresholds for critical risk alerts.</p>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label>Stock LTCG Days Limit</label>
+                <input type="number" class="form-control" id="settings-stock-ltcg" min="1" value="365">
+              </div>
+              <div class="form-group">
+                <label>Mutual Fund LTCG Days Limit</label>
+                <input type="number" class="form-control" id="settings-mf-ltcg" min="1" value="365">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 0.5rem;">
+              <div class="form-group">
+                <label>High Concentration Alert limit (%)</label>
+                <input type="number" class="form-control" id="settings-alert-concentration" min="1" max="100" value="20">
+              </div>
+              <div class="form-group">
+                <label>High Drawdown Alert limit (%)</label>
+                <input type="number" class="form-control" id="settings-alert-loss" min="1" max="100" value="10">
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Advanced Portfolio Actions -->
+          <div class="form-group" style="margin-bottom: 2rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 2rem;">
+            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">5. Advanced Portfolio Management</label>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Perform bulk operations on your active portfolio dataset:</p>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+              <button type="button" class="btn btn-danger" onclick="clearPortfolioHoldings()">
+                <i class="fa-solid fa-eraser"></i> Reset & Clear All Holdings
+              </button>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" onclick="loadSettings()">Reset Changes</button>
+            <button type="submit" class="btn"><i class="fa-solid fa-save"></i> Save Custom Configuration</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB 5: AI PORTFOLIO ADVISOR -->
+    <div id="tab-advisor" class="tab-content" style="display: none;">
+      <div class="card" style="margin-bottom: 2rem; border-color: rgba(var(--accent-rgb), 0.3);">
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 1rem;">
+          <div style="font-size: 2.2rem; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            <i class="fa-solid fa-brain-circuit"></i>
+          </div>
+          <div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary);">💬 AI Portfolio Specialist</h2>
+            <p style="font-size: 0.85rem; color: var(--text-secondary);">Direct macro wealth analysis, asset concentration diagnostics, stress testing & tax-rebalancing advice.</p>
+          </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="advisor-chat-container" style="display: flex; flex-direction: column; height: 500px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.03); border-radius: 12px; overflow: hidden; position: relative;">
+          
+          <!-- Chat Messages Box -->
+          <div id="advisor-chat-box" style="flex-grow: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+            
+            <!-- System Welcome Message -->
+            <div class="advisor-message system" style="display: flex; gap: 0.75rem; max-width: 85%; align-self: flex-start;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--accent-gradient); display: flex; justify-content: center; align-items: center; color: white; font-size: 0.95rem; font-weight: 700; box-shadow: 0 0 10px var(--accent-glow); flex-shrink: 0;">
+                <i class="fa-solid fa-user-tie"></i>
+              </div>
+              <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.03); border-radius: 0 16px 16px 16px; padding: 1rem; color: var(--text-primary); font-size: 0.9rem; line-height: 1.5;">
+                <span style="font-weight: 700; display: block; margin-bottom: 0.25rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent);">CFA Senior Advisor</span>
+                Greetings! I am your institutional-grade **Senior Wealth Analyst & CFA Portfolio Specialist**. I have analyzed your live portfolio values, average buys, and concentration sectors.
+                <br><br>
+                How may I assist you with your capital allocation today? Click one of the quick diagnostics below or type your investment query!
+              </div>
+            </div>
+            
+          </div>
+
+          <!-- Suggested Prompt Pills -->
+          <div style="display: flex; gap: 0.5rem; padding: 0.75rem 1.25rem; background: rgba(255, 255, 255, 0.01); border-top: 1px solid rgba(255, 255, 255, 0.02); overflow-x: auto; white-space: nowrap;">
+            <button class="btn btn-secondary btn-sm" onclick="sendSuggestedPrompt('📊 Concentration & Risk Audit')" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 20px;">📊 Concentration Risk Audit</button>
+            <button class="btn btn-secondary btn-sm" onclick="sendSuggestedPrompt('🔥 Run Macro Scenario Stress Test')" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 20px;">🔥 Scenario Stress Test</button>
+            <button class="btn btn-secondary btn-sm" onclick="sendSuggestedPrompt('💡 Actionable Rebalancing Plan')" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 20px;">💡 Rebalancing Plan</button>
+            <button class="btn btn-secondary btn-sm" onclick="sendSuggestedPrompt('📈 Deep Dive Worst Performing Positions')" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 20px;">📈 Worst Positions Audit</button>
+          </div>
+
+          <!-- Input Bar -->
+          <div style="display: flex; gap: 0.5rem; padding: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.03); background: rgba(0, 0, 0, 0.3);">
+            <input type="text" id="advisor-user-input" class="form-control" placeholder="Ask your portfolio specialist (e.g. 'Should I sell Vodafone Idea?')" onkeypress="handleAdvisorKeyPress(event)" style="border-radius: 20px; padding: 0.65rem 1.25rem;">
+            <button class="btn" onclick="submitAdvisorMessage()" style="border-radius: 50%; width: 42px; height: 42px; padding: 0; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
+              <i class="fa-solid fa-paper-plane" style="font-size: 0.95rem;"></i>
+            </button>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+
+  </div> <!-- End App Container -->
+
+  <!-- MODAL: ADD / EDIT STOCK (4-field simplified form) -->
+  <div class="modal-overlay" id="modal-stock">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-stock-title">Add New Stock</h3>
+        <button class="modal-close" onclick="closeStockModal()">&times;</button>
+      </div>
+      <form id="stock-form" onsubmit="submitStockForm(event)">
+        <input type="hidden" id="stock-row-idx">
+
+        <div class="form-group">
+          <label>Company Name *</label>
+          <input type="text" class="form-control" id="stock-scrip" placeholder="e.g. Coal India, HDFC Bank" required>
+        </div>
+
+        <div class="form-group">
+          <label>Sector</label>
+          <input type="text" class="form-control" id="stock-sector" placeholder="e.g. Banking, Energy, IT">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Total Quantity *</label>
+            <input type="number" class="form-control" id="stock-qty" step="any" required min="0.001" placeholder="e.g. 10">
+          </div>
+          <div class="form-group">
+            <label>Avg Trading Price (₹) *</label>
+            <input type="number" class="form-control" id="stock-buy-price" step="0.01" required min="0" placeholder="e.g. 305.41">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeStockModal()">Cancel</button>
+          <button type="submit" class="btn" id="btn-stock-submit">Add Stock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: IMPORT STOCKS FROM CSV -->
+  <div class="modal-overlay" id="modal-import-csv">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-file-csv" style="color: var(--accent);"></i> Import Stocks from CSV</h3>
+        <button class="modal-close" onclick="closeImportCsvModal()">&times;</button>
+      </div>
+
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.6;">
+        Upload your broker's equity holdings CSV export. The importer will automatically extract
+        <strong>Company Name</strong>, <strong>Sector</strong>, <strong>Total Quantity</strong>, and
+        <strong>Avg Trading Price</strong> from the <em>Equity Holdings Details</em> section.
+      </p>
+
+      <!-- Drop Zone -->
+      <div id="csv-drop-zone"
+           style="border: 2px dashed rgba(var(--accent-rgb), 0.5); border-radius: 12px;
+                  padding: 2rem; text-align: center; cursor: pointer; transition: all 0.2s;
+                  background: rgba(var(--accent-rgb), 0.04); margin-bottom: 1.25rem;"
+           onclick="document.getElementById('csv-file-input').click()"
+           ondragover="csvDragOver(event)" ondragleave="csvDragLeave(event)" ondrop="csvDrop(event)">
+        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2.5rem; color: var(--accent); margin-bottom: 0.75rem; display: block;"></i>
+        <p style="font-weight: 600; color: var(--text-primary); margin: 0;">Click to browse or drag & drop CSV file</p>
+        <p style="font-size: 0.78rem; color: var(--text-secondary); margin: 0.35rem 0 0;">Supports broker equity export .csv files</p>
+        <input type="file" id="csv-file-input" accept=".csv" style="display: none;" onchange="csvFileSelected(event)">
+      </div>
+
+      <!-- Selected file name + preview -->
+      <div id="csv-file-preview" style="display: none; margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem;
+                    background: rgba(var(--accent-rgb), 0.08); border-radius: 8px; border: 1px solid rgba(var(--accent-rgb), 0.2);">
+          <i class="fa-solid fa-file-csv" style="color: var(--accent); font-size: 1.3rem;"></i>
+          <div style="flex: 1;">
+            <div id="csv-filename" style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem;"></div>
+            <div id="csv-filesize" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
+          </div>
+          <button onclick="clearCsvSelection()" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.1rem;">&times;</button>
+        </div>
+      </div>
+
+      <!-- Result / Status Banner -->
+      <div id="csv-import-result" style="display: none; padding: 0.85rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.88rem; font-weight: 500;"></div>
+
+      <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="closeImportCsvModal()">Close</button>
+        <button type="button" class="btn" id="btn-csv-import-submit" onclick="submitCsvImport()" disabled>
+          <i class="fa-solid fa-file-import"></i> Import Stocks
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: MUTUAL FUND (Add / Edit) -->
+  <div class="modal-overlay" id="modal-mf">
+    <div class="modal-content" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 id="modal-mf-title">Add Mutual Fund</h3>
+        <button class="modal-close" onclick="closeMfModal()">&times;</button>
+      </div>
+      <form id="mf-form" onsubmit="submitMfForm(event)">
+        <input type="hidden" id="mf-row-idx">
+        
+        <div class="form-group">
+          <label>Fund Name *</label>
+          <input type="text" class="form-control" id="mf-name" placeholder="e.g. Parag Parikh Flexi Cap Fund" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Category *</label>
+            <input type="text" class="form-control" id="mf-category" placeholder="e.g. Equity, Debt, Hybrid" required>
+          </div>
+          <div class="form-group">
+            <label>Sub-Category</label>
+            <input type="text" class="form-control" id="mf-subcategory" placeholder="e.g. Flexi Cap, ELSS">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>AMC</label>
+            <input type="text" class="form-control" id="mf-amc" placeholder="e.g. PPFAS, HDFC, Axis">
+          </div>
+          <div class="form-group">
+            <label>Investment Type</label>
+            <select class="form-control" id="mf-investment-type">
+              <option value="Lumpsum">Lumpsum</option>
+              <option value="SIP">SIP</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Units Purchased *</label>
+            <input type="number" class="form-control" id="mf-units" step="any" required min="0.0001" placeholder="e.g. 143.456">
+          </div>
+          <div class="form-group">
+            <label>Buy NAV (₹) *</label>
+            <input type="number" class="form-control" id="mf-buy-nav" step="0.0001" required min="0.0001" placeholder="e.g. 52.38">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Purchase Date (DD-MM-YYYY)</label>
+            <input type="text" class="form-control" id="mf-buy-date" placeholder="e.g. 15-08-2024">
+          </div>
+          <div class="form-group">
+            <label>Current NAV (₹)</label>
+            <input type="number" class="form-control" id="mf-current-nav" step="0.0001" placeholder="Defaults to Buy NAV">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Benchmark 1Y Return %</label>
+            <input type="number" class="form-control" id="mf-benchmark" step="0.01" placeholder="Optional">
+          </div>
+          <div class="form-group">
+            <label>Expense Ratio %</label>
+            <input type="number" class="form-control" id="mf-expense" step="0.01" value="0">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeMfModal()">Cancel</button>
+          <button type="submit" class="btn" id="btn-mf-submit">Add Fund</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: PROFILE MANAGER -->
+  <div class="modal-overlay" id="modal-profile">
+    <div class="modal-content" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-circle" style="color: var(--accent);"></i> Portfolio Profiles</h3>
+        <button class="modal-close" onclick="closeProfileModal()">&times;</button>
+      </div>
+      <div style="padding: 1.25rem 0 0 0;">
+        
+        <!-- Available Profiles Picker -->
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label style="font-weight: 700; color: var(--text-primary);">Available Profiles</label>
+          <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Manage, switch, or delete your client & family account profiles:</p>
+          <div id="profiles-list-container" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 200px; overflow-y: auto; padding-right: 0.25rem;">
+            <!-- Dynamic profile items rendered by JS -->
+          </div>
+        </div>
+        
+        <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 1.5rem 0;">
+        
+        <!-- Create Profile Form -->
+        <form id="create-profile-form" onsubmit="submitCreateProfile(event)">
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label style="font-weight: 700; color: var(--text-primary);">Create New Profile</label>
+            <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Initializes a separate Excel worksheet & customized settings dashboard:</p>
+            <input type="text" class="form-control" id="new-profile-input" placeholder="e.g. Krish Mehta, Mom Portfolio" required>
+          </div>
+          
+          <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" onclick="closeProfileModal()">Close</button>
+            <button type="submit" class="btn"><i class="fa-solid fa-plus-circle"></i> Create & Load</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- FUND DETAIL DRAWER (slide-in from right) -->
+  <div class="mf-drawer-overlay" id="mf-drawer-overlay" onclick="closeMfDetailDrawer()"></div>
+  <div class="mf-detail-drawer" id="mf-detail-drawer">
+    <div class="mf-drawer-header">
+      <div>
+        <h3 id="mf-drawer-title">Fund Details</h3>
+        <p id="mf-drawer-subtitle"></p>
+      </div>
+      <button class="mf-drawer-close" onclick="closeMfDetailDrawer()">&times;</button>
+    </div>
+    <div class="mf-drawer-body" id="mf-drawer-body">
+      <!-- Populated by JS -->
+    </div>
+    <div class="mf-drawer-footer">
+      <button class="btn btn-secondary" style="flex:1;" onclick="closeMfDetailDrawer()"><i class="fa-solid fa-times"></i> Close</button>
+      <button class="btn" style="flex:1;" id="mf-drawer-edit-btn"><i class="fa-solid fa-edit"></i> Edit Holding</button>
+    </div>
+  </div>
+
+  <!-- Custom Visual Script App.js -->
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

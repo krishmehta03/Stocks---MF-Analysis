@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: stocks-mf-analysis
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app

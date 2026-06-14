@@ -1,0 +1,2481 @@
+// Global Application State
+let portfolioData = null;
+let appConfig = null;
+let sectorChart = null;
+let assetChart = null;
+let performanceChart = null;
+let sectorContribChart = null;
+let activeTheme = 'emerald';
+let activeTab = 'dashboard';
+let priceUpdateTimer = null;
+let activePeriod = '1M';
+let activeBenchmark = 'nifty50';
+let activeContribPeriod = '1M';
+let contribSortMode = 'contribution';
+
+
+// Core Constants
+const ALL_STOCK_COLUMNS = [
+  "Scrip Name", "Exchange", "Sector", "Qty", "Buy Price", "Buy Date", 
+  "Current Price", "5Y CAGR", "Nifty 5Y CAGR", "Invested Value", 
+  "Current Value", "P&L", "Return %", "Dividends", "Tax Flag", "Total Return"
+];
+
+const ALL_MF_COLUMNS = [
+  "Fund Name", "Category", "Units Held", "Invested Value",
+  "Current Value", "P&L", "Absolute Return %", "XIRR %",
+  "Holding Period", "Tax Flag"
+];
+
+// Document Ready Initialization
+document.addEventListener("DOMContentLoaded", () => {
+  initializeApp();
+  setupEventListeners();
+});
+
+// Initialize Config and Data
+async function initializeApp() {
+  await fetchConfig();
+  await fetchPortfolio();
+  await fetchProfilesList();
+  checkScraperRunningOnStartup();
+}
+
+function setupEventListeners() {
+  // Quick Theme Toggle
+  document.getElementById("btn-theme-toggle").addEventListener("click", () => {
+    const themes = ["emerald", "ocean", "cyberpunk", "rose-gold"];
+    let nextIdx = (themes.indexOf(activeTheme) + 1) % themes.length;
+    applyTheme(themes[nextIdx]);
+    
+    // Save updated theme to config
+    appConfig.theme = themes[nextIdx];
+    saveConfigOnServer(appConfig);
+  });
+
+  // Price Scraper Trigger
+  document.getElementById("btn-update-prices-trigger").addEventListener("click", startLivePriceScraper);
+  
+  // Search Filters
+  document.getElementById("stock-search").addEventListener("input", filterStocksTable);
+  document.getElementById("mf-search").addEventListener("input", filterMfsTable);
+  document.getElementById("signal-search").addEventListener("input", filterSignalsTable);
+
+  // Close scraper box
+  document.getElementById("btn-updater-close").addEventListener("click", () => {
+    document.getElementById("price-updater-container").style.display = "none";
+  });
+}
+
+// SWITCH TABS
+function switchTab(tabId) {
+  activeTab = tabId;
+  
+  // Update nav buttons
+  const tabBtns = document.querySelectorAll(".tab-btn");
+  tabBtns.forEach(btn => {
+    if (btn.getAttribute("onclick").includes(tabId)) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  // Show/Hide tab content
+  const tabContents = document.querySelectorAll(".tab-content");
+  tabContents.forEach(content => {
+    if (content.id === `tab-${tabId}`) {
+      content.style.display = "block";
+      content.classList.add("active");
+    } else {
+      content.style.display = "none";
+      content.classList.remove("active");
+    }
+  });
+
+  // Re-render charts to prevent sizing bugs on tab reveal
+  if (tabId === 'dashboard') {
+    renderCharts();
+  }
+}
+
+// FETCH SYSTEM DATA
+async function fetchConfig() {
+  try {
+    const res = await fetch('/api/config');
+    appConfig = await res.json();
+    applyTheme(appConfig.theme || 'emerald');
+    loadSettingsIntoForm();
+  } catch (err) {
+    console.error("Error loading config:", err);
+  }
+}
+
+async function fetchPortfolio() {
+  try {
+    const res = await fetch('/api/portfolio');
+    portfolioData = await res.json();
+    
+    if (portfolioData.error) {
+      alert("Error: " + portfolioData.error);
+      return;
+    }
+    
+    updateDashboardMetrics();
+    renderCharts();
+    renderStocksTable();
+    renderMfsTable();
+    renderRiskSignals();
+    evaluateRiskAlerts();
+    
+    // Fetch performance historical trend data
+    fetchPerformanceData();
+    
+    // Fetch sector contribution breakdown data
+    fetchSectorContributionData();
+  } catch (err) {
+    console.error("Error loading portfolio data:", err);
+  }
+}
+
+// APPLY VISUAL THEME
+function applyTheme(themeName) {
+  activeTheme = themeName;
+  document.body.className = '';
+  document.body.classList.add(`theme-${themeName}`);
+  
+  // Highlight active option in Settings Form
+  document.querySelectorAll(".theme-option").forEach(opt => {
+    opt.classList.remove("active");
+  });
+  const activeOpt = document.getElementById(`theme-opt-${themeName}`);
+  if (activeOpt) activeOpt.classList.add("active");
+}
+
+function selectThemeOption(themeName) {
+  applyTheme(themeName);
+}
+
+// DYNAMIC DASHBOARD METRICS
+function updateDashboardMetrics() {
+  if (!portfolioData || !portfolioData.summary) return;
+  const s = portfolioData.summary;
+  
+  // Combined Stats
+  document.getElementById("val-total-portfolio").innerText = formatINR(s.total_portfolio_value);
+  document.getElementById("sub-total-portfolio").innerText = `Invested: ${formatINR(s.total_portfolio_invested)}`;
+  
+  const pnlVal = document.getElementById("val-total-pnl");
+  pnlVal.innerText = formatINR(s.total_portfolio_pnl);
+  pnlVal.className = 'value ' + (s.total_portfolio_pnl >= 0 ? 'positive' : 'negative');
+  
+  const pnlSub = document.getElementById("sub-total-pnl");
+  pnlSub.innerText = `Return: ${s.total_portfolio_return_pct.toFixed(2)}%`;
+  pnlSub.className = 'sub-value ' + (s.total_portfolio_pnl >= 0 ? 'positive' : 'negative');
+  
+  // Portfolio Beta
+  document.getElementById("val-portfolio-beta").innerText = s.portfolio_beta.toFixed(2);
+  const stSub = document.getElementById("sub-portfolio-beta");
+  stSub.innerText = "Weighted sensitivity relative to Nifty 50";
+  stSub.className = 'sub-value text-secondary';
+  
+  // Update Combined Portfolio breakdown tooltip values
+  document.getElementById("tooltip-stocks-val").innerText = formatINR(s.total_stock_value);
+  document.getElementById("tooltip-mfs-val").innerText = formatINR(s.total_mf_value);
+  
+  // MF Stats (Dynamic empty or populated state)
+  const mfCardContent = document.getElementById("mf-card-content");
+  const hasMfData = portfolioData.mfs && portfolioData.mfs.length > 0;
+  
+  if (!hasMfData) {
+    // Empty State
+    mfCardContent.innerHTML = `
+      <h3>Mutual Fund Allocation</h3>
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0.5rem 0;">
+        <i class="fa-solid fa-wallet" style="font-size: 1.25rem; color: var(--text-secondary); margin-bottom: 0.4rem;"></i>
+        <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">No mutual funds yet</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin: 0.15rem 0 0.5rem;">Current Value: ₹0.00</div>
+        <button class="btn btn-secondary btn-sm" onclick="switchTab('mfs'); openAddMfModal();" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 6px;"><i class="fa-solid fa-plus"></i> Add Mutual Fund</button>
+      </div>
+    `;
+  } else {
+    // Populated State
+    const pnlSign = s.total_mf_pnl >= 0 ? '+' : '';
+    const pnlClass = s.total_mf_pnl >= 0 ? 'positive' : 'negative';
+    const fundCountStr = portfolioData.mfs.length === 1 ? '1 fund' : `${portfolioData.mfs.length} funds`;
+    
+    mfCardContent.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <h3>Mutual Fund Allocation</h3>
+        <span style="font-size: 0.75rem; padding: 0.15rem 0.45rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: var(--text-secondary); font-weight: 600;">${fundCountStr}</span>
+      </div>
+      <div class="value" id="val-mf-value" style="margin-top: 0.35rem;">${formatINR(s.total_mf_value)}</div>
+      <div class="sub-value" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem;">Invested: ${formatINR(s.total_mf_invested)}</div>
+      <div class="sub-value ${pnlClass}" id="sub-mf-value" style="margin-top: 0.25rem; font-weight: 600;">P&L: ${pnlSign}${formatINR(s.total_mf_pnl)} (${s.total_mf_return_pct.toFixed(2)}%)</div>
+    `;
+  }
+  
+  // Toggles active widgets display
+  toggleWidgetsVisibility();
+  
+  // Render leaderboard Performers
+  renderLeaders();
+  renderUnderperformers();
+}
+
+function toggleWidgetsVisibility() {
+  if (!appConfig || !appConfig.widgets) return;
+  const w = appConfig.widgets;
+  
+  document.getElementById("widget-sector-chart-box").style.display = w.sector_allocation ? 'block' : 'none';
+  document.getElementById("widget-asset-chart-box").style.display = w.asset_allocation ? 'block' : 'none';
+  document.getElementById("widget-leaders-box").style.display = w.top_performers ? 'block' : 'none';
+  document.getElementById("widget-underperformers-box").style.display = (w.top_underperformers !== false) ? 'block' : 'none';
+  
+  // Recalculate Dashboard details grid layout based on what widgets are visible
+  const detGrid = document.querySelector(".dashboard-details");
+  const rightColHasContent = w.asset_allocation || w.top_performers || (w.top_underperformers !== false);
+  if (!w.sector_allocation && !rightColHasContent) {
+    detGrid.style.display = 'none';
+  } else if (!w.sector_allocation) {
+    detGrid.style.gridTemplateColumns = '1fr';
+  } else {
+    detGrid.style.gridTemplateColumns = rightColHasContent ? '2fr 1fr' : '1fr';
+  }
+}
+
+// Renders the Top Stock Performers list on the dashboard
+function renderLeaders() {
+  const container = document.getElementById("dashboard-leaders-list");
+  container.innerHTML = "";
+  if (!portfolioData || !portfolioData.stocks) return;
+  
+  // Sort stocks by return percentage descending
+  const sorted = [...portfolioData.stocks]
+    .filter(s => s["Invested Value"] > 0)
+    .sort((a, b) => b["Return %"] - a["Return %"])
+    .slice(0, 3);
+    
+  if (sorted.length === 0) {
+    container.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; padding: 1rem;">No stock holdings to evaluate.</p>`;
+    return;
+  }
+  
+  sorted.forEach((s, i) => {
+    const medals = ['🥇', '🥈', '🥉'];
+    const el = document.createElement("div");
+    el.className = "leader-item";
+    el.innerHTML = `
+      <span class="leader-name">${medals[i]} ${s["Scrip Name"]} <small style="color: var(--text-secondary); font-weight: normal;">(${s["Exchange"]})</small></span>
+      <span class="leader-val ${s["P&L"] >= 0 ? 'positive' : 'negative'}">${s["Return %"].toFixed(2)}%</span>
+    `;
+    container.appendChild(el);
+  });
+}
+
+// Renders the Top Underperformers list on the dashboard
+function renderUnderperformers() {
+  const container = document.getElementById("dashboard-underperformers-list");
+  if (!container) return;
+  container.innerHTML = "";
+  if (!portfolioData || !portfolioData.stocks) return;
+
+  // Sort ascending — worst performers first
+  const sorted = [...portfolioData.stocks]
+    .filter(s => s["Invested Value"] > 0)
+    .sort((a, b) => a["Return %"] - b["Return %"])
+    .slice(0, 3);
+
+  if (sorted.length === 0) {
+    container.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; padding: 1rem;">No stock holdings to evaluate.</p>`;
+    return;
+  }
+
+  const rankIcons = ['1️⃣', '2️⃣', '3️⃣'];
+  sorted.forEach((s, i) => {
+    const el = document.createElement("div");
+    el.className = "leader-item";
+    const retPct = s["Return %"].toFixed(2);
+    const pnlClass = s["Return %"] >= 0 ? 'positive' : 'negative';
+    el.innerHTML = `
+      <span class="leader-name">${rankIcons[i]} ${s["Scrip Name"]} <small style="color: var(--text-secondary); font-weight: normal;">(${s["Exchange"]})</small></span>
+      <span class="leader-val ${pnlClass}" style="font-size:0.9rem;">${retPct}%</span>
+    `;
+    container.appendChild(el);
+  });
+}
+
+// RENDER BEAUTIFUL CHARTS
+function renderCharts() {
+  if (!portfolioData) return;
+  
+  const w = appConfig ? appConfig.widgets : { sector_allocation: true, asset_allocation: true };
+  
+  // Theme styling helpers
+  const cssVariables = getComputedStyle(document.body);
+  const accentColor = cssVariables.getPropertyValue('--accent').trim() || '#10b981';
+  const textSecondary = cssVariables.getPropertyValue('--text-secondary').trim() || '#94a3b8';
+  
+  // 1. SECTOR ALLOCATION DOUGHNUT
+  if (w.sector_allocation) {
+    const sectorCtx = document.getElementById('chart-sector-allocation');
+    if (sectorCtx) {
+      if (sectorChart) sectorChart.destroy();
+      
+      // Calculate sector totals
+      const sectorsMap = {};
+      portfolioData.stocks.forEach(s => {
+        const sec = s["Sector"] || "Other";
+        sectorsMap[sec] = (sectorsMap[sec] || 0) + s["Current Value"];
+      });
+      
+      const labels = Object.keys(sectorsMap);
+      const data = Object.values(sectorsMap);
+      
+      if (labels.length === 0) {
+        labels.push("No Holdings");
+        data.push(1);
+      }
+      
+      sectorChart = new Chart(sectorCtx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: labels.map(l => getSectorBaseColor(l)),
+            borderColor: 'rgba(255, 255, 255, 0.05)',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                color: textSecondary,
+                font: { family: 'Plus Jakarta Sans', size: 11 }
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // 2. ASSET ALLOCATION SPLIT PIE/DONUT
+  if (w.asset_allocation) {
+    const assetCtx = document.getElementById('chart-asset-allocation');
+    const chartContainer = document.getElementById('asset-chart-container');
+    const emptyState = document.getElementById('asset-empty-state');
+    
+    if (assetCtx) {
+      if (assetChart) assetChart.destroy();
+      
+      const stVal = portfolioData.summary.total_stock_value;
+      const mfVal = portfolioData.summary.total_mf_value;
+      
+      if (mfVal === 0) {
+        if (chartContainer) chartContainer.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'flex';
+      } else {
+        if (chartContainer) chartContainer.style.display = 'flex';
+        if (emptyState) emptyState.style.display = 'none';
+        
+        const totalVal = stVal + mfVal;
+        const stPct = totalVal > 0 ? ((stVal / totalVal) * 100).toFixed(1) : '0.0';
+        const mfPct = totalVal > 0 ? ((mfVal / totalVal) * 100).toFixed(1) : '0.0';
+        
+        assetChart = new Chart(assetCtx, {
+          type: 'doughnut',
+          data: {
+            labels: [`Stocks ${stPct}%`, `Mutual Funds ${mfPct}%`],
+            datasets: [{
+              data: [stVal, mfVal],
+              backgroundColor: [
+                '#ec4899',
+                '#ffffff'
+              ],
+              borderColor: 'rgba(255, 255, 255, 0.05)',
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  color: textSecondary,
+                  boxWidth: 12,
+                  font: { family: 'Plus Jakarta Sans', size: 10, weight: 'bold' }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+  }
+}
+
+// ─── PORTFOLIO PERFORMANCE CHART FUNCTIONS ───────────────────────────────────
+async function fetchPerformanceData() {
+  const loader = document.getElementById("perf-loading");
+  const canvas = document.getElementById("chart-performance");
+  const badge = document.getElementById("perf-outperf-badge");
+  
+  if (loader) loader.style.display = "flex";
+  if (canvas) canvas.style.display = "none";
+  
+  try {
+    const res = await fetch(`/api/portfolio/performance?period=${activePeriod}&benchmark=${activeBenchmark}`);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to fetch performance data");
+    }
+    const data = await res.json();
+    
+    if (loader) loader.style.display = "none";
+    if (canvas) canvas.style.display = "block";
+    
+    renderPerformanceChart(data);
+  } catch (err) {
+    console.error("Error loading performance chart:", err);
+    if (loader) {
+      loader.innerHTML = `<span style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || "No data available. Add stock holdings to see performance."}</span>`;
+    }
+    if (badge) {
+      badge.innerText = "No Data";
+      badge.style.background = "rgba(255,255,255,0.05)";
+      badge.style.color = "var(--text-secondary)";
+      badge.style.borderColor = "rgba(255,255,255,0.1)";
+    }
+  }
+}
+
+function formatDateCleanly(dateStr) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${date.getDate()} ${months[date.getMonth()]}`;
+}
+
+function renderPerformanceChart(data) {
+  const ctx = document.getElementById('chart-performance');
+  if (!ctx) return;
+  
+  if (performanceChart) {
+    performanceChart.destroy();
+  }
+  
+  // Theme styling colors
+  const cssVars = getComputedStyle(document.body);
+  const accentColor = cssVars.getPropertyValue('--accent').trim() || '#10b981';
+  const textPrimary = cssVars.getPropertyValue('--text-primary').trim() || '#f8fafc';
+  const textSecondary = cssVars.getPropertyValue('--text-secondary').trim() || '#94a3b8';
+
+  // Update dynamic Outperformance Badge
+  const badge = document.getElementById("perf-outperf-badge");
+  if (badge) {
+    const diff = data.outperformance;
+    if (diff >= 0) {
+      badge.innerText = `+${diff.toFixed(2)}% Outperformance`;
+      badge.style.background = "rgba(16, 185, 129, 0.15)";
+      badge.style.color = "#10b981";
+      badge.style.borderColor = "rgba(16, 185, 129, 0.3)";
+    } else {
+      badge.innerText = `${diff.toFixed(2)}% Underperformance`;
+      badge.style.background = "rgba(239, 68, 68, 0.15)";
+      badge.style.color = "#ef4444";
+      badge.style.borderColor = "rgba(239, 68, 68, 0.3)";
+    }
+  }
+  
+  // Update Legend Row
+  const legendRow = document.getElementById("perf-chart-legend-row");
+  const hasCombined = !!data.combined;
+  if (legendRow) {
+    if (hasCombined) {
+      legendRow.innerHTML = `
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:3px;background:#ec4899;border-radius:2px;"></div>
+          <span style="color:var(--text-secondary);">Stocks Portfolio</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:3px;background:#ffffff;border-radius:2px;"></div>
+          <span style="color:var(--text-secondary);">Combined Portfolio</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:2px;background:rgba(148,163,184,0.6);border-radius:2px;border-top:2px dashed rgba(148,163,184,0.6);"></div>
+          <span id="perf-bench-legend" style="color:var(--text-secondary);">${data.benchmark_name}</span>
+        </div>
+      `;
+    } else {
+      legendRow.innerHTML = `
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:3px;background:${accentColor};border-radius:2px;"></div>
+          <span style="color:var(--text-secondary);">Your Portfolio</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:2px;background:rgba(148,163,184,0.6);border-radius:2px;border-top:2px dashed rgba(148,163,184,0.6);"></div>
+          <span id="perf-bench-legend" style="color:var(--text-secondary);">${data.benchmark_name}</span>
+        </div>
+      `;
+    }
+  }
+
+  // Set up datasets dynamically
+  const datasets = [];
+  if (hasCombined) {
+    datasets.push({
+      label: 'Stocks Portfolio',
+      data: data.portfolio,
+      borderColor: '#ec4899',
+      borderWidth: 3,
+      pointRadius: 0,
+      pointHoverRadius: 6,
+      pointBackgroundColor: '#ec4899',
+      fill: false,
+      tension: 0.25
+    });
+    datasets.push({
+      label: 'Combined Portfolio',
+      data: data.combined,
+      borderColor: '#ffffff',
+      borderWidth: 3,
+      pointRadius: 0,
+      pointHoverRadius: 6,
+      pointBackgroundColor: '#ffffff',
+      fill: false,
+      tension: 0.25
+    });
+  } else {
+    datasets.push({
+      label: 'Your Portfolio',
+      data: data.portfolio,
+      borderColor: accentColor,
+      borderWidth: 3,
+      pointRadius: 0,
+      pointHoverRadius: 6,
+      pointBackgroundColor: accentColor,
+      fill: false,
+      tension: 0.25
+    });
+  }
+
+  // Add Benchmark dataset
+  datasets.push({
+    label: data.benchmark_name,
+    data: data.benchmark,
+    borderColor: 'rgba(148, 163, 184, 0.65)',
+    borderWidth: 2,
+    borderDash: [5, 5],
+    pointRadius: 0,
+    pointHoverRadius: 5,
+    pointBackgroundColor: 'rgba(148, 163, 184, 0.9)',
+    fill: false,
+    tension: 0.2
+  });
+  
+  performanceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.dates,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      hover: {
+        mode: 'index',
+        intersect: false
+      },
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          enabled: true,
+          mode: 'index',
+          intersect: false,
+          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          titleColor: textPrimary,
+          bodyColor: textSecondary,
+          borderColor: 'rgba(255, 255, 255, 0.12)',
+          borderWidth: 1,
+          padding: 12,
+          bodySpacing: 6,
+          titleFont: { family: 'Outfit', size: 13, weight: 'bold' },
+          bodyFont: { family: 'Plus Jakarta Sans', size: 12 },
+          callbacks: {
+            title: function(context) {
+              const dateStr = context[0].label;
+              return formatDateCleanly(dateStr);
+            },
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              if (context.parsed.y !== null) {
+                label += context.parsed.y.toFixed(2) + '%';
+              }
+              return label;
+            },
+            footer: function(context) {
+              if (context.length >= 3) {
+                const combinedVal = context[1].parsed.y;
+                const benchVal = context[2].parsed.y;
+                const gap = combinedVal - benchVal;
+                const sign = gap >= 0 ? '+' : '';
+                return `Combined Gap: ${sign}${gap.toFixed(2)}%`;
+              } else if (context.length === 2) {
+                const portVal = context[0].parsed.y;
+                const benchVal = context[1].parsed.y;
+                const gap = portVal - benchVal;
+                const sign = gap >= 0 ? '+' : '';
+                return `Gap: ${sign}${gap.toFixed(2)}%`;
+              }
+              return '';
+            }
+          },
+          footerColor: function(context) {
+            if (context.length >= 3) {
+              const combinedVal = context[1].parsed.y;
+              const benchVal = context[2].parsed.y;
+              return (combinedVal - benchVal >= 0) ? '#10b981' : '#ef4444';
+            } else if (context.length === 2) {
+              const portVal = context[0].parsed.y;
+              const benchVal = context[1].parsed.y;
+              return (portVal - benchVal >= 0) ? '#10b981' : '#ef4444';
+            }
+            return '#94a3b8';
+          },
+          footerFont: { family: 'Outfit', size: 12, weight: 'bold' }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            color: textSecondary,
+            font: { family: 'Plus Jakarta Sans', size: 10 },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 6,
+            callback: function(value, index, values) {
+              const label = this.getLabelForValue(value);
+              return formatDateCleanly(label);
+            }
+          }
+        },
+        y: {
+          grid: {
+            color: 'rgba(255, 255, 255, 0.04)'
+          },
+          ticks: {
+            color: textSecondary,
+            font: { family: 'Plus Jakarta Sans', size: 10 }
+          }
+        }
+      }
+    }
+  });
+}
+
+function setPeriod(period) {
+  activePeriod = period;
+  
+  // Update UI active buttons
+  const buttons = document.querySelectorAll(".perf-period-btn");
+  buttons.forEach(btn => {
+    if (btn.id === `perf-btn-${period}`) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+  
+  fetchPerformanceData();
+}
+
+function setBenchmark(benchmark) {
+  activeBenchmark = benchmark;
+  fetchPerformanceData();
+}
+
+
+// ─── SECTOR CONTRIBUTION TO RETURNS FUNCTIONS ───────────────────────────────
+async function fetchSectorContributionData() {
+  const loader = document.getElementById("contrib-loading");
+  const chartContainer = document.getElementById("contrib-chart-container");
+  const summaryRow = document.getElementById("contrib-summary-row");
+  const emptyState = document.getElementById("contrib-empty-state");
+  
+  if (loader) loader.style.display = "flex";
+  if (chartContainer) chartContainer.style.display = "none";
+  if (summaryRow) summaryRow.style.display = "none";
+  if (emptyState) emptyState.style.display = "none";
+  
+  try {
+    const res = await fetch(`/api/portfolio/sector-contribution?period=${activeContribPeriod}&benchmark=${activeBenchmark}`);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to fetch sector attribution data");
+    }
+    const data = await res.json();
+    
+    renderSectorContributionChart(data);
+  } catch (err) {
+    console.error("Error loading sector contribution:", err);
+    if (loader) {
+      loader.innerHTML = `<span style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || "Failed to load sector attribution."}</span>`;
+    }
+  }
+}
+
+function getSectorBaseColor(sectorName) {
+  const colors = {
+    'Banking & Finance': 'rgba(59, 130, 246, 0.75)',       // blue
+    'Financial Services': 'rgba(59, 130, 246, 0.75)',      // blue
+    'Financials': 'rgba(59, 130, 246, 0.75)',              // blue
+    'Communication Services': 'rgba(168, 85, 247, 0.75)',  // purple
+    'Communication': 'rgba(168, 85, 247, 0.75)',           // purple
+    'Energy': 'rgba(249, 115, 22, 0.75)',                  // orange
+    'Materials': 'rgba(20, 184, 166, 0.75)',                 // teal
+    'Basic Materials': 'rgba(20, 184, 166, 0.75)',          // teal
+    'Consumer Discretionary': 'rgba(234, 179, 8, 0.75)',   // yellow
+    'Consumer Cyclical': 'rgba(234, 179, 8, 0.75)',        // yellow
+    'Utilities': 'rgba(16, 185, 129, 0.75)',               // green
+    'Industrials': 'rgba(236, 72, 153, 0.75)',             // pink
+    'Healthcare': 'rgba(217, 70, 239, 0.75)',              // fuchsia
+    'Technology': 'rgba(79, 70, 229, 0.75)',              // indigo
+    'Real Estate': 'rgba(139, 92, 246, 0.75)',             // violet
+    'Consumer Defensive': 'rgba(244, 63, 94, 0.75)'        // rose
+  };
+  return colors[sectorName] || 'rgba(148, 163, 184, 0.75)'; // default slate
+}
+
+function getSectorColor(sectorName, isNegative = false) {
+  if (isNegative) {
+    return 'rgba(239, 68, 68, 0.75)'; // Red is reserved strictly for negative return segments only
+  }
+  return getSectorBaseColor(sectorName);
+}
+
+function formatINRNoSymbol(val) {
+  return Math.abs(val).toLocaleString('en-IN', {
+    maximumFractionDigits: 0
+  });
+}
+
+function externalTooltipHandler(context) {
+  // Tooltip Element
+  let tooltipEl = document.getElementById('chartjs-tooltip');
+
+  // Create element on first render
+  if (!tooltipEl) {
+    tooltipEl = document.createElement('div');
+    tooltipEl.id = 'chartjs-tooltip';
+    tooltipEl.style.background = 'rgba(15, 23, 42, 0.96)';
+    tooltipEl.style.borderRadius = '12px';
+    tooltipEl.style.color = '#94a3b8';
+    tooltipEl.style.opacity = 1;
+    tooltipEl.style.pointerEvents = 'none';
+    tooltipEl.style.position = 'absolute';
+    tooltipEl.style.transition = 'all .08s ease';
+    tooltipEl.style.border = '1px solid rgba(255, 255, 255, 0.12)';
+    tooltipEl.style.padding = '12px';
+    tooltipEl.style.zIndex = '9999';
+    tooltipEl.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.5)';
+    tooltipEl.style.fontSize = '12px';
+    tooltipEl.style.fontFamily = '"Plus Jakarta Sans", sans-serif';
+    document.body.appendChild(tooltipEl);
+  }
+
+  // Hide if no tooltip
+  const tooltipModel = context.tooltip;
+  if (tooltipModel.opacity === 0) {
+    tooltipEl.style.opacity = 0;
+    return;
+  }
+
+  // Set Text content
+  if (tooltipModel.body) {
+    const dataset = context.chart.data.datasets[tooltipModel.dataPoints[0].datasetIndex];
+    const sec = dataset.sectorRawData;
+    if (sec) {
+      const sign = sec.return_pct >= 0 ? '+' : '';
+      const rupeesSign = sec.contrib_rupees >= 0 ? '+' : '';
+      
+      const posColor = '#10b981';
+      const negColor = '#ef4444';
+      
+      let innerHtml = `
+        <div style="font-weight: bold; font-family: 'Outfit'; font-size: 13px; color: #f8fafc; margin-bottom: 6px; display: flex; align-items: center; gap: 0.4rem;">
+          <span>📁 Sector: ${sec.sector}</span>
+        </div>
+        <div style="margin-bottom: 4px;">💼 Portfolio Weight: <strong>${sec.weight_pct.toFixed(2)}%</strong></div>
+        <div style="margin-bottom: 4px;">📈 Sector Return: <strong style="color: ${sec.return_pct >= 0 ? posColor : negColor};">${sign}${sec.return_pct.toFixed(2)}%</strong></div>
+        <div style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+          🎯 Contribution: <strong style="color: ${sec.contrib_pct >= 0 ? posColor : negColor};">${sec.contrib_pct >= 0 ? '+' : ''}${sec.contrib_pct.toFixed(2)}% (${rupeesSign}₹${formatINRNoSymbol(sec.contrib_rupees)})</strong>
+        </div>
+        <div style="font-weight: bold; color: #f8fafc; margin-bottom: 4px; font-size: 11px;">Holdings Detail:</div>
+        <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px;">
+      `;
+      
+      sec.stocks.forEach(st => {
+        const stSign = st.return_pct >= 0 ? '+' : '';
+        const stRupeesSign = st.contrib_rupees >= 0 ? '+' : '';
+        innerHtml += `
+          <li style="font-size: 11px; display: flex; justify-content: space-between; gap: 1.5rem;">
+            <span style="color:#e2e8f0;">• ${st.name}</span>
+            <span>
+              <span style="color: ${st.return_pct >= 0 ? posColor : negColor}; font-weight:600;">${stSign}${st.return_pct.toFixed(2)}%</span>
+              <small style="color: #94a3b8; font-weight:normal;">(${stRupeesSign}₹${formatINRNoSymbol(st.contrib_rupees)})</small>
+            </span>
+          </li>
+        `;
+      });
+      
+      innerHtml += '</ul>';
+      tooltipEl.innerHTML = innerHtml;
+    }
+  }
+
+  const position = context.chart.canvas.getBoundingClientRect();
+
+  // Position calculation with right-edge screen overflow check
+  tooltipEl.style.opacity = 1;
+  const tooltipWidth = tooltipEl.offsetWidth;
+  const viewportWidth = window.innerWidth;
+  
+  let leftPos = window.pageXOffset + position.left + tooltipModel.caretX + 15;
+  if (leftPos + tooltipWidth > viewportWidth - 20) {
+    leftPos = window.pageXOffset + position.left + tooltipModel.caretX - tooltipWidth - 15;
+  }
+  
+  tooltipEl.style.left = leftPos + 'px';
+  tooltipEl.style.top = window.pageYOffset + position.top + tooltipModel.caretY - 40 + 'px';
+}
+
+function renderSectorContributionChart(data) {
+  const ctx = document.getElementById('chart-sector-contribution');
+  if (!ctx) return;
+  
+  if (sectorContribChart) {
+    sectorContribChart.destroy();
+  }
+  
+  // Clean elements
+  const loader = document.getElementById("contrib-loading");
+  const chartContainer = document.getElementById("contrib-chart-container");
+  const summaryRow = document.getElementById("contrib-summary-row");
+  const emptyState = document.getElementById("contrib-empty-state");
+  const legendBox = document.getElementById("contrib-legend");
+  
+  // Sort sectors based on active sorting mode
+  let sortedSectors = [...data.sectors];
+  if (contribSortMode === 'contribution') {
+    sortedSectors.sort((a, b) => b.contrib_pct - a.contrib_pct);
+  } else {
+    sortedSectors.sort((a, b) => a.sector.localeCompare(b.sector));
+  }
+  
+  // Empty State Check: If only 1 sector exists, show the requested empty state
+  if (sortedSectors.length <= 1) {
+    if (loader) loader.style.display = "none";
+    if (chartContainer) chartContainer.style.display = "none";
+    if (summaryRow) summaryRow.style.display = "none";
+    if (legendBox) legendBox.style.display = "none";
+    if (emptyState) emptyState.style.display = "flex";
+    return;
+  } else {
+    if (loader) loader.style.display = "none";
+    if (emptyState) emptyState.style.display = "none";
+    if (chartContainer) chartContainer.style.display = "block";
+    if (summaryRow) summaryRow.style.display = "grid";
+    if (legendBox) {
+      legendBox.style.display = "flex";
+      legendBox.innerHTML = sortedSectors.map(sec => {
+        const isNeg = sec.contrib_pct < 0;
+        const color = getSectorColor(sec.sector, isNeg);
+        const sign = sec.contrib_pct >= 0 ? '+' : '';
+        const rupeesSign = sec.contrib_rupees >= 0 ? '₹' : '-₹';
+        const rupeesVal = formatINRNoSymbol(Math.abs(sec.contrib_rupees));
+        return `
+          <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${color};"></span>
+            <span style="color: var(--text-secondary);">${sec.sector} | <strong style="color: ${isNeg ? '#f87171' : '#34d399'}">${sign}${sec.contrib_pct.toFixed(2)}%</strong> | <span style="color: var(--text-primary); font-family: 'Outfit'; font-size: 0.8rem;">${rupeesSign}${rupeesVal}</span></span>
+          </div>
+        `;
+      }).join("");
+    }
+  }
+  
+  // CSS Vars for styling tooltips
+  const cssVars = getComputedStyle(document.body);
+  const textPrimary = cssVars.getPropertyValue('--text-primary').trim() || '#f8fafc';
+  const textSecondary = cssVars.getPropertyValue('--text-secondary').trim() || '#94a3b8';
+  
+  // Update summary stats
+  document.getElementById("contrib-summary-portfolio").innerText = `${data.portfolio_return_pct >= 0 ? '+' : ''}${data.portfolio_return_pct.toFixed(2)}%`;
+  document.getElementById("contrib-summary-portfolio").className = data.portfolio_return_pct >= 0 ? 'positive' : 'negative';
+  
+  document.getElementById("contrib-summary-bench-name").innerText = `${data.benchmark_name} Return`;
+  document.getElementById("contrib-summary-bench").innerText = `${data.benchmark_return_pct >= 0 ? '+' : ''}${data.benchmark_return_pct.toFixed(2)}%`;
+  document.getElementById("contrib-summary-bench").className = data.benchmark_return_pct >= 0 ? 'positive' : 'negative';
+  
+  document.getElementById("contrib-summary-alpha").innerText = `${data.alpha >= 0 ? '+' : ''}${data.alpha.toFixed(2)}%`;
+  document.getElementById("contrib-summary-alpha").className = data.alpha >= 0 ? 'positive' : 'negative';
+  
+  // Build Chart.js horizontal stacked datasets
+  const datasets = sortedSectors.map(sec => {
+    const isNeg = sec.contrib_pct < 0;
+    const color = getSectorColor(sec.sector, isNeg);
+    
+    // Ensure thin visible sliver for near-zero contributions (min +/- 0.18% display value)
+    const originalValue = sec.contrib_pct;
+    let displayValue = originalValue;
+    const minVisPct = 0.18;
+    if (Math.abs(originalValue) < minVisPct) {
+      displayValue = originalValue >= 0 ? minVisPct : -minVisPct;
+    }
+    
+    return {
+      label: sec.sector,
+      data: [displayValue],
+      backgroundColor: color,
+      borderColor: color.replace('0.75', '1.0').replace('0.22', '0.6'),
+      borderWidth: 1,
+      stack: 'stack1',
+      sectorRawData: sec,
+      originalValue: originalValue
+    };
+  });
+  
+  // Inline Custom Plugin to render sector labels inside segments if they fit
+  const segmentLabelsPlugin = {
+    id: 'segmentLabels',
+    afterDatasetDraw(chart, args, options) {
+      const { ctx } = chart;
+      const meta = args.meta;
+      const dataset = chart.data.datasets[args.index];
+      const rawData = dataset.sectorRawData;
+      if (!rawData) return;
+
+      const element = meta.data[0];
+      if (!element) return;
+
+      // Midpoint coordinate and width of horizontal bar segment
+      const x = element.x;
+      const base = element.base;
+      const midX = (base + x) / 2;
+      const y = element.y;
+      const segmentWidth = Math.abs(x - base);
+
+      // Save canvas state
+      ctx.save();
+      ctx.font = 'bold 10px "Plus Jakarta Sans"';
+      const pct = rawData.contrib_pct;
+      const text = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+
+      // Font padding check to guarantee no fonts ever overlap
+      if (segmentWidth > 40) {
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Smooth shadow for perfect readability on all gradients
+        ctx.shadowColor = 'rgba(15, 23, 42, 0.75)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+
+        ctx.fillText(text, midX, y);
+      }
+      ctx.restore();
+    }
+  };
+  
+  sectorContribChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Contribution'],
+      datasets: datasets
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      hover: {
+        mode: 'dataset',
+        intersect: true
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: {
+            color: 'rgba(255, 255, 255, 0.04)'
+          },
+          ticks: {
+            color: textSecondary,
+            font: { family: 'Plus Jakarta Sans', size: 10 },
+            callback: function(value) {
+              return (value >= 0 ? '+' : '') + value.toFixed(1) + '%';
+            }
+          }
+        },
+        y: {
+          stacked: true,
+          display: false
+        }
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          enabled: false,
+          external: externalTooltipHandler
+        }
+      }
+    },
+    plugins: [segmentLabelsPlugin]
+  });
+}
+
+function setContribPeriod(period) {
+  activeContribPeriod = period;
+  
+  // Update UI active buttons
+  const buttons = document.querySelectorAll("#widget-sector-contribution-chart .perf-period-btn");
+  buttons.forEach(btn => {
+    if (btn.id === `contrib-btn-${period}`) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+  
+  fetchSectorContributionData();
+}
+
+function toggleContribSorting() {
+  const btn = document.getElementById("contrib-sort-btn");
+  if (contribSortMode === 'contribution') {
+    contribSortMode = 'sector';
+    btn.innerHTML = `<i class="fa-solid fa-sort-alpha-down"></i> Sort: Sector`;
+  } else {
+    contribSortMode = 'contribution';
+    btn.innerHTML = `<i class="fa-solid fa-sort-amount-down"></i> Sort: Contribution`;
+  }
+  
+  // Re-fetch or re-render
+  fetchSectorContributionData();
+}
+
+
+
+// RENDER STOCKS GRID WITH CUSTOM COLUMNS
+function renderStocksTable() {
+  if (!portfolioData) return;
+  
+  const headersRow = document.getElementById("stocks-table-headers");
+  const body = document.getElementById("stocks-table-body");
+  headersRow.innerHTML = "";
+  body.innerHTML = "";
+  
+  // Determine visible columns from user config or default
+  const visCols = appConfig ? appConfig.display_columns.stocks : ALL_STOCK_COLUMNS;
+  
+  // Generate Table Headers
+  visCols.forEach(col => {
+    const th = document.createElement("th");
+    th.innerText = col;
+    headersRow.appendChild(th);
+  });
+  
+  // Add Actions header
+  const thActions = document.createElement("th");
+  thActions.innerText = "Actions";
+  headersRow.appendChild(thActions);
+  
+  // Generate rows
+  if (portfolioData.stocks.length === 0) {
+    body.innerHTML = `<tr><td colspan="${visCols.length + 1}" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No stock holdings in Excel file. Click 'Add New Stock' to insert!</td></tr>`;
+    return;
+  }
+  
+  portfolioData.stocks.forEach(s => {
+    const tr = document.createElement("tr");
+    tr.id = `stock-row-${s.row_idx}`;
+    
+    visCols.forEach(col => {
+      const td = document.createElement("td");
+      const rawVal = s[col];
+      
+      // Formatting cells beautifully
+      if (col === "Scrip Name") {
+        td.innerHTML = `<strong>${rawVal}</strong>`;
+      } else if (col === "Exchange" || col === "Sector") {
+        td.innerText = rawVal || "-";
+        td.style.color = "var(--text-secondary)";
+      } else if (col === "Qty") {
+        td.innerText = rawVal.toLocaleString();
+      } else if (col === "Buy Price" || col === "Current Price" || col === "Invested Value" || col === "Current Value" || col === "Dividends") {
+        td.innerText = formatINR(rawVal);
+      } else if (col === "P&L" || col === "Total Return") {
+        td.innerText = formatINR(rawVal);
+        td.className = rawVal >= 0 ? 'positive' : 'negative';
+      } else if (col === "Return %" || col === "5Y CAGR" || col === "Nifty 5Y CAGR") {
+        if (rawVal !== null && rawVal !== undefined && !isNaN(rawVal)) {
+          td.innerText = `${rawVal.toFixed(2)}%`;
+          if (col === "Return %") td.className = rawVal >= 0 ? 'positive' : 'negative';
+        } else {
+          td.innerText = "N/A";
+        }
+      } else if (col === "Tax Flag") {
+        if (rawVal) {
+          td.innerHTML = `<span class="badge ${rawVal.toLowerCase()}">${rawVal}</span>`;
+        } else {
+          td.innerText = "-";
+        }
+      } else {
+        td.innerText = rawVal !== null ? rawVal : "-";
+      }
+      
+      tr.appendChild(td);
+    });
+    
+    // Add edit/delete buttons
+    const tdActions = document.createElement("td");
+    tdActions.innerHTML = `
+      <div style="display: flex; gap: 0.5rem;">
+        <button class="btn btn-secondary btn-sm" onclick="openEditStockModal(${JSON.stringify(s).replace(/"/g, '&quot;')})" title="Edit"><i class="fa-solid fa-edit"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="deleteStockHolding(${s.row_idx})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    `;
+    tr.appendChild(tdActions);
+    body.appendChild(tr);
+  });
+}
+
+// FILTER TABLES
+function filterStocksTable() {
+  const q = document.getElementById("stock-search").value.toLowerCase();
+  const rows = document.querySelectorAll("#stocks-table-body tr");
+  
+  rows.forEach(row => {
+    const text = row.innerText.toLowerCase();
+    row.style.display = text.includes(q) ? "" : "none";
+  });
+}
+
+// RENDER MUTUAL FUNDS GRID
+let mfSortCol = null;
+let mfSortDir = 1; // 1 = asc, -1 = desc
+
+function renderMfsTable() {
+  if (!portfolioData) return;
+  
+  const headersRow = document.getElementById("mfs-table-headers");
+  const body = document.getElementById("mfs-table-body");
+  headersRow.innerHTML = "";
+  body.innerHTML = "";
+  
+  // Always use the canonical MF columns (not appConfig customizable for now)
+  const visCols = ALL_MF_COLUMNS;
+  
+  // Build sortable headers
+  visCols.forEach(col => {
+    const th = document.createElement("th");
+    th.className = "th-sortable";
+    th.dataset.col = col;
+    
+    // Nice display labels
+    const labels = {
+      "Fund Name": "Fund Name",
+      "Category": "Category",
+      "Units Held": "Units",
+      "Invested Value": "Invested",
+      "Current Value": "Current Value",
+      "P&L": "P&L",
+      "Absolute Return %": "Abs. Return %",
+      "XIRR %": "XIRR %",
+      "Holding Period": "Holding Period",
+      "Tax Flag": "Tax Type"
+    };
+    th.innerText = labels[col] || col;
+    
+    if (mfSortCol === col) th.classList.add(mfSortDir === 1 ? "th-asc" : "th-desc");
+    
+    th.addEventListener("click", () => {
+      if (mfSortCol === col) mfSortDir *= -1;
+      else { mfSortCol = col; mfSortDir = 1; }
+      renderMfsTable();
+    });
+    headersRow.appendChild(th);
+  });
+  
+  const thActions = document.createElement("th");
+  thActions.innerText = "Actions";
+  headersRow.appendChild(thActions);
+  
+  if (portfolioData.mfs.length === 0) {
+    body.innerHTML = `<tr><td colspan="${visCols.length + 1}" style="text-align: center; color: var(--text-secondary); padding: 3rem 1rem;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;">
+        <i class="fa-solid fa-folder-open" style="font-size:2rem;opacity:0.3;"></i>
+        <p style="margin:0;font-size:0.95rem;">No mutual funds added yet.</p>
+        <button class="btn btn-secondary btn-sm" onclick="openAddMfModal()"><i class="fa-solid fa-plus"></i> Add New Fund</button>
+      </div>
+    </td></tr>`;
+    renderMfSummaryFooter();
+    return;
+  }
+  
+  // Sort data
+  let mfRows = [...portfolioData.mfs];
+  if (mfSortCol) {
+    mfRows.sort((a, b) => {
+      let aVal = mfSortCol === "Holding Period" ? (a["Holding Period Yrs"] ?? 0) : (a[mfSortCol] ?? "");
+      let bVal = mfSortCol === "Holding Period" ? (b["Holding Period Yrs"] ?? 0) : (b[mfSortCol] ?? "");
+      if (typeof aVal === "string") aVal = aVal.toLowerCase();
+      if (typeof bVal === "string") bVal = bVal.toLowerCase();
+      if (aVal < bVal) return -mfSortDir;
+      if (aVal > bVal) return mfSortDir;
+      return 0;
+    });
+  }
+  
+  mfRows.forEach(m => {
+    const tr = document.createElement("tr");
+    tr.id = `mf-row-${m.row_idx}`;
+    tr.dataset.category = (m["Category"] || "").toLowerCase();
+    tr.dataset.taxflag = (m["Tax Flag"] || "").toLowerCase();
+    
+    visCols.forEach(col => {
+      const td = document.createElement("td");
+      
+      if (col === "Fund Name") {
+        td.innerHTML = `<span class="mf-fund-link" onclick="openMfDetailDrawer(${JSON.stringify(m).replace(/"/g, '&quot;')})">${m["Fund Name"]}</span>`;
+        
+      } else if (col === "Category") {
+        td.innerText = m["Category"] || "—";
+        td.style.color = "var(--text-secondary)";
+        
+      } else if (col === "Units Held") {
+        td.innerText = (m["Units Held"] || 0).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+        
+      } else if (col === "Invested Value" || col === "Current Value") {
+        td.innerText = formatINR(m[col]);
+        
+      } else if (col === "P&L") {
+        const pnl = m["P&L"];
+        td.innerText = formatINR(pnl);
+        td.className = pnl >= 0 ? "positive" : "negative";
+        
+      } else if (col === "Absolute Return %") {
+        const ret = m["Absolute Return %"];
+        if (ret !== null && ret !== undefined) {
+          td.innerText = `${ret >= 0 ? "+" : ""}${ret.toFixed(2)}%`;
+          td.className = ret >= 0 ? "positive" : "negative";
+        } else {
+          td.innerText = "N/A";
+        }
+        
+      } else if (col === "XIRR %") {
+        const xirr = m["XIRR %"];
+        if (xirr === null || xirr === undefined) {
+          td.innerText = "—";
+          td.style.color = "var(--text-secondary)";
+          td.title = "XIRR unavailable (holding period < 7 days or insufficient data)";
+        } else {
+          td.innerText = `${xirr >= 0 ? "+" : ""}${xirr.toFixed(2)}%`;
+          td.className = xirr >= 0 ? "positive" : "negative";
+        }
+        
+      } else if (col === "Holding Period") {
+        const yrs = m["Holding Period Yrs"] || 0;
+        const type = m["Holding Type"] || "ST";
+        const badgeClass = type === "LT" ? "badge-lt" : "badge-st";
+        td.innerHTML = `${yrs.toFixed(2)} Yrs<span class="${badgeClass}">${type}</span>`;
+        
+      } else if (col === "Tax Flag") {
+        const flag = m["Tax Flag"] || "";
+        const est = m["Estimated Tax"] || 0;
+        const taxLabel = flag === "LTCG" ? "LTCG" : (flag === "STCG" ? "STCG" : flag);
+        const badgeCls = flag === "LTCG" ? "ltcg" : "stcg";
+        const rateHint = flag === "LTCG" ? "12.5% above ₹1.25L" : "20% flat";
+        td.innerHTML = `<span class="badge ${badgeCls}" title="Est. tax if redeemed today: ${formatINR(est)} (${rateHint})">${taxLabel}</span>`;
+        
+      } else {
+        td.innerText = m[col] !== null && m[col] !== undefined ? m[col] : "—";
+      }
+      
+      tr.appendChild(td);
+    });
+    
+    const tdActions = document.createElement("td");
+    const mJson = JSON.stringify(m).replace(/"/g, '&quot;');
+    tdActions.innerHTML = `
+      <div style="display: flex; gap: 0.5rem;">
+        <button class="btn btn-secondary btn-sm" onclick="openMfDetailDrawer(${mJson})" title="View Details"><i class="fa-solid fa-eye"></i></button>
+        <button class="btn btn-secondary btn-sm" onclick="openEditMfModal(${mJson})" title="Edit"><i class="fa-solid fa-edit"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMfHolding(${m.row_idx})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    `;
+    tr.appendChild(tdActions);
+    body.appendChild(tr);
+  });
+  
+  renderMfSummaryFooter();
+  filterMfsTable();
+}
+
+function renderMfSummaryFooter() {
+  const footer = document.getElementById("mf-summary-footer");
+  if (!footer || !portfolioData) return;
+  
+  const mfs = portfolioData.mfs;
+  if (mfs.length === 0) { footer.style.display = "none"; return; }
+  
+  const s = portfolioData.summary;
+  const pnl = s.total_mf_pnl;
+  
+  footer.style.display = "flex";
+  document.getElementById("mf-sum-invested").innerText = formatINR(s.total_mf_invested);
+  document.getElementById("mf-sum-value").innerText = formatINR(s.total_mf_value);
+  const pnlEl = document.getElementById("mf-sum-pnl");
+  pnlEl.innerText = `${formatINR(pnl)} (${s.total_mf_return_pct.toFixed(2)}%)`;
+  pnlEl.style.color = pnl >= 0 ? "var(--positive)" : "var(--negative)";
+  document.getElementById("mf-sum-stcg").innerText = formatINR(s.total_mf_stcg_tax || 0);
+  document.getElementById("mf-sum-ltcg").innerText = formatINR(s.total_mf_ltcg_tax || 0);
+}
+
+function openMfDetailDrawer(m) {
+  const drawer = document.getElementById("mf-detail-drawer");
+  const overlay = document.getElementById("mf-drawer-overlay");
+  const body = document.getElementById("mf-drawer-body");
+  
+  document.getElementById("mf-drawer-title").innerText = m["Fund Name"];
+  document.getElementById("mf-drawer-subtitle").innerText = `${m["AMC"] || "—"}  ·  ${m["Category"] || "—"}`;
+  
+  const pnl = m["P&L"] || 0;
+  const pnlColor = pnl >= 0 ? "var(--positive)" : "var(--negative)";
+  const xirr = m["XIRR %"];
+  const xirrStr = (xirr === null || xirr === undefined) ? "—" : `${xirr >= 0 ? "+" : ""}${xirr.toFixed(2)}%`;
+  const rateHint = m["Tax Flag"] === "LTCG" ? "12.5% above ₹1.25L exemption" : "20% flat";
+
+  body.innerHTML = `
+    <div class="mf-drawer-section-title">Fund Identity</div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Fund Name</span><span class="mf-drawer-value" style="max-width:240px;text-align:right;line-height:1.4;">${m["Fund Name"]}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">AMC</span><span class="mf-drawer-value">${m["AMC"] || "—"}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Category</span><span class="mf-drawer-value">${m["Category"] || "—"}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Sub-Category</span><span class="mf-drawer-value">${m["Sub-Category"] || "—"}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Investment Type</span><span class="mf-drawer-value">${m["Investment Type"] || "Lumpsum"}</span></div>
+
+    <div class="mf-drawer-section-title">NAV & Units</div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Buy NAV</span><span class="mf-drawer-value">${formatINR(m["Buy NAV"])}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Current NAV</span><span class="mf-drawer-value">${formatINR(m["Current NAV"])}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Units Held</span><span class="mf-drawer-value">${(m["Units Held"] || 0).toLocaleString(undefined, {minimumFractionDigits:3, maximumFractionDigits:3})}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Purchase Date</span><span class="mf-drawer-value">${m["Buy Date"] || "—"}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Holding Period</span><span class="mf-drawer-value">${(m["Holding Period Yrs"] || 0).toFixed(2)} Yrs <span class="${m["Holding Type"] === "LT" ? "badge-lt" : "badge-st"}">${m["Holding Type"] || "ST"}</span></span></div>
+
+    <div class="mf-drawer-section-title">Returns</div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Invested Amount</span><span class="mf-drawer-value">${formatINR(m["Invested Value"])}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Current Value</span><span class="mf-drawer-value">${formatINR(m["Current Value"])}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Unrealised P&L</span><span class="mf-drawer-value" style="color:${pnlColor}">${formatINR(pnl)}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Absolute Return %</span><span class="mf-drawer-value ${pnl >= 0 ? "positive" : "negative"}">${m["Absolute Return %"] !== null ? (m["Absolute Return %"] >= 0 ? "+" : "") + m["Absolute Return %"].toFixed(2) + "%" : "N/A"}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">XIRR % (Annualised)</span><span class="mf-drawer-value ${xirr !== null && xirr !== undefined ? (xirr >= 0 ? "positive" : "negative") : ""}">${xirrStr}</span></div>
+
+    <div class="mf-drawer-section-title">Tax & Fund Info</div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Tax Classification</span><span class="mf-drawer-value"><span class="badge ${(m["Tax Flag"] || "").toLowerCase()}">${m["Tax Flag"] || "—"}</span></span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Est. Tax if Redeemed</span><span class="mf-drawer-value" style="color:#fb923c;">${formatINR(m["Estimated Tax"] || 0)} <small style="font-weight:400;color:var(--text-secondary);">(${rateHint})</small></span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Expense Ratio</span><span class="mf-drawer-value">${m["Expense Ratio %"] ? m["Expense Ratio %"].toFixed(2) + "%" : "—"}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Benchmark 1Y Return</span><span class="mf-drawer-value">${m["Benchmark 1Y Return %"] !== null && m["Benchmark 1Y Return %"] !== undefined ? m["Benchmark 1Y Return %"].toFixed(2) + "%" : "—"}</span></div>
+  `;
+  
+  // Wire up Edit button
+  document.getElementById("mf-drawer-edit-btn").onclick = () => {
+    closeMfDetailDrawer();
+    openEditMfModal(m);
+  };
+  
+  drawer.classList.add("open");
+  overlay.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeMfDetailDrawer() {
+  document.getElementById("mf-detail-drawer").classList.remove("open");
+  document.getElementById("mf-drawer-overlay").classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+function filterMfsTable() {
+  const q = (document.getElementById("mf-search")?.value || "").toLowerCase();
+  const catFilter = (document.getElementById("mf-category-filter")?.value || "").toLowerCase();
+  const taxFilter = (document.getElementById("mf-tax-filter")?.value || "").toLowerCase();
+  
+  const rows = document.querySelectorAll("#mfs-table-body tr");
+  rows.forEach(row => {
+    const text = row.innerText.toLowerCase();
+    const cat = (row.dataset.category || "").toLowerCase();
+    const tax = (row.dataset.taxflag || "").toLowerCase();
+    
+    const matchQ = !q || text.includes(q);
+    const matchCat = !catFilter || cat.includes(catFilter);
+    const matchTax = !taxFilter || tax === taxFilter;
+    
+    row.style.display = (matchQ && matchCat && matchTax) ? "" : "none";
+  });
+}
+
+
+
+// RENDER RISK & SIGNALS GRID
+function renderRiskSignals() {
+  if (!portfolioData) return;
+  
+  const body = document.getElementById("signals-table-body");
+  if (!body) return;
+  body.innerHTML = "";
+  
+  const signals = portfolioData.signals || [];
+  
+  let gCount = 0;
+  let lCount = 0;
+  let underCount = 0;
+  
+  signals.forEach(s => {
+    const sig = s["Signal"] ? s["Signal"].toLowerCase() : "";
+    const priority = s["Priority"] ? s["Priority"].toLowerCase() : "";
+    const ret = s["Return %"];
+    
+    // Increment counts for the summary widget cards
+    if (sig.includes("strong") || ret > 20) {
+      gCount++;
+    } else if (sig.includes("loss") || ret < 0) {
+      lCount++;
+    } else if (sig.includes("tiny") || priority.includes("medium") || priority.includes("high")) {
+      underCount++;
+    }
+  });
+
+  document.getElementById("signal-cnt-gainers").innerText = gCount;
+  document.getElementById("signal-cnt-losers").innerText = lCount;
+  document.getElementById("signal-cnt-under").innerText = underCount;
+  
+  if (signals.length === 0) {
+    body.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">No action signals found in Excel sheet. Check back later!</td></tr>`;
+    return;
+  }
+  
+  // Render table rows
+  signals.forEach(s => {
+    const tr = document.createElement("tr");
+    
+    // Styled rows based on priority levels
+    let rowClass = "";
+    let priorityBadge = "ltcg"; // blue
+    
+    if (s["Priority"].includes("HIGH")) {
+      rowClass = "priority-high-row";
+      priorityBadge = "stcg"; // red
+    } else if (s["Priority"].includes("MEDIUM")) {
+      rowClass = "priority-medium-row";
+      priorityBadge = "warning-badge"; // yellow badge
+    }
+    
+    if (rowClass) tr.className = rowClass;
+    
+    // 1. Scrip
+    const tdScrip = document.createElement("td");
+    tdScrip.innerHTML = `<strong>${s["Scrip Name"]}</strong>`;
+    tr.appendChild(tdScrip);
+    
+    // 2. Value
+    const tdVal = document.createElement("td");
+    tdVal.innerText = formatINR(s["Current Value"]);
+    tr.appendChild(tdVal);
+    
+    // 3. Return
+    const tdRet = document.createElement("td");
+    const rVal = s["Return %"];
+    if (typeof rVal === 'number') {
+      tdRet.innerText = `${rVal.toFixed(2)}%`;
+      tdRet.className = rVal >= 0 ? 'positive' : 'negative';
+    } else {
+      tdRet.innerText = rVal || "0.00%";
+    }
+    tr.appendChild(tdRet);
+    
+    // 4. Signal Type
+    const tdSig = document.createElement("td");
+    let sigBadgeClass = "badge ltcg";
+    if (s["Signal"].includes("Tiny")) sigBadgeClass = "badge warning-badge";
+    if (s["Signal"].includes("Loss")) sigBadgeClass = "badge stcg";
+    tdSig.innerHTML = `<span class="${sigBadgeClass}">${s["Signal"] || "Active"}</span>`;
+    tr.appendChild(tdSig);
+    
+    // 5. Priority Level
+    const tdPriority = document.createElement("td");
+    tdPriority.innerHTML = `<span class="badge ${priorityBadge}">${s["Priority"] || "LOW"}</span>`;
+    tr.appendChild(tdPriority);
+    
+    // 6. Action Recommendation
+    const tdAction = document.createElement("td");
+    tdAction.innerText = s["Recommended Action"] || "-";
+    tdAction.style.fontSize = "0.85rem";
+    tdAction.style.color = "var(--text-secondary)";
+    tr.appendChild(tdAction);
+    
+    body.appendChild(tr);
+  });
+}
+
+function filterSignalsTable() {
+  const q = document.getElementById("signal-search").value.toLowerCase();
+  const rows = document.querySelectorAll("#signals-table-body tr");
+  
+  rows.forEach(row => {
+    const text = row.innerText.toLowerCase();
+    row.style.display = text.includes(q) ? "" : "none";
+  });
+}
+
+// REAL-TIME CONCENTRATION & HIGH DRAWDOWN RISK ALERTS
+function evaluateRiskAlerts() {
+  const container = document.getElementById("alerts-container");
+  container.innerHTML = "";
+  if (!portfolioData || !appConfig) return;
+  
+  if (appConfig.widgets && appConfig.widgets.risk_alerts === false) {
+    return;
+  }
+  
+  const rules = appConfig.custom_alerts || { high_concentration_pct: 20, high_loss_pct: 10 };
+  const alerts = [];
+  
+  // 1. Sector Concentration Alerts
+  const sectorsMap = {};
+  const totalStockVal = portfolioData.summary.total_stock_value;
+  
+  if (totalStockVal > 0) {
+    portfolioData.stocks.forEach(s => {
+      const sec = s["Sector"] || "Other";
+      sectorsMap[sec] = (sectorsMap[sec] || 0) + s["Current Value"];
+    });
+    
+    Object.keys(sectorsMap).forEach(sec => {
+      const pct = (sectorsMap[sec] / totalStockVal) * 100;
+      if (pct > rules.high_concentration_pct) {
+        alerts.push({
+          severity: 'orange',
+          severityScore: 2,
+          html: `
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              <span><strong>Concentration Warning:</strong> Sector <strong>'${sec}'</strong> makes up <strong>${pct.toFixed(1)}%</strong> of your Stock portfolio (Threshold: ${rules.high_concentration_pct}%). Consider diversifying!</span>
+            </div>
+          `
+        });
+      }
+    });
+  }
+  
+  // 2. High Drawdown Stock Alerts (Severity-Sorted)
+  portfolioData.stocks.forEach(s => {
+    const ret = s["Return %"];
+    const lossPct = -ret; // positive percentage representing loss/drawdown
+    const drawdownDays = s["Drawdown Days"] || 0;
+    
+    let severity = null;
+    let score = 0;
+    let label = '';
+    let icon = '';
+    
+    if (lossPct > 20 || drawdownDays > 45) {
+      severity = 'red';
+      score = 3;
+      label = 'High Severity Drawdown';
+      icon = 'fa-solid fa-circle-exclamation';
+    } else if (lossPct > 10 || drawdownDays > 30) {
+      severity = 'orange';
+      score = 2;
+      label = 'Medium Severity Drawdown';
+      icon = 'fa-solid fa-triangle-exclamation';
+    } else if (lossPct > 5 || drawdownDays > 15) {
+      severity = 'yellow';
+      score = 1;
+      label = 'Low Severity Drawdown';
+      icon = 'fa-solid fa-circle-info';
+    }
+    
+    if (severity) {
+      const stockJson = JSON.stringify(s).replace(/"/g, '&quot;');
+      alerts.push({
+        severity: severity,
+        severityScore: score,
+        html: `
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <i class="${icon}"></i>
+            <span><strong>${label}:</strong> Position <strong>'${s["Scrip Name"]}'</strong> is down <strong>${lossPct.toFixed(1)}%</strong> (Drawdown: ${drawdownDays} consecutive days).</span>
+          </div>
+          <button class="alert-review-btn" onclick="openEditStockModal(${stockJson})"><i class="fa-solid fa-eye"></i> Review Holding</button>
+        `
+      });
+    }
+  });
+  
+  // Sort alerts: Red (3) -> Orange (2) -> Yellow (1)
+  alerts.sort((a, b) => b.severityScore - a.severityScore);
+  
+  // Render sorted alerts to container
+  alerts.forEach(alert => {
+    const div = document.createElement("div");
+    div.className = `alert-banner-${alert.severity}`;
+    div.innerHTML = alert.html;
+    container.appendChild(div);
+  });
+}
+
+// CONVERT TO FORMATTED INR
+function formatINR(val) {
+  if (val === null || val === undefined) return "₹0.00";
+  return "₹" + val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// STOCK CRUD MODAL INTERACTIONS
+function openAddStockModal() {
+  document.getElementById("modal-stock-title").innerText = "Add New Stock Holding";
+  document.getElementById("stock-form").reset();
+  document.getElementById("stock-row-idx").value = "";
+  document.getElementById("btn-stock-submit").innerText = "Add Holding";
+  document.getElementById("modal-stock").classList.add("active");
+}
+
+function openEditStockModal(s) {
+  document.getElementById("modal-stock-title").innerText = `Edit: ${s["Scrip Name"]}`;
+  document.getElementById("stock-row-idx").value = s.row_idx;
+  document.getElementById("stock-scrip").value = s["Scrip Name"] || "";
+  document.getElementById("stock-sector").value = s["Sector"] || "";
+  document.getElementById("stock-qty").value = s["Qty"];
+  document.getElementById("stock-buy-price").value = s["Buy Price"];
+  
+  document.getElementById("btn-stock-submit").innerText = "Save Changes";
+  document.getElementById("modal-stock").classList.add("active");
+}
+
+function closeStockModal() {
+  document.getElementById("modal-stock").classList.remove("active");
+}
+
+async function submitStockForm(e) {
+  e.preventDefault();
+  const rowIdx = document.getElementById("stock-row-idx").value;
+  const url = rowIdx ? '/api/stock/edit' : '/api/stock/add';
+  
+  const payload = {
+    row_idx: rowIdx,
+    "Company Name":       document.getElementById("stock-scrip").value.trim(),
+    "Sector":             document.getElementById("stock-sector").value.trim(),
+    "Total Quantity":     parseFloat(document.getElementById("stock-qty").value) || 0,
+    "Avg Trading Price":  parseFloat(document.getElementById("stock-buy-price").value) || 0,
+    // For edit compatibility — these map to the same fields the backend reads
+    "Scrip Name":         document.getElementById("stock-scrip").value.trim(),
+    "Exchange":           "NSE",
+    "Qty":                parseFloat(document.getElementById("stock-qty").value) || 0,
+    "Buy Price":          parseFloat(document.getElementById("stock-buy-price").value) || 0,
+    "Current Price":      parseFloat(document.getElementById("stock-buy-price").value) || 0,
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      closeStockModal();
+      await fetchPortfolio();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    alert("API connection failed. Ensure Flask app is running!");
+  }
+}
+
+// ─── CSV IMPORT MODAL ──────────────────────────────────────────────────────────
+let selectedCsvFile = null;
+
+function openImportCsvModal() {
+  clearCsvSelection();
+  document.getElementById("csv-import-result").style.display = "none";
+  document.getElementById("modal-import-csv").classList.add("active");
+}
+
+function closeImportCsvModal() {
+  document.getElementById("modal-import-csv").classList.remove("active");
+  clearCsvSelection();
+  document.getElementById("csv-import-result").style.display = "none";
+}
+
+function csvDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const zone = document.getElementById("csv-drop-zone");
+  zone.style.borderColor = "var(--accent)";
+  zone.style.background = "rgba(var(--accent-rgb), 0.1)";
+}
+
+function csvDragLeave(e) {
+  const zone = document.getElementById("csv-drop-zone");
+  zone.style.borderColor = "rgba(var(--accent-rgb), 0.5)";
+  zone.style.background = "rgba(var(--accent-rgb), 0.04)";
+}
+
+function csvDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  csvDragLeave(e);
+  const file = e.dataTransfer.files[0];
+  if (file) setCsvFile(file);
+}
+
+function csvFileSelected(e) {
+  const file = e.target.files[0];
+  if (file) setCsvFile(file);
+}
+
+function setCsvFile(file) {
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    showCsvResult(false, 'Invalid file type. Please select a .csv file.');
+    return;
+  }
+  selectedCsvFile = file;
+  document.getElementById("csv-filename").innerText = file.name;
+  document.getElementById("csv-filesize").innerText = `${(file.size / 1024).toFixed(1)} KB`;
+  document.getElementById("csv-file-preview").style.display = "block";
+  document.getElementById("btn-csv-import-submit").disabled = false;
+  document.getElementById("csv-import-result").style.display = "none";
+}
+
+function clearCsvSelection() {
+  selectedCsvFile = null;
+  document.getElementById("csv-file-input").value = "";
+  document.getElementById("csv-file-preview").style.display = "none";
+  document.getElementById("btn-csv-import-submit").disabled = true;
+}
+
+function showCsvResult(success, message) {
+  const el = document.getElementById("csv-import-result");
+  el.style.display = "block";
+  el.style.background = success
+    ? "rgba(16, 185, 129, 0.12)"
+    : "rgba(239, 68, 68, 0.12)";
+  el.style.border = success
+    ? "1px solid rgba(16, 185, 129, 0.35)"
+    : "1px solid rgba(239, 68, 68, 0.35)";
+  el.style.color = success ? "#10b981" : "#ef4444";
+  el.innerHTML = success
+    ? `<i class="fa-solid fa-circle-check"></i> ${message}`
+    : `<i class="fa-solid fa-circle-xmark"></i> ${message}`;
+}
+
+async function submitCsvImport() {
+  if (!selectedCsvFile) return;
+
+  const btn = document.getElementById("btn-csv-import-submit");
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing...';
+
+  try {
+    const formData = new FormData();
+    formData.append('file', selectedCsvFile);
+
+    const res = await fetch('/api/stock/import-csv', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      showCsvResult(true, data.message);
+      clearCsvSelection();
+      await fetchPortfolio();  // Refresh the table
+    } else {
+      showCsvResult(false, data.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-file-import"></i> Import Stocks';
+    }
+  } catch (err) {
+    showCsvResult(false, 'Network error. Make sure the Flask server is running.');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-file-import"></i> Import Stocks';
+  }
+}
+
+async function deleteStockHolding(rowIdx) {
+  if (!confirm("Are you sure you want to delete this stock from your portfolio and the underlying Excel file?")) return;
+  try {
+    const res = await fetch('/api/stock/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({row_idx: rowIdx})
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      await fetchPortfolio();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    console.error("Delete stock request failed", err);
+  }
+}
+
+// MUTUAL FUND CRUD MODAL INTERACTIONS
+function openAddMfModal() {
+  document.getElementById("modal-mf-title").innerText = "Add New Mutual Fund Holding";
+  document.getElementById("mf-form").reset();
+  document.getElementById("mf-row-idx").value = "";
+  document.getElementById("btn-mf-submit").innerText = "Add Fund";
+  document.getElementById("modal-mf").classList.add("active");
+}
+
+function openEditMfModal(m) {
+  document.getElementById("modal-mf-title").innerText = `Edit: ${m["Fund Name"]}`;
+  document.getElementById("mf-row-idx").value = m.row_idx;
+  document.getElementById("mf-name").value = m["Fund Name"] || "";
+  document.getElementById("mf-amc").value = m["AMC"] || "";
+  document.getElementById("mf-category").value = m["Category"] || "";
+  document.getElementById("mf-subcategory").value = m["Sub-Category"] || "";
+  document.getElementById("mf-units").value = m["Units Held"] || "";
+  document.getElementById("mf-buy-nav").value = m["Buy NAV"] || "";
+  document.getElementById("mf-buy-date").value = m["Buy Date"] || "";
+  document.getElementById("mf-current-nav").value = m["Current NAV"] || "";
+  document.getElementById("mf-benchmark").value = m["Benchmark 1Y Return %"] || "";
+  document.getElementById("mf-expense").value = m["Expense Ratio %"] || 0;
+  document.getElementById("mf-investment-type").value = m["Investment Type"] || "Lumpsum";
+  
+  document.getElementById("btn-mf-submit").innerText = "Save Changes";
+  document.getElementById("modal-mf").classList.add("active");
+}
+
+function closeMfModal() {
+  document.getElementById("modal-mf").classList.remove("active");
+}
+
+async function submitMfForm(e) {
+  e.preventDefault();
+  const rowIdx = document.getElementById("mf-row-idx").value;
+  const url = rowIdx ? '/api/mf/edit' : '/api/mf/add';
+  
+  const payload = {
+    row_idx: rowIdx,
+    "Fund Name": document.getElementById("mf-name").value,
+    AMC: document.getElementById("mf-amc").value,
+    Category: document.getElementById("mf-category").value,
+    "Sub-Category": document.getElementById("mf-subcategory").value,
+    "Units Held": document.getElementById("mf-units").value,
+    "Buy NAV": document.getElementById("mf-buy-nav").value,
+    "Buy Date": document.getElementById("mf-buy-date").value,
+    "Current NAV": document.getElementById("mf-current-nav").value || document.getElementById("mf-buy-nav").value,
+    "Benchmark 1Y Return %": document.getElementById("mf-benchmark").value,
+    "Expense Ratio %": document.getElementById("mf-expense").value,
+    "Investment Type": document.getElementById("mf-investment-type").value || "Lumpsum"
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      closeMfModal();
+      await fetchPortfolio();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    alert("API connection failed.");
+  }
+}
+
+async function deleteMfHolding(rowIdx) {
+  if (!confirm("Are you sure you want to delete this Mutual Fund holding from your portfolio?")) return;
+  try {
+    const res = await fetch('/api/mf/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({row_idx: rowIdx})
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      await fetchPortfolio();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    console.error("Delete fund failed", err);
+  }
+}
+
+// VISUAL SETTINGS PANEL logic
+function loadSettingsIntoForm() {
+  if (!appConfig) return;
+  
+  // Theme highlights
+  applyTheme(appConfig.theme);
+  
+  // Columns Checkboxes inside Settings
+  const stChecksContainer = document.getElementById("settings-stock-columns-checks");
+  const mfChecksContainer = document.getElementById("settings-mf-columns-checks");
+  stChecksContainer.innerHTML = "";
+  mfChecksContainer.innerHTML = "";
+  
+  ALL_STOCK_COLUMNS.forEach(col => {
+    const isChecked = appConfig.display_columns.stocks.includes(col);
+    const label = document.createElement("label");
+    label.className = "checkbox-label";
+    label.innerHTML = `<input type="checkbox" name="stock-col" value="${col}" ${isChecked ? 'checked' : ''}> ${col}`;
+    stChecksContainer.appendChild(label);
+  });
+
+  ALL_MF_COLUMNS.forEach(col => {
+    const isChecked = appConfig.display_columns.mf.includes(col);
+    const label = document.createElement("label");
+    label.className = "checkbox-label";
+    label.innerHTML = `<input type="checkbox" name="mf-col" value="${col}" ${isChecked ? 'checked' : ''}> ${col}`;
+    mfChecksContainer.appendChild(label);
+  });
+  
+  // Widgets toggles
+  document.getElementById("widget-check-sector").checked = appConfig.widgets.sector_allocation;
+  document.getElementById("widget-check-asset").checked = appConfig.widgets.asset_allocation;
+  document.getElementById("widget-check-leaders").checked = appConfig.widgets.top_performers;
+  document.getElementById("widget-check-underperformers").checked = (appConfig.widgets.top_underperformers !== false);
+  document.getElementById("widget-check-alerts").checked = (appConfig.widgets.risk_alerts !== false);
+  
+  // Tax flags days
+  document.getElementById("settings-stock-ltcg").value = appConfig.tax_rules.stocks_ltcg_days;
+  document.getElementById("settings-mf-ltcg").value = appConfig.tax_rules.mf_ltcg_days;
+  
+  // Custom limits
+  document.getElementById("settings-alert-concentration").value = appConfig.custom_alerts.high_concentration_pct;
+  document.getElementById("settings-alert-loss").value = appConfig.custom_alerts.high_loss_pct;
+}
+
+// SAVE CONFIGURATION SETTINGS
+async function saveCustomSettings(e) {
+  e.preventDefault();
+  
+  // Gather active Stock columns checkboxes
+  const stockCols = [];
+  document.querySelectorAll("input[name='stock-col']:checked").forEach(cb => {
+    stockCols.push(cb.value);
+  });
+  
+  // Gather active Mutual Fund columns checkboxes
+  const mfCols = [];
+  document.querySelectorAll("input[name='mf-col']:checked").forEach(cb => {
+    mfCols.push(cb.value);
+  });
+  
+  // Map payload
+  const payload = {
+    theme: activeTheme,
+    tax_rules: {
+      stocks_ltcg_days: parseInt(document.getElementById("settings-stock-ltcg").value),
+      mf_ltcg_days: parseInt(document.getElementById("settings-mf-ltcg").value)
+    },
+    display_columns: {
+      stocks: stockCols,
+      mf: mfCols
+    },
+    widgets: {
+      sector_allocation: document.getElementById("widget-check-sector").checked,
+      asset_allocation: document.getElementById("widget-check-asset").checked,
+      top_performers: document.getElementById("widget-check-leaders").checked,
+      top_underperformers: document.getElementById("widget-check-underperformers").checked,
+      risk_alerts: document.getElementById("widget-check-alerts").checked,
+      portfolio_signals: true,
+      dividend_yield: true
+    },
+    custom_alerts: {
+      high_concentration_pct: parseInt(document.getElementById("settings-alert-concentration").value),
+      high_loss_pct: parseInt(document.getElementById("settings-alert-loss").value)
+    }
+  };
+  
+  await saveConfigOnServer(payload);
+  appConfig = payload;
+  
+  // Instantly apply settings without full reload
+  updateDashboardMetrics();
+  renderCharts();
+  renderStocksTable();
+  renderMfsTable();
+  evaluateRiskAlerts();
+  
+  alert("Settings saved successfully! Excel formulas and columns have been customised.");
+}
+
+async function saveConfigOnServer(config) {
+  try {
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(config)
+    });
+  } catch (err) {
+    console.error("Config save failed", err);
+  }
+}
+
+// BACKGROUND LIVE PRICE UPDATER PROCESS
+async function startLivePriceScraper() {
+  // Trigger update prices background thread
+  try {
+    const res = await fetch('/api/update-prices', { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'success') {
+      showScraperProgressWidget();
+      startPollingProgress();
+    } else {
+      alert("Error starting scraper: " + data.message);
+    }
+  } catch (err) {
+    console.error("Failed to start prices update", err);
+  }
+}
+
+function checkScraperRunningOnStartup() {
+  // Query status once to check if running
+  fetch('/api/update-status')
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'running') {
+        showScraperProgressWidget();
+        startPollingProgress();
+      }
+    });
+}
+
+function showScraperProgressWidget() {
+  document.getElementById("price-updater-container").style.display = "flex";
+  document.getElementById("btn-updater-close").style.display = "none";
+  console.log("Initializing scraping connections...");
+}
+
+function startPollingProgress() {
+  if (priceUpdateTimer) clearInterval(priceUpdateTimer);
+  
+  let lastLoggedLength = 0;
+  
+  priceUpdateTimer = setInterval(async () => {
+    try {
+      const res = await fetch('/api/update-status');
+      const data = await res.json();
+      
+      // Update UI labels
+      document.getElementById("updater-progress-pct").innerText = `${data.progress_pct}%`;
+      document.getElementById("updater-progress-bar").style.width = `${data.progress_pct}%`;
+      document.getElementById("updater-current-ticker").innerText = data.current_ticker 
+        ? `Active scrip: ${data.current_ticker} (${data.current_index}/${data.total_tickers}) — Elapsed: ${data.elapsed_seconds}s` 
+        : "Checking sheet...";
+        
+      // Redirect logs to console
+      if (data.logs && data.logs.length > lastLoggedLength) {
+        for (let i = lastLoggedLength; i < data.logs.length; i++) {
+          console.log("[Scraper] " + data.logs[i]);
+        }
+        lastLoggedLength = data.logs.length;
+      }
+      
+      if (data.status === 'completed') {
+        clearInterval(priceUpdateTimer);
+        document.getElementById("updater-status-title").innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--success);"></i> Live Price Update Complete!`;
+        document.getElementById("btn-updater-close").style.display = "none";
+        
+        // Refresh tables to see fresh prices
+        await fetchPortfolio();
+        
+        // Auto-dismiss the widget after 3 seconds
+        setTimeout(() => {
+          document.getElementById("price-updater-container").style.display = "none";
+        }, 3000);
+      } else if (data.status === 'error') {
+        clearInterval(priceUpdateTimer);
+        document.getElementById("updater-status-title").innerHTML = `<i class="fa-solid fa-circle-xmark" style="color: var(--danger);"></i> Scraper Error`;
+        document.getElementById("btn-updater-close").style.display = "none";
+        
+        // Auto-dismiss the widget after 3 seconds
+        setTimeout(() => {
+          document.getElementById("price-updater-container").style.display = "none";
+        }, 3000);
+      }
+    } catch (err) {
+      console.error("Scraper status poll failed", err);
+      clearInterval(priceUpdateTimer);
+    }
+  }, 1200);
+}
+
+// AI ADVISOR CHAT INTERACTION
+function handleAdvisorKeyPress(event) {
+  if (event.key === 'Enter') {
+    submitAdvisorMessage();
+  }
+}
+
+function sendSuggestedPrompt(text) {
+  document.getElementById("advisor-user-input").value = text;
+  submitAdvisorMessage();
+}
+
+async function submitAdvisorMessage() {
+  const inputEl = document.getElementById("advisor-user-input");
+  const promptText = inputEl.value.trim();
+  if (!promptText) return;
+  
+  // Clear input
+  inputEl.value = "";
+  
+  const chatBox = document.getElementById("advisor-chat-box");
+  
+  // 1. Append User Message
+  const userMsgDiv = document.createElement("div");
+  userMsgDiv.className = "advisor-message user";
+  userMsgDiv.style.display = "flex";
+  userMsgDiv.style.gap = "0.75rem";
+  userMsgDiv.style.maxWidth = "85%";
+  userMsgDiv.style.alignSelf = "flex-end";
+  
+  userMsgDiv.innerHTML = `
+    <div style="background: var(--accent-gradient); border-radius: 16px 0 16px 16px; padding: 1rem; color: #ffffff; font-size: 0.9rem; line-height: 1.5; box-shadow: 0 4px 15px var(--accent-glow);">
+      ${promptText}
+    </div>
+    <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--bg-tertiary); display: flex; justify-content: center; align-items: center; color: var(--text-primary); font-size: 0.9rem; flex-shrink: 0;">
+      <i class="fa-solid fa-user"></i>
+    </div>
+  `;
+  chatBox.appendChild(userMsgDiv);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  
+  // 2. Append Spinner / Loading State
+  const loadingDiv = document.createElement("div");
+  loadingDiv.className = "advisor-message system loading";
+  loadingDiv.style.display = "flex";
+  loadingDiv.style.gap = "0.75rem";
+  loadingDiv.style.maxWidth = "85%";
+  loadingDiv.style.alignSelf = "flex-start";
+  
+  loadingDiv.innerHTML = `
+    <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--accent-gradient); display: flex; justify-content: center; align-items: center; color: white; font-size: 0.95rem; font-weight: 700; box-shadow: 0 0 10px var(--accent-glow); flex-shrink: 0;">
+      <i class="fa-solid fa-user-tie"></i>
+    </div>
+    <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.03); border-radius: 0 16px 16px 16px; padding: 1rem; color: var(--text-secondary); font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+      <i class="fa-solid fa-spinner fa-spin" style="color: var(--accent);"></i> Analyzing portfolio sheets...
+    </div>
+  `;
+  chatBox.appendChild(loadingDiv);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  
+  // 3. Post to API
+  try {
+    const res = await fetch('/api/advisor/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: promptText })
+    });
+    const data = await res.json();
+    
+    // Remove loading indicator
+    chatBox.removeChild(loadingDiv);
+    
+    // Append Advisor Response
+    const responseDiv = document.createElement("div");
+    responseDiv.className = "advisor-message system";
+    responseDiv.style.display = "flex";
+    responseDiv.style.gap = "0.75rem";
+    responseDiv.style.maxWidth = "85%";
+    responseDiv.style.alignSelf = "flex-start";
+    
+    responseDiv.innerHTML = `
+      <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--accent-gradient); display: flex; justify-content: center; align-items: center; color: white; font-size: 0.95rem; font-weight: 700; box-shadow: 0 0 10px var(--accent-glow); flex-shrink: 0;">
+        <i class="fa-solid fa-user-tie"></i>
+      </div>
+      <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.03); border-radius: 0 16px 16px 16px; padding: 1rem; color: var(--text-primary); font-size: 0.9rem; line-height: 1.6;">
+        <span style="font-weight: 700; display: block; margin-bottom: 0.4rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent);">CFA Senior Advisor</span>
+        ${data.response}
+      </div>
+    `;
+    chatBox.appendChild(responseDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    
+  } catch (err) {
+    if (chatBox.contains(loadingDiv)) {
+      chatBox.removeChild(loadingDiv);
+    }
+    console.error("Advisor API call failed:", err);
+  }
+}
+
+// MULTI-PROFILE CONTROLLER OPERATIONS
+function openProfileModal() {
+  document.getElementById("modal-profile").classList.add("active");
+  fetchProfilesList();
+}
+
+function closeProfileModal() {
+  document.getElementById("modal-profile").classList.remove("active");
+}
+
+async function fetchProfilesList() {
+  try {
+    const res = await fetch('/api/profiles');
+    const data = await res.json();
+    
+    // Update header label with profile name
+    document.getElementById("active-profile-name").innerHTML = `<i class="fa-solid fa-user-circle"></i> Profile: ${data.active_profile}`;
+    
+    // Populate dynamic profiles list inside modal
+    const listContainer = document.getElementById("profiles-list-container");
+    if (listContainer) {
+      listContainer.innerHTML = "";
+      data.profiles.forEach(p => {
+        const isActive = p === data.active_profile;
+        const isDefault = p === "Default Portfolio";
+        
+        const item = document.createElement("div");
+        item.className = `profile-item ${isActive ? 'active' : ''}`;
+        
+        // Clicking on the profile item (except action buttons) switches to it
+        item.onclick = (e) => {
+          if (e.target.closest('.btn-profile-delete')) return;
+          if (e.target.closest('.btn-profile-rename')) return;
+          if (!isActive) switchProfile(p);
+        };
+        
+        item.innerHTML = `
+          <div class="profile-item-info">
+            <span class="profile-item-name">${p}</span>
+            ${isActive ? '<span class="profile-item-status"><i class="fa-solid fa-circle-dot"></i> Active Portfolio</span>' : ''}
+          </div>
+          <div class="profile-item-actions">
+            ${!isDefault ? `
+              <button class="btn-profile-rename" title="Rename Profile">
+                <i class="fa-solid fa-pencil"></i>
+              </button>
+              <button class="btn-profile-delete" title="Delete Profile">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            ` : ''}
+          </div>
+        `;
+        
+        // Bind click events for rename and delete buttons
+        const renameBtn = item.querySelector(".btn-profile-rename");
+        if (renameBtn) {
+          renameBtn.onclick = (e) => {
+            e.stopPropagation();
+            renameProfile(p);
+          };
+        }
+        const delBtn = item.querySelector(".btn-profile-delete");
+        if (delBtn) {
+          delBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteProfile(p);
+          };
+        }
+        
+        listContainer.appendChild(item);
+      });
+    }
+  } catch (err) {
+    console.error("Failed to fetch profiles list:", err);
+  }
+}
+
+async function renameProfile(oldName) {
+  if (oldName === "Default Portfolio") {
+    alert("The Default Portfolio profile cannot be renamed.");
+    return;
+  }
+
+  const newName = prompt(`Enter a new name for the profile "${oldName}":`, oldName);
+  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
+  try {
+    const res = await fetch('/api/profiles/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ old_name: oldName, new_name: newName.trim() })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      // Refresh header label, profile list, and theme
+      await fetchConfig();
+      await fetchProfilesList();
+      if (appConfig && appConfig.theme) applyTheme(appConfig.theme);
+    } else {
+      alert("Error renaming profile: " + data.message);
+    }
+  } catch (err) {
+    console.error("Failed to rename profile:", err);
+    alert("API connection failed. Ensure Flask app is running!");
+  }
+}
+
+async function deleteProfile(profileName) {
+  if (profileName === "Default Portfolio") {
+    alert("The Default Portfolio profile cannot be deleted.");
+    return;
+  }
+  
+  if (!confirm(`Are you sure you want to delete the profile "${profileName}"? This will permanently delete its associated Excel workbook, config file, and all recorded holdings. This action CANNOT be undone.`)) {
+    return;
+  }
+  
+  try {
+    const res = await fetch('/api/profiles/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_name: profileName })
+    });
+    
+    const data = await res.json();
+    if (data.status === 'success') {
+      alert(data.message);
+      
+      // Reload entire visual layout & charts instantly
+      await fetchConfig();
+      await fetchPortfolio();
+      await fetchProfilesList();
+      
+      // Reset visual theme to active profile's theme
+      if (appConfig && appConfig.theme) {
+        applyTheme(appConfig.theme);
+      }
+    } else {
+      alert("Error deleting profile: " + data.message);
+    }
+  } catch (err) {
+    console.error("Failed to delete profile:", err);
+    alert("API connection failed. Ensure Flask app is running!");
+  }
+}
+
+async function switchProfile(profileName) {
+  try {
+    const res = await fetch('/api/profiles/select', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_name: profileName })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      alert(data.message);
+      closeProfileModal();
+      
+      // Reload entire visual layout & charts instantly from new Excel & config
+      await fetchConfig();
+      await fetchPortfolio();
+      await fetchProfilesList();
+      
+      // Reset visual theme to the profile's saved preference
+      if (appConfig && appConfig.theme) {
+        applyTheme(appConfig.theme);
+      }
+    } else {
+      alert("Error switching profile: " + data.message);
+    }
+  } catch (err) {
+    console.error("Failed to switch profile:", err);
+  }
+}
+
+async function submitCreateProfile(e) {
+  e.preventDefault();
+  const inputEl = document.getElementById("new-profile-input");
+  const profileName = inputEl.value.trim();
+  if (!profileName) return;
+  
+  try {
+    const res = await fetch('/api/profiles/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_name: profileName })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      alert(data.message);
+      inputEl.value = "";
+      closeProfileModal();
+      
+      // Reload entire visual layout & charts instantly from new Excel & config
+      await fetchConfig();
+      await fetchPortfolio();
+      await fetchProfilesList();
+      
+      // Set visual theme to standard default
+      if (appConfig && appConfig.theme) {
+        applyTheme(appConfig.theme);
+      }
+    } else {
+      alert("Error creating profile: " + data.message);
+    }
+  } catch (err) {
+    console.error("Failed to create profile:", err);
+  }
+}
+
+async function clearPortfolioHoldings() {
+  if (!confirm("⚠️ WARNING: Are you sure you want to delete and clear ALL stock and mutual fund holdings inside the currently active profile? This will completely empty your portfolio data and cannot be undone.")) {
+    return;
+  }
+  
+  try {
+    const res = await fetch('/api/portfolio/reset', {
+      method: 'POST'
+    });
+    
+    const data = await res.json();
+    if (data.status === 'success') {
+      alert(data.message);
+      
+      // Reload entire visual layout & charts instantly
+      await fetchPortfolio();
+      
+      // Navigate user back to executive dashboard to show clean slate
+      switchTab('dashboard');
+    } else {
+      alert("Error resetting portfolio: " + data.message);
+    }
+  } catch (err) {
+    console.error("Failed to reset portfolio:", err);
+    alert("API connection failed. Ensure Flask app is running!");
+  }
+}
+
+
