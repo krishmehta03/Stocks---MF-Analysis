@@ -1185,3 +1185,156 @@ select option {
   background-color: #111827;
   color: var(--text-primary);
 }
+
+/* Premium Mobile View Layout Adjustments */
+@media (max-width: 768px) {
+  /* Main Container Padding */
+  .app-container {
+    padding: 1rem 0.75rem;
+  }
+
+  /* Header Navigation */
+  header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1.25rem !important;
+    text-align: center;
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .logo-section h1 {
+    font-size: 1.6rem;
+    justify-content: center;
+  }
+
+  .header-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 0.75rem !important;
+  }
+
+  .header-actions button,
+  .header-actions .btn,
+  .header-actions select {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Real-time scraper widget mobile stacking */
+  .updater-widget {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1rem !important;
+  }
+
+  /* Navigation Tabs: Horizontal Scroll with hidden scrollbar */
+  .nav-tabs {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.35rem !important;
+    padding: 0.25rem !important;
+    margin-bottom: 1.75rem !important;
+    scrollbar-width: none; /* Hide scrollbar Firefox */
+  }
+
+  .nav-tabs::-webkit-scrollbar {
+    display: none; /* Hide scrollbar Chrome/Safari/Webkit */
+  }
+
+  .tab-btn {
+    padding: 0.6rem 1rem !important;
+    font-size: 0.85rem !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Summary Metrics Cards Grid */
+  .summary-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    margin-bottom: 1.75rem !important;
+  }
+
+  .summary-card {
+    min-height: auto !important;
+    padding: 1.25rem !important;
+  }
+
+  .summary-card .value {
+    font-size: 1.5rem !important;
+  }
+
+  /* Card Headings and Tooltips */
+  .breakdown-tooltip {
+    width: 90%;
+    max-width: 260px;
+  }
+
+  /* Flex widgets & details section stacking */
+  .dashboard-details {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    margin-bottom: 1.75rem !important;
+  }
+
+  /* Stacking chart headers */
+  #widget-performance-chart > div:first-child,
+  #widget-sector-contribution-chart > div:first-child,
+  .tab-content .card > div:first-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1rem !important;
+  }
+
+  #widget-performance-chart > div:first-child > div:last-child,
+  #widget-sector-contribution-chart > div:first-child > div:last-child,
+  .tab-content .card > div:first-child > div:last-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 0.75rem !important;
+  }
+
+  #widget-performance-chart > div:first-child > div:last-child select,
+  #widget-performance-chart > div:first-child > div:last-child button,
+  #widget-performance-chart > div:first-child > div:last-child div,
+  #widget-sector-contribution-chart > div:first-child > div:last-child button,
+  #widget-sector-contribution-chart > div:first-child > div:last-child div,
+  .tab-content .card > div:first-child > div:last-child input,
+  .tab-content .card > div:first-child > div:last-child button,
+  .tab-content .card > div:first-child > div:last-child div {
+    width: 100% !important;
+    max-width: none !important;
+    justify-content: center !important;
+  }
+
+  /* Sector contribution summary row stacking */
+  #contrib-summary-row {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+    text-align: center !important;
+  }
+
+  /* Chart height limiter on mobile */
+  canvas {
+    max-height: 250px !important;
+  }
+
+  #chart-sector-contribution {
+    max-height: 120px !important;
+  }
+
+  /* Modals scaling */
+  .modal-content {
+    width: 95% !important;
+    padding: 1.5rem 1.25rem !important;
+    margin: 0 auto;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+}
