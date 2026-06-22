@@ -533,7 +533,11 @@ def get_portfolio_data():
                 continue
             
             exchange = ws[f'B{row}'].value or "NSE"
-            sector = ws[f'C{row}'].value or "Other"
+            raw_sector = ws[f'C{row}'].value
+            if not raw_sector or str(raw_sector).strip() == "" or str(raw_sector).strip().lower() == "other":
+                sector = "ETFs"
+            else:
+                sector = str(raw_sector).strip()
             qty = ws[f'D{row}'].value or 0
             buy_price = ws[f'E{row}'].value or 0
             buy_date_raw = ws[f'F{row}'].value
@@ -795,7 +799,7 @@ def live_price_updater_thread():
 
                 # Auto-fill sector if missing or still default
                 current_sector = str(ws[f'C{row}'].value or "").strip()
-                if current_sector in ("", "Other") and sector:
+                if current_sector in ("", "Other", "ETFs") and sector:
                     ws[f'C{row}'].value = sector
                     log_line += f"  | Sector: {sector}"
 
@@ -1040,7 +1044,11 @@ def sector_contribution():
             if not scrip:
                 break
             exchange = ws[f'B{row}'].value or 'NSE'
-            sector   = ws[f'C{row}'].value or 'Other'
+            raw_sector = ws[f'C{row}'].value
+            if not raw_sector or str(raw_sector).strip() == "" or str(raw_sector).strip().lower() == "other":
+                sector = "ETFs"
+            else:
+                sector = str(raw_sector).strip()
             qty      = ws[f'D{row}'].value or 0
             if float(qty) > 0:
                 holdings.append({

@@ -1039,8 +1039,8 @@ function normalizeSectorName(name) {
 
 function getSectorColor(sectorName) {
   const norm = normalizeSectorName(sectorName);
-  if (norm === 'others') {
-    return 'rgba(71, 85, 105, 0.85)'; // slate-600 for "Others"
+  if (norm === 'others' || norm === 'other' || norm === 'etfs') {
+    return 'rgba(71, 85, 105, 0.85)'; // slate-600 for "Others" / "ETFs"
   }
   
   const explicitMappings = {
