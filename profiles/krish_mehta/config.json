@@ -6,16 +6,14 @@
   "display_columns": {
     "mf": [
       "Fund Name",
-      "AMC",
       "Category",
-      "Sub-Category",
       "Units Held",
-      "Buy NAV",
-      "Current NAV",
       "Invested Value",
       "Current Value",
       "P&L",
-      "Absolute Return %",
+      "Return %",
+      "XIRR %",
+      "Holding Period",
       "Tax Flag"
     ],
     "stocks": [
@@ -24,6 +22,7 @@
       "Sector",
       "Qty",
       "Buy Price",
+      "Buy Date",
       "Current Price",
       "Invested Value",
       "Current Value",
@@ -36,13 +35,13 @@
     "mf_ltcg_days": 365,
     "stocks_ltcg_days": 365
   },
-  "theme": "rose-gold",
+  "theme": "cyberpunk",
   "widgets": {
     "asset_allocation": true,
     "dividend_yield": true,
     "portfolio_signals": true,
+    "risk_alerts": false,
     "sector_allocation": true,
-    "top_performers": true,
-    "risk_alerts": false
+    "top_performers": true
   }
 }

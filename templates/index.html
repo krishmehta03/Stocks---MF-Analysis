@@ -312,6 +312,7 @@
             <input type="text" class="form-control" id="stock-search" placeholder="Search scrip..." style="max-width: 200px;">
             <button class="btn btn-secondary" onclick="openImportCsvModal()"><i class="fa-solid fa-file-csv"></i> Import CSV</button>
             <button class="btn" onclick="openAddStockModal()"><i class="fa-solid fa-plus"></i> Add New Stock</button>
+            <button class="btn btn-danger" onclick="deleteAllStocks()"><i class="fa-solid fa-trash-can"></i> Delete All</button>
           </div>
         </div>
 
@@ -469,8 +470,11 @@
 
           <!-- 2. Customize Visible Columns -->
           <div class="form-group" style="margin-bottom: 2rem;">
-            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">2. Show/Hide Portfolio Columns</label>
-            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Choose which data columns are rendered in the visual grids. Changes apply to the UI instantly.</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin: 0;">2. Show/Hide Portfolio Columns</label>
+              <button type="button" id="settings-reset-columns-btn" class="btn btn-secondary btn-sm" style="font-size: 0.8rem; padding: 4px 10px;">Reset to Default</button>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem; margin-bottom: 0.5rem;">Choose which data columns are rendered in the visual grids. Changes apply to the UI instantly.</p>
             
             <h4 style="font-size: 0.9rem; margin-top: 1rem; color: var(--accent);">Stock Columns:</h4>
             <div class="column-selection-grid" id="settings-stock-columns-checks">
@@ -658,6 +662,19 @@
           <div class="form-group">
             <label>Avg Trading Price (₹) *</label>
             <input type="number" class="form-control" id="stock-buy-price" step="0.01" required min="0" placeholder="e.g. 305.41">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <span>Current Price (₹)</span>
+              <span id="stock-live-price-helper" style="font-size: 0.75rem; color: var(--accent); font-weight: 500;"></span>
+            </label>
+            <input type="number" class="form-control" id="stock-current-price" step="0.01" placeholder="Defaults to Live Price">
+          </div>
+          <div class="form-group">
+            <!-- Keeps layout aligned -->
           </div>
         </div>
 

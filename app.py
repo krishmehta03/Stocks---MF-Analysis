@@ -9,6 +9,7 @@ import threading
 import csv
 import io
 from datetime import datetime
+import re
 
 import shutil
 import yfinance as yf
@@ -179,6 +180,8 @@ def load_cache():
                 _info_cache.update(data.get("info_cache", {}))
                 _drawdown_cache.update(data.get("drawdown_cache", {}))
                 _mf_scheme_cache.update(data.get("mf_scheme_cache", {}))
+                # Filter out null values so we retry resolving them
+                _ticker_cache = {k: v for k, v in _ticker_cache.items() if v is not None}
         except Exception as e:
             print("Error loading yfinance cache:", e)
 
@@ -212,18 +215,81 @@ _SECTOR_MAP = {
 }
 
 
+_CUSTOM_TICKER_MAP = {
+    "NIPPON INDIA LTG": "LTGILTBEES.NS",
+    "NIPPON INDIA NM": "MID150BEES.NS",
+    "NIP. INDIA NIFTY": "NIFTYBEES.NS",
+    "NIPPON INDIA NIFTY": "NIFTYBEES.NS",
+    "NIP. INDIA GOLD": "GOLDBEES.NS",
+    "NIPPON INDIA GOLD": "GOLDBEES.NS",
+    "NASDAQ 100": "MON100.NS",
+    "HDFC NSC 250 ETF": "HDFCSML250.NS",
+    "ST BK OF INDIA": "SBIN.NS",
+    "STATE BANK OF INDIA": "SBIN.NS",
+    "POWER GRID CORPN": "POWERGRID.NS",
+    "POWER GRID": "POWERGRID.NS",
+    "POWER GRID CORPORATION": "POWERGRID.NS",
+    "A R C FINANCE": "ARCFIN.BO",
+    "ARC FINANCE": "ARCFIN.BO",
+    "SERVOTECH POWER": "SERVOTECH.NS",
+    "SERVOTECH POWER SYSTEMS": "SERVOTECH.NS",
+    "VISAGAR POLYTEX": "VIVIDHA.NS",
+    "CPSE ETF*": "CPSEETF.NS",
+    "CPSE ETF": "CPSEETF.NS",
+    "TATA MOTORS": "TMCV.NS",
+    "TATA MOTORS LIMITED": "TMCV.NS",
+    "TATA MOTORS PASS VEH LTD": "TMPV.NS",
+    "TATA MOTORS PASSENGER VEHICLES": "TMPV.NS",
+    "TATA STEEL": "TATASTEEL.NS",
+    "TATA STEEL LIMITED": "TATASTEEL.NS",
+    "ASHOK LEYLAND": "ASHOKLEY.NS",
+    "ASHOK LEYLAND LIMITED": "ASHOKLEY.NS",
+    "COAL INDIA": "COALINDIA.NS",
+    "COAL INDIA LTD": "COALINDIA.NS",
+    "COAL INDIA LIMITED": "COALINDIA.NS",
+    "TITAN COMPANY": "TITAN.NS",
+    "TITAN COMPANY LIMITED": "TITAN.NS",
+    "VEDANTA": "VEDL.NS",
+    "VEDANTA LIMITED": "VEDL.NS",
+    "VODAFONE IDEA": "IDEA.NS",
+    "VODAFONE IDEA LIMITED": "IDEA.NS",
+    "NHPC LTD": "NHPC.NS",
+    "NHPC LIMITED": "NHPC.NS",
+}
+
+
+def _clean_search_query(q: str) -> str:
+    q = q.strip()
+    q = re.sub(r'(?i)\bst\s+bk\b', 'State Bank', q)
+    q = re.sub(r'(?i)\bnip\.?\b', 'Nippon', q)
+    q = re.sub(r'(?i)\b(ltd|limited|corp|corpn|corporation|co|company)\b', '', q)
+    q = re.sub(r'\s+', ' ', q).strip()
+    return q
+
+
 def _resolve_ticker(company_name: str, exchange: str) -> str | None:
     """
     Convert a full company name (e.g. 'TATA MOTORS LIMITED') to the correct
-    Yahoo Finance ticker symbol (e.g. 'TATAMOTORS.NS') using yfinance search.
+    Yahoo Finance ticker symbol (e.g. 'TATAMOTORS.NS') using direct search requests.
     Results are cached so each name is resolved only once per session.
     """
-    cache_key = f"{company_name.strip().upper()}|{exchange.strip().upper()}"
+    name_clean = company_name.strip()
+    clean_upper = name_clean.upper()
+
+    # Strategy 0: Direct custom lookup mapping
+    if clean_upper in _CUSTOM_TICKER_MAP:
+        resolved = _CUSTOM_TICKER_MAP[clean_upper]
+        cache_key = f"{clean_upper}|{exchange.strip().upper()}"
+        if _ticker_cache.get(cache_key) != resolved:
+            _ticker_cache[cache_key] = resolved
+            save_cache()
+        return resolved
+
+    cache_key = f"{clean_upper}|{exchange.strip().upper()}"
     if cache_key in _ticker_cache:
         return _ticker_cache[cache_key]
 
     ex_suffix = ".BO" if "BSE" in exchange.upper() else ".NS"
-    name_clean = company_name.strip()
 
     # Strategy 1 — treat the stored value as a raw ticker (works if user typed TATAMOTORS)
     direct = f"{name_clean}{ex_suffix}"
@@ -237,19 +303,25 @@ def _resolve_ticker(company_name: str, exchange: str) -> str | None:
     except Exception:
         pass
 
-    # Strategy 2 — use yfinance search to find the right symbol
+    # Strategy 2 — use Yahoo Finance Search API directly
     try:
-        results = yf.Search(name_clean, max_results=5).quotes
-        # Prefer exact exchange match, then any Indian exchange
-        for preference in (ex_suffix.upper(), ".NS", ".BO"):
-            for r in results:
-                sym = r.get("symbol", "")
-                if sym.upper().endswith(preference):
-                    _ticker_cache[cache_key] = sym
-                    save_cache()
-                    return sym
+        cleaned_query = _clean_search_query(name_clean)
+        url = "https://query2.finance.yahoo.com/v1/finance/search"
+        params = {"q": cleaned_query, "quotesCount": 5, "newsCount": 0}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        r = requests.get(url, params=params, headers=headers, timeout=5)
+        if r.status_code == 200:
+            results = r.json().get("quotes", [])
+            # Prefer exact exchange match, then any Indian exchange
+            for preference in (ex_suffix.upper(), ".NS", ".BO"):
+                for r_quote in results:
+                    sym = r_quote.get("symbol", "")
+                    if sym.upper().endswith(preference):
+                        _ticker_cache[cache_key] = sym
+                        save_cache()
+                        return sym
     except Exception as e:
-        print(f"[yfinance search] '{name_clean}': {e}")
+        print(f"[Yahoo Search API] '{name_clean}': {e}")
 
     _ticker_cache[cache_key] = None
     save_cache()
@@ -308,49 +380,72 @@ def _fetch_mf_history(scheme_code: int) -> pd.Series:
     return pd.Series(dtype=float)
 
 
-def _yf_info(symbol: str) -> dict:
+def _yf_info(symbol: str, bypass_cache: bool = False) -> dict:
     """
     Fetch price and sector for a resolved Yahoo Finance symbol via yfinance.
-    Returns a dict with keys 'price' (float|None) and 'sector' (str|None).
-    Results are cached per session.
+    Returns a dict with keys 'price' (float|None), 'sector' (str|None), and 'beta' (float|None).
     """
-    if symbol in _info_cache:
-        return _info_cache[symbol]
+    now = time.time()
+    
+    # If not bypassing cache, check if we have a fresh cached entry with price and recent timestamp
+    if not bypass_cache and symbol in _info_cache:
+        cached = _info_cache[symbol]
+        if cached.get("price_timestamp") and now - cached["price_timestamp"] < 300:
+            return cached
 
-    result = {"price": None, "sector": None, "beta": None}
+    # Pre-populate sector & beta from cached entry if they exist to avoid making an expensive ticker.info call
+    cached_sector = None
+    cached_beta = None
+    if symbol in _info_cache:
+        cached_sector = _info_cache[symbol].get("sector")
+        cached_beta = _info_cache[symbol].get("beta")
+
+    result = {
+        "price": None,
+        "sector": cached_sector,
+        "beta": cached_beta,
+        "price_timestamp": None
+    }
+    
     try:
         ticker = yf.Ticker(symbol)
 
-        # Price: fast_info is lightweight; falls back to info dict
+        # Price: fast_info is lightweight and fast
         try:
             price = ticker.fast_info.last_price
             if price:
                 result["price"] = round(float(price), 2)
+                result["price_timestamp"] = now
         except Exception:
             pass
 
-        # Sector & Beta: from the full info dict (one API call covers both)
-        try:
-            info = ticker.info
-            if not result["price"]:
-                mp = info.get("regularMarketPrice") or info.get("currentPrice")
-                if mp:
-                    result["price"] = round(float(mp), 2)
-            raw_sector = info.get("sector", "")
-            if raw_sector:
-                result["sector"] = _SECTOR_MAP.get(raw_sector, raw_sector)
-            
-            beta = info.get("beta")
-            if beta is not None:
-                result["beta"] = round(float(beta), 3)
-        except Exception:
-            pass
+        # Sector & Beta: from the full info dict (only if not already cached)
+        if not result["sector"] or result["beta"] is None:
+            try:
+                info = ticker.info
+                if not result["price"]:
+                    mp = info.get("regularMarketPrice") or info.get("currentPrice")
+                    if mp:
+                        result["price"] = round(float(mp), 2)
+                        result["price_timestamp"] = now
+                raw_sector = info.get("sector", "")
+                if raw_sector:
+                    result["sector"] = _SECTOR_MAP.get(raw_sector, raw_sector)
+                
+                beta = info.get("beta")
+                if beta is not None:
+                    result["beta"] = round(float(beta), 3)
+            except Exception:
+                pass
 
     except Exception as e:
         print(f"[yfinance info] {symbol}: {e}")
 
-    _info_cache[symbol] = result
-    save_cache()
+    # Save to persistent cache if we resolved a price
+    if result["price"] is not None:
+        _info_cache[symbol] = result
+        save_cache()
+        
     return result
 
 
@@ -654,8 +749,11 @@ def live_price_updater_thread():
     price_update_state["logs"] = []
     price_update_state["start_time"] = time.time()
     
+    # Capture active profile's excel file at start to prevent race conditions on profile switches
+    active_excel_file = EXCEL_FILE
+    
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
+        wb = openpyxl.load_workbook(active_excel_file)
         if "📥 Stock Data Input" not in wb.sheetnames:
             raise Exception("Stock Data Input sheet not found.")
             
@@ -687,7 +785,7 @@ def live_price_updater_thread():
                 continue
 
             # Fetch price + sector in one call (cached after first hit)
-            info = _yf_info(sym)
+            info = _yf_info(sym, bypass_cache=True)
             price  = info["price"]
             sector = info["sector"]
 
@@ -708,7 +806,7 @@ def live_price_updater_thread():
 
             time.sleep(0.3)  # small delay between tickers
             
-        wb.save(EXCEL_FILE)
+        wb.save(active_excel_file)
         price_update_state["status"] = "completed"
         price_update_state["logs"].append(f"Successfully updated {updated_count} stock prices and saved Excel file.")
     except Exception as e:
@@ -1139,6 +1237,18 @@ def api_config():
         save_config(new_config)
         return jsonify({"status": "success", "config": new_config})
 
+@app.route('/api/stock/live-price', methods=['GET'])
+def get_live_stock_price():
+    scrip = request.args.get('scrip', '').strip()
+    if not scrip:
+        return jsonify({"status": "error", "message": "Scrip name is required."}), 400
+    
+    price = get_yahoo_finance_price(scrip, "NSE")
+    if price is not None:
+        return jsonify({"status": "success", "price": price})
+    else:
+        return jsonify({"status": "error", "message": "Could not fetch live price."}), 404
+
 @app.route('/api/stock/add', methods=['POST'])
 def add_stock():
     data = request.json
@@ -1151,7 +1261,6 @@ def add_stock():
         while ws[f'A{empty_row}'].value is not None:
             empty_row += 1
         
-        # Only 4 required fields from user input
         company_name = data.get("Company Name", "").strip()
         sector       = data.get("Sector", "Other").strip() or "Other"
         qty          = float(data.get("Total Quantity", 0) or 0)
@@ -1163,6 +1272,20 @@ def add_stock():
             if fetched_sector:
                 sector = fetched_sector
 
+        # Resolve Current Price: user provided -> live price -> avg_price fallback
+        current_price = data.get("Current Price")
+        if current_price is not None and str(current_price).strip() != "":
+            try:
+                current_price = float(current_price)
+            except ValueError:
+                current_price = None
+        else:
+            current_price = None
+
+        if current_price is None:
+            live_price = get_yahoo_finance_price(company_name, "NSE")
+            current_price = live_price if live_price is not None else avg_price
+
         # Write user data
         ws[f'A{empty_row}'] = company_name
         ws[f'B{empty_row}'] = "NSE"          # Default exchange
@@ -1170,7 +1293,7 @@ def add_stock():
         ws[f'D{empty_row}'] = qty
         ws[f'E{empty_row}'] = avg_price
         ws[f'F{empty_row}'] = ""             # Buy Date left blank
-        ws[f'G{empty_row}'] = avg_price      # Current Price defaults to Avg Trading Price
+        ws[f'G{empty_row}'] = current_price
         ws[f'P{empty_row}'] = 0.0            # Dividends default 0
         
         # Write formulas so Excel auto-calculates
@@ -1412,13 +1535,32 @@ def edit_stock():
         qty          = float(data.get("Total Quantity") or data.get("Qty", 0) or 0)
         avg_price    = float(data.get("Avg Trading Price") or data.get("Buy Price", 0) or 0)
 
+        # Resolve Current Price: user provided -> live price -> keep existing -> avg_price fallback
+        current_price = data.get("Current Price")
+        if current_price is not None and str(current_price).strip() != "":
+            try:
+                current_price = float(current_price)
+            except ValueError:
+                current_price = None
+        else:
+            current_price = None
+
+        if current_price is None:
+            old_scrip = ws[f'A{row_idx}'].value
+            existing_price = ws[f'G{row_idx}'].value
+            if str(old_scrip).strip().upper() != company_name.upper() or existing_price is None or existing_price == 0:
+                live_price = get_yahoo_finance_price(company_name, "NSE")
+                current_price = live_price if live_price is not None else avg_price
+            else:
+                current_price = existing_price
+
         # Write updated values
         ws[f'A{row_idx}'] = company_name
         ws[f'B{row_idx}'] = "NSE"
         ws[f'C{row_idx}'] = sector
         ws[f'D{row_idx}'] = qty
         ws[f'E{row_idx}'] = avg_price
-        ws[f'G{row_idx}'] = avg_price  # keep current price in sync with avg price
+        ws[f'G{row_idx}'] = current_price
 
         apply_excel_styles(ws, row_idx)
         wb.save(EXCEL_FILE)
@@ -1443,6 +1585,24 @@ def delete_stock():
         return jsonify({"status": "error", "message": "The Excel file 'Stocks & MF Analysis_V3.xlsx' is currently open in Microsoft Excel or another program. Please close Excel and try again!"}), 423
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/stock/delete-all', methods=['POST'])
+def delete_all_stocks():
+    try:
+        wb = openpyxl.load_workbook(EXCEL_FILE)
+        if "📥 Stock Data Input" in wb.sheetnames:
+            ws = wb["📥 Stock Data Input"]
+            ws.delete_rows(4, 1000)
+            wb.save(EXCEL_FILE)
+            return jsonify({"status": "success", "message": "All stock holdings deleted successfully!"})
+        else:
+            return jsonify({"status": "error", "message": "Stock Data Input sheet not found."}), 404
+    except PermissionError:
+        return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/api/mf/add', methods=['POST'])
 def add_mf():
@@ -1803,8 +1963,8 @@ def create_profile():
                 default_config = {
                     "theme": "emerald",
                     "display_columns": {
-                        "stocks": ["Scrip Name", "Qty", "Buy Price", "Current Price", "Return %", "P&L"],
-                        "mf": ["Fund Name", "Units Held", "Buy NAV", "Current NAV", "Absolute Return %", "P&L"]
+                        "stocks": ["Scrip Name", "Exchange", "Sector", "Qty", "Buy Price", "Buy Date", "Current Price", "Invested Value", "Current Value", "P&L", "Return %", "Tax Flag"],
+                        "mf": ["Fund Name", "Category", "Units Held", "Invested Value", "Current Value", "P&L", "Return %", "XIRR %", "Holding Period", "Tax Flag"]
                     },
                     "widgets": {
                         "sector_allocation": True,
@@ -1821,6 +1981,7 @@ def create_profile():
                 }
                 with open(new_config_path, "w") as f:
                     json.dump(default_config, f, indent=4)
+
                     
         meta_file = "profiles_config.json"
         if not os.path.exists(meta_file):

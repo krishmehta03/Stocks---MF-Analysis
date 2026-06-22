@@ -6,16 +6,14 @@
   "display_columns": {
     "mf": [
       "Fund Name",
-      "AMC",
       "Category",
-      "Sub-Category",
       "Units Held",
-      "Buy NAV",
-      "Current NAV",
       "Invested Value",
       "Current Value",
       "P&L",
-      "Absolute Return %",
+      "Return %",
+      "XIRR %",
+      "Holding Period",
       "Tax Flag"
     ],
     "stocks": [
@@ -24,6 +22,7 @@
       "Sector",
       "Qty",
       "Buy Price",
+      "Buy Date",
       "Current Price",
       "Invested Value",
       "Current Value",

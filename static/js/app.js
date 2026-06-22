@@ -18,13 +18,23 @@ let contribSortMode = 'contribution';
 const ALL_STOCK_COLUMNS = [
   "Scrip Name", "Exchange", "Sector", "Qty", "Buy Price", "Buy Date", 
   "Current Price", "5Y CAGR", "Nifty 5Y CAGR", "Invested Value", 
-  "Current Value", "P&L", "Return %", "Dividends", "Tax Flag", "Total Return"
+  "Current Value", "P&L", "Return %", "Dividends", "Tax Flag", "Return (₹)"
 ];
 
 const ALL_MF_COLUMNS = [
   "Fund Name", "Category", "Units Held", "Invested Value",
-  "Current Value", "P&L", "Absolute Return %", "XIRR %",
+  "Current Value", "P&L", "Return %", "XIRR %",
   "Holding Period", "Tax Flag"
+];
+
+const DEFAULT_STOCK_COLUMNS = [
+  "Scrip Name", "Exchange", "Sector", "Qty", "Buy Price", "Buy Date", 
+  "Current Price", "Invested Value", "Current Value", "P&L", "Return %", "Tax Flag"
+];
+
+const DEFAULT_MF_COLUMNS = [
+  "Fund Name", "Category", "Units Held", "Invested Value",
+  "Current Value", "P&L", "Return %", "XIRR %", "Holding Period", "Tax Flag"
 ];
 
 // Document Ready Initialization
@@ -46,12 +56,30 @@ function setupEventListeners() {
   document.getElementById("btn-theme-toggle").addEventListener("click", () => {
     const themes = ["emerald", "ocean", "cyberpunk", "rose-gold"];
     let nextIdx = (themes.indexOf(activeTheme) + 1) % themes.length;
-    applyTheme(themes[nextIdx]);
+    const nextTheme = themes[nextIdx];
+    applyTheme(nextTheme);
     
     // Save updated theme to config
-    appConfig.theme = themes[nextIdx];
-    saveConfigOnServer(appConfig);
+    if (appConfig) {
+      appConfig.theme = nextTheme;
+      saveConfigOnServer(appConfig);
+    }
+    
+    const themeLabels = {
+      'emerald': 'Emerald Forest',
+      'ocean': 'Deep Blue Ocean',
+      'cyberpunk': 'Cyberpunk Dark',
+      'rose-gold': 'Rose Gold Premium'
+    };
+    const displayName = themeLabels[nextTheme] || nextTheme;
+    showToast(`Theme updated to ${displayName}`);
   });
+
+  // Reset columns button
+  const resetBtn = document.getElementById("settings-reset-columns-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", resetColumnsToDefault);
+  }
 
   // Price Scraper Trigger
   document.getElementById("btn-update-prices-trigger").addEventListener("click", startLivePriceScraper);
@@ -65,6 +93,14 @@ function setupEventListeners() {
   document.getElementById("btn-updater-close").addEventListener("click", () => {
     document.getElementById("price-updater-container").style.display = "none";
   });
+
+  // Dynamic live price fetch on stock scrip input
+  const stockScripInput = document.getElementById("stock-scrip");
+  if (stockScripInput) {
+    stockScripInput.addEventListener("input", debounce((e) => {
+      fetchLivePriceHelper(e.target.value);
+    }, 600));
+  }
 }
 
 // SWITCH TABS
@@ -152,8 +188,130 @@ function applyTheme(themeName) {
   if (activeOpt) activeOpt.classList.add("active");
 }
 
-function selectThemeOption(themeName) {
+async function selectThemeOption(themeName) {
   applyTheme(themeName);
+  if (appConfig) {
+    appConfig.theme = themeName;
+    await saveConfigOnServer(appConfig);
+  }
+  const themeLabels = {
+    'emerald': 'Emerald Forest',
+    'ocean': 'Deep Blue Ocean',
+    'cyberpunk': 'Cyberpunk Dark',
+    'rose-gold': 'Rose Gold Premium'
+  };
+  const displayName = themeLabels[themeName] || themeName;
+  showToast(`Theme updated to ${displayName}`);
+}
+
+// TOAST NOTIFICATIONS & PREFERENCES AUTO-SAVE
+let checkboxToastTimeout = null;
+let toastTimeout = null;
+
+function showToast(message) {
+  let toastEl = document.getElementById("app-toast");
+  if (!toastEl) {
+    toastEl = document.createElement("div");
+    toastEl.id = "app-toast";
+    toastEl.style.position = "fixed";
+    toastEl.style.bottom = "20px";
+    toastEl.style.right = "20px";
+    toastEl.style.background = "rgba(15, 23, 42, 0.95)";
+    toastEl.style.color = "#ffffff";
+    toastEl.style.padding = "10px 16px";
+    toastEl.style.borderRadius = "8px";
+    toastEl.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.3)";
+    toastEl.style.display = "flex";
+    toastEl.style.alignItems = "center";
+    toastEl.style.gap = "8px";
+    toastEl.style.fontFamily = "'Outfit', sans-serif";
+    toastEl.style.fontSize = "13px";
+    toastEl.style.zIndex = "10000";
+    toastEl.style.transition = "opacity 0.3s ease, transform 0.3s ease";
+    document.body.appendChild(toastEl);
+  }
+  
+  toastEl.innerHTML = `<i class="fa-solid fa-circle-check" style="color: #10b981;"></i> <span>${message}</span>`;
+  toastEl.style.opacity = "0";
+  toastEl.style.transform = "translateY(10px)";
+  toastEl.style.display = "flex";
+  
+  // Trigger animation
+  setTimeout(() => {
+    toastEl.style.opacity = "1";
+    toastEl.style.transform = "translateY(0)";
+  }, 10);
+  
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+  }
+  
+  toastTimeout = setTimeout(() => {
+    toastEl.style.opacity = "0";
+    toastEl.style.transform = "translateY(10px)";
+    setTimeout(() => {
+      toastEl.style.display = "none";
+    }, 300);
+  }, 2000);
+}
+
+function triggerCheckboxToast() {
+  if (checkboxToastTimeout) {
+    clearTimeout(checkboxToastTimeout);
+  }
+  checkboxToastTimeout = setTimeout(() => {
+    showToast("Column preferences saved");
+    saveColumnPreferences();
+  }, 1500);
+}
+
+async function saveColumnPreferences() {
+  if (!appConfig) return;
+  
+  const stockCols = [];
+  document.querySelectorAll("input[name='stock-col']:checked").forEach(cb => {
+    stockCols.push(cb.value);
+  });
+  
+  const mfCols = [];
+  document.querySelectorAll("input[name='mf-col']:checked").forEach(cb => {
+    mfCols.push(cb.value);
+  });
+  
+  appConfig.display_columns.stocks = stockCols;
+  appConfig.display_columns.mf = mfCols;
+  
+  await saveConfigOnServer(appConfig);
+  
+  // Update tables
+  renderStocksTable();
+  renderMfsTable();
+}
+
+async function resetColumnsToDefault() {
+  if (!appConfig) return;
+  
+  document.querySelectorAll("input[name='stock-col']").forEach(cb => {
+    cb.checked = DEFAULT_STOCK_COLUMNS.includes(cb.value);
+  });
+  
+  document.querySelectorAll("input[name='mf-col']").forEach(cb => {
+    cb.checked = DEFAULT_MF_COLUMNS.includes(cb.value);
+  });
+  
+  // Save preferences immediately (no debounce needed for reset)
+  if (checkboxToastTimeout) clearTimeout(checkboxToastTimeout);
+  
+  appConfig.display_columns.stocks = [...DEFAULT_STOCK_COLUMNS];
+  appConfig.display_columns.mf = [...DEFAULT_MF_COLUMNS];
+  
+  await saveConfigOnServer(appConfig);
+  
+  // Update tables
+  renderStocksTable();
+  renderMfsTable();
+  
+  showToast("Columns reset to default");
 }
 
 // DYNAMIC DASHBOARD METRICS
@@ -323,18 +481,94 @@ function renderCharts() {
       if (sectorChart) sectorChart.destroy();
       
       // Calculate sector totals
-      const sectorsMap = {};
+      const sectorsList = [];
+      let totalValue = 0;
       portfolioData.stocks.forEach(s => {
         const sec = s["Sector"] || "Other";
-        sectorsMap[sec] = (sectorsMap[sec] || 0) + s["Current Value"];
+        const val = s["Current Value"] || 0;
+        totalValue += val;
+        
+        let existing = sectorsList.find(item => item.sector === sec);
+        if (existing) {
+          existing.value += val;
+        } else {
+          sectorsList.push({ sector: sec, value: val });
+        }
       });
       
-      const labels = Object.keys(sectorsMap);
-      const data = Object.values(sectorsMap);
+      // Sort descending by value
+      sectorsList.sort((a, b) => b.value - a.value);
       
-      if (labels.length === 0) {
+      const mainSectors = [];
+      const othersSectors = [];
+      
+      sectorsList.forEach((item) => {
+        const pct = totalValue > 0 ? (item.value / totalValue) * 100 : 0;
+        const isTooSmall = pct < 2.0;
+        // Limit to Top 7 if total sectors > 8
+        const isBeyondTop7 = sectorsList.length > 8 && mainSectors.length >= 7;
+        
+        if (isTooSmall || isBeyondTop7) {
+          othersSectors.push(item);
+        } else {
+          mainSectors.push(item);
+        }
+      });
+      
+      // Fallback: If all sectors are tiny, keep the largest as main so we don't have 100% Others
+      if (mainSectors.length === 0 && sectorsList.length > 0) {
+        mainSectors.push(sectorsList[0]);
+        const idx = othersSectors.findIndex(item => item.sector === sectorsList[0].sector);
+        if (idx !== -1) othersSectors.splice(idx, 1);
+      }
+      
+      const finalSectors = [...mainSectors];
+      if (othersSectors.length > 0) {
+        const othersVal = othersSectors.reduce((sum, item) => sum + item.value, 0);
+        finalSectors.push({
+          sector: 'Others',
+          value: othersVal,
+          isOthers: true,
+          breakdown: othersSectors
+        });
+      }
+      
+      let labels = [];
+      let dataForChart = [];
+      
+      if (finalSectors.length === 0) {
         labels.push("No Holdings");
-        data.push(1);
+        dataForChart.push(1);
+      } else {
+        labels = finalSectors.map(item => item.sector);
+        
+        // Force minimum 1% for any slice with value > 0 for visual rendering
+        const totalDisplayVal = finalSectors.reduce((sum, item) => sum + item.value, 0);
+        const minVal = totalDisplayVal * 0.01;
+        
+        let displayData = finalSectors.map(item => item.value);
+        if (totalDisplayVal > 0) {
+          let adjustedSum = 0;
+          displayData = finalSectors.map(item => {
+            if (item.value > 0 && item.value < minVal) {
+              adjustedSum += minVal;
+              return minVal;
+            }
+            return item.value;
+          });
+          
+          const originalRemainingSum = finalSectors.reduce((sum, item) => (item.value >= minVal ? sum + item.value : sum), 0);
+          const targetRemainingSum = totalDisplayVal - adjustedSum;
+          if (originalRemainingSum > 0 && targetRemainingSum > 0) {
+            displayData = displayData.map((val, idx) => {
+              if (finalSectors[idx].value >= minVal) {
+                return (val / originalRemainingSum) * targetRemainingSum;
+              }
+              return val;
+            });
+          }
+        }
+        dataForChart = displayData;
       }
       
       sectorChart = new Chart(sectorCtx, {
@@ -342,8 +576,8 @@ function renderCharts() {
         data: {
           labels: labels,
           datasets: [{
-            data: data,
-            backgroundColor: labels.map(l => getSectorBaseColor(l)),
+            data: dataForChart,
+            backgroundColor: labels.map(l => getSectorColor(l)),
             borderColor: 'rgba(255, 255, 255, 0.05)',
             borderWidth: 2
           }]
@@ -357,6 +591,29 @@ function renderCharts() {
               labels: {
                 color: textSecondary,
                 font: { family: 'Plus Jakarta Sans', size: 11 }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const idx = context.dataIndex;
+                  const item = finalSectors[idx];
+                  if (!item) return '';
+                  
+                  const actualVal = item.value;
+                  const actualPct = totalValue > 0 ? (actualVal / totalValue) * 100 : 0;
+                  
+                  if (item.isOthers) {
+                    const lines = ['Others:'];
+                    othersSectors.forEach(sub => {
+                      const subPct = totalValue > 0 ? (sub.value / totalValue) * 100 : 0;
+                      lines.push(`  • ${sub.sector}: ${formatINR(sub.value)} (${subPct.toFixed(2)}%)`);
+                    });
+                    return lines;
+                  }
+                  
+                  return ` ${item.sector}: ${formatINR(actualVal)} (${actualPct.toFixed(2)}%)`;
+                }
               }
             }
           }
@@ -746,33 +1003,106 @@ async function fetchSectorContributionData() {
   }
 }
 
-function getSectorBaseColor(sectorName) {
-  const colors = {
-    'Banking & Finance': 'rgba(59, 130, 246, 0.75)',       // blue
-    'Financial Services': 'rgba(59, 130, 246, 0.75)',      // blue
-    'Financials': 'rgba(59, 130, 246, 0.75)',              // blue
-    'Communication Services': 'rgba(168, 85, 247, 0.75)',  // purple
-    'Communication': 'rgba(168, 85, 247, 0.75)',           // purple
-    'Energy': 'rgba(249, 115, 22, 0.75)',                  // orange
-    'Materials': 'rgba(20, 184, 166, 0.75)',                 // teal
-    'Basic Materials': 'rgba(20, 184, 166, 0.75)',          // teal
-    'Consumer Discretionary': 'rgba(234, 179, 8, 0.75)',   // yellow
-    'Consumer Cyclical': 'rgba(234, 179, 8, 0.75)',        // yellow
-    'Utilities': 'rgba(16, 185, 129, 0.75)',               // green
-    'Industrials': 'rgba(236, 72, 153, 0.75)',             // pink
-    'Healthcare': 'rgba(217, 70, 239, 0.75)',              // fuchsia
-    'Technology': 'rgba(79, 70, 229, 0.75)',              // indigo
-    'Real Estate': 'rgba(139, 92, 246, 0.75)',             // violet
-    'Consumer Defensive': 'rgba(244, 63, 94, 0.75)'        // rose
-  };
-  return colors[sectorName] || 'rgba(148, 163, 184, 0.75)'; // default slate
+const BACKUP_PALETTE = [
+  'rgba(34, 197, 94, 0.85)',   // green
+  'rgba(249, 115, 22, 0.85)',   // orange
+  'rgba(236, 72, 153, 0.85)',  // pink
+  'rgba(168, 85, 247, 0.85)',  // purple
+  'rgba(59, 130, 246, 0.85)',   // blue
+  'rgba(20, 184, 166, 0.85)',   // teal
+  'rgba(99, 102, 241, 0.85)',   // indigo
+  'rgba(245, 158, 11, 0.85)',   // amber
+  'rgba(255, 127, 80, 0.85)',   // coral
+  'rgba(255, 69, 0, 0.85)',     // red-orange
+  'rgba(6, 182, 212, 0.85)',    // cyan
+  'rgba(253, 224, 71, 0.85)',   // gold
+  'rgba(217, 70, 239, 0.85)',   // magenta
+  'rgba(106, 90, 205, 0.85)',   // slate blue
+  'rgba(120, 113, 108, 0.85)',  // brown
+  // Additional backup distinct hues
+  'rgba(132, 204, 22, 0.85)',   // lime
+  'rgba(244, 63, 94, 0.85)',    // rose
+  'rgba(14, 165, 233, 0.85)',   // sky blue
+  'rgba(13, 148, 136, 0.85)',   // dark teal
+  'rgba(162, 28, 175, 0.85)',   // dark magenta
+  'rgba(180, 83, 9, 0.85)',     // dark amber
+  'rgba(67, 56, 202, 0.85)',     // dark indigo
+];
+
+const sectorColorCache = {};
+let backupColorIdx = 0;
+
+function normalizeSectorName(name) {
+  if (!name) return "";
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
-function getSectorColor(sectorName, isNegative = false) {
-  if (isNegative) {
-    return 'rgba(239, 68, 68, 0.75)'; // Red is reserved strictly for negative return segments only
+function getSectorColor(sectorName) {
+  const norm = normalizeSectorName(sectorName);
+  if (norm === 'others') {
+    return 'rgba(71, 85, 105, 0.85)'; // slate-600 for "Others"
   }
-  return getSectorBaseColor(sectorName);
+  
+  const explicitMappings = {
+    'utilities': 'rgba(34, 197, 94, 0.85)', // green
+    'energy': 'rgba(249, 115, 22, 0.85)', // orange
+    'consumer discretionary': 'rgba(236, 72, 153, 0.85)', // pink
+    'consumer cyclical': 'rgba(236, 72, 153, 0.85)', // pink
+    'materials': 'rgba(168, 85, 247, 0.85)', // purple
+    'basic materials': 'rgba(168, 85, 247, 0.85)', // purple
+    'communication': 'rgba(59, 130, 246, 0.85)', // blue
+    'telecommunication': 'rgba(59, 130, 246, 0.85)', // blue
+    'communication services': 'rgba(59, 130, 246, 0.85)', // blue
+    'telecommunication - service provider': 'rgba(59, 130, 246, 0.85)', // blue
+    'telecommunication - service  provider': 'rgba(59, 130, 246, 0.85)', // blue // double spaces
+    'banking - private': 'rgba(20, 184, 166, 0.85)', // teal
+    'bank - private': 'rgba(20, 184, 166, 0.85)', // teal
+    'banking - public': 'rgba(99, 102, 241, 0.85)', // indigo
+    'bank - public': 'rgba(99, 102, 241, 0.85)', // indigo
+    'finance/nbfc': 'rgba(245, 158, 11, 0.85)', // amber
+    'banking & finance': 'rgba(245, 158, 11, 0.85)', // amber
+    'financial services': 'rgba(245, 158, 11, 0.85)', // amber
+    'financials': 'rgba(245, 158, 11, 0.85)', // amber
+    'automobiles - passenger cars': 'rgba(255, 127, 80, 0.85)', // coral
+    'auto - trucks': 'rgba(255, 69, 0, 0.85)', // red-orange
+    'electric equipment': 'rgba(6, 182, 212, 0.85)', // cyan
+    'diamond & gold jewellery': 'rgba(253, 224, 71, 0.85)', // gold
+    'diamond  & gold  jewellery': 'rgba(253, 224, 71, 0.85)', // gold // double spaces
+    'textile': 'rgba(217, 70, 239, 0.85)', // magenta
+    'power generation/distribution': 'rgba(106, 90, 205, 0.85)', // slate blue
+    'mining & minerals': 'rgba(120, 113, 108, 0.85)', // brown
+    'metal - non ferrous': 'rgba(148, 163, 184, 0.85)', // grey
+  };
+  
+  if (explicitMappings[norm]) {
+    return explicitMappings[norm];
+  }
+  
+  if (sectorColorCache[norm]) {
+    return sectorColorCache[norm];
+  }
+  
+  // Assign next unused backup color (never grey)
+  let chosenColor = null;
+  for (let i = 0; i < BACKUP_PALETTE.length; i++) {
+    const color = BACKUP_PALETTE[(backupColorIdx + i) % BACKUP_PALETTE.length];
+    if (color !== 'rgba(148, 163, 184, 0.85)') {
+      chosenColor = color;
+      backupColorIdx = (backupColorIdx + i + 1) % BACKUP_PALETTE.length;
+      break;
+    }
+  }
+  
+  if (!chosenColor) {
+    chosenColor = 'rgba(34, 197, 94, 0.85)';
+  }
+  
+  sectorColorCache[norm] = chosenColor;
+  return chosenColor;
+}
+
+function getSectorBaseColor(sectorName) {
+  return getSectorColor(sectorName);
 }
 
 function formatINRNoSymbol(val) {
@@ -908,20 +1238,79 @@ function renderSectorContributionChart(data) {
     if (chartContainer) chartContainer.style.display = "block";
     if (summaryRow) summaryRow.style.display = "grid";
     if (legendBox) {
-      legendBox.style.display = "flex";
-      legendBox.innerHTML = sortedSectors.map(sec => {
+      legendBox.style.display = "block";
+      legendBox.style.flexWrap = "unset";
+      legendBox.style.justifyContent = "unset";
+      legendBox.style.gap = "unset";
+      
+      const top5 = sortedSectors.slice(0, 5);
+      const remaining = sortedSectors.slice(5);
+      
+      const renderLegendItem = (sec) => {
         const isNeg = sec.contrib_pct < 0;
-        const color = getSectorColor(sec.sector, isNeg);
+        const color = getSectorColor(sec.sector);
         const sign = sec.contrib_pct >= 0 ? '+' : '';
         const rupeesSign = sec.contrib_rupees >= 0 ? '₹' : '-₹';
         const rupeesVal = formatINRNoSymbol(Math.abs(sec.contrib_rupees));
         return `
-          <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem;">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${color};"></span>
-            <span style="color: var(--text-secondary);">${sec.sector} | <strong style="color: ${isNeg ? '#f87171' : '#34d399'}">${sign}${sec.contrib_pct.toFixed(2)}%</strong> | <span style="color: var(--text-primary); font-family: 'Outfit'; font-size: 0.8rem;">${rupeesSign}${rupeesVal}</span></span>
+          <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 12px; height: 16px;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${color}; flex-shrink: 0;"></span>
+            <span style="color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${sec.sector}">${sec.sector}</span>
+            <strong style="color: ${isNeg ? '#f87171' : '#34d399'}; margin-left: auto; padding-left: 4px; font-weight: 600;">${sign}${sec.contrib_pct.toFixed(2)}%</strong>
+            <span style="color: var(--text-primary); font-family: 'Outfit'; font-weight: 500; margin-left: 6px;">${rupeesSign}${rupeesVal}</span>
           </div>
         `;
-      }).join("");
+      };
+      
+      let legendHTML = `
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 8px; font-size: 12px; padding: 0.5rem 0 0;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
+            ${top5.map(sec => renderLegendItem(sec)).join('')}
+          </div>
+      `;
+      
+      if (remaining.length > 0) {
+        legendHTML += `
+          <div id="contrib-remaining-sectors" style="display: none; margin-top: 8px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
+              ${remaining.map(sec => renderLegendItem(sec)).join('')}
+            </div>
+          </div>
+          <div style="text-align: center; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 6px;">
+            <button id="contrib-more-btn" style="
+              background: none; border: none; color: var(--accent); cursor: pointer;
+              font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600;
+              padding: 4px 8px; display: inline-flex; align-items: center; gap: 4px;
+            ">
+              <span id="contrib-more-text">+${remaining.length} more sectors</span>
+              <i id="contrib-more-icon" class="fa-solid fa-chevron-down"></i>
+            </button>
+          </div>
+        `;
+      }
+      
+      legendHTML += `</div>`;
+      legendBox.innerHTML = legendHTML;
+      
+      if (remaining.length > 0) {
+        const moreBtn = document.getElementById("contrib-more-btn");
+        if (moreBtn) {
+          moreBtn.addEventListener("click", () => {
+            const container = document.getElementById("contrib-remaining-sectors");
+            const textEl = document.getElementById("contrib-more-text");
+            const iconEl = document.getElementById("contrib-more-icon");
+            if (container.style.display === "none") {
+              container.style.display = "block";
+              textEl.innerText = "Show less";
+              iconEl.className = "fa-solid fa-chevron-up";
+            } else {
+              container.style.display = "none";
+              textEl.innerText = `+${remaining.length} more sectors`;
+              iconEl.className = "fa-solid fa-chevron-down";
+            }
+          });
+        }
+      }
     }
   }
   
@@ -944,21 +1333,25 @@ function renderSectorContributionChart(data) {
   // Build Chart.js horizontal stacked datasets
   const datasets = sortedSectors.map(sec => {
     const isNeg = sec.contrib_pct < 0;
-    const color = getSectorColor(sec.sector, isNeg);
+    const color = getSectorColor(sec.sector);
     
-    // Ensure thin visible sliver for near-zero contributions (min +/- 0.18% display value)
+    // Ensure thin visible sliver for near-zero contributions (min +/- 0.35% display value for 3px width)
     const originalValue = sec.contrib_pct;
     let displayValue = originalValue;
-    const minVisPct = 0.18;
-    if (Math.abs(originalValue) < minVisPct) {
-      displayValue = originalValue >= 0 ? minVisPct : -minVisPct;
+    const minVisPct = 0.35;
+    if (Math.abs(originalValue) < 1.0) {
+      if (originalValue >= 0) {
+        displayValue = Math.max(originalValue, minVisPct);
+      } else {
+        displayValue = Math.min(originalValue, -minVisPct);
+      }
     }
     
     return {
       label: sec.sector,
       data: [displayValue],
       backgroundColor: color,
-      borderColor: color.replace('0.75', '1.0').replace('0.22', '0.6'),
+      borderColor: color.replace('0.85', '1.0').replace('0.75', '1.0').replace('0.22', '0.6'),
       borderWidth: 1,
       stack: 'stack1',
       sectorRawData: sec,
@@ -1125,7 +1518,7 @@ function renderStocksTable() {
     
     visCols.forEach(col => {
       const td = document.createElement("td");
-      const rawVal = s[col];
+      const rawVal = col === "Return (₹)" ? s["Total Return"] : s[col];
       
       // Formatting cells beautifully
       if (col === "Scrip Name") {
@@ -1137,7 +1530,7 @@ function renderStocksTable() {
         td.innerText = rawVal.toLocaleString();
       } else if (col === "Buy Price" || col === "Current Price" || col === "Invested Value" || col === "Current Value" || col === "Dividends") {
         td.innerText = formatINR(rawVal);
-      } else if (col === "P&L" || col === "Total Return") {
+      } else if (col === "P&L" || col === "Return (₹)") {
         td.innerText = formatINR(rawVal);
         td.className = rawVal >= 0 ? 'positive' : 'negative';
       } else if (col === "Return %" || col === "5Y CAGR" || col === "Nifty 5Y CAGR") {
@@ -1196,8 +1589,8 @@ function renderMfsTable() {
   headersRow.innerHTML = "";
   body.innerHTML = "";
   
-  // Always use the canonical MF columns (not appConfig customizable for now)
-  const visCols = ALL_MF_COLUMNS;
+  // Use custom columns if loaded in config
+  const visCols = appConfig ? appConfig.display_columns.mf : ALL_MF_COLUMNS;
   
   // Build sortable headers
   visCols.forEach(col => {
@@ -1213,7 +1606,7 @@ function renderMfsTable() {
       "Invested Value": "Invested",
       "Current Value": "Current Value",
       "P&L": "P&L",
-      "Absolute Return %": "Abs. Return %",
+      "Return %": "Return %",
       "XIRR %": "XIRR %",
       "Holding Period": "Holding Period",
       "Tax Flag": "Tax Type"
@@ -1250,8 +1643,9 @@ function renderMfsTable() {
   let mfRows = [...portfolioData.mfs];
   if (mfSortCol) {
     mfRows.sort((a, b) => {
-      let aVal = mfSortCol === "Holding Period" ? (a["Holding Period Yrs"] ?? 0) : (a[mfSortCol] ?? "");
-      let bVal = mfSortCol === "Holding Period" ? (b["Holding Period Yrs"] ?? 0) : (b[mfSortCol] ?? "");
+      const colKey = mfSortCol === "Return %" ? "Absolute Return %" : mfSortCol;
+      let aVal = colKey === "Holding Period" ? (a["Holding Period Yrs"] ?? 0) : (a[colKey] ?? "");
+      let bVal = colKey === "Holding Period" ? (b["Holding Period Yrs"] ?? 0) : (b[colKey] ?? "");
       if (typeof aVal === "string") aVal = aVal.toLowerCase();
       if (typeof bVal === "string") bVal = bVal.toLowerCase();
       if (aVal < bVal) return -mfSortDir;
@@ -1287,7 +1681,7 @@ function renderMfsTable() {
         td.innerText = formatINR(pnl);
         td.className = pnl >= 0 ? "positive" : "negative";
         
-      } else if (col === "Absolute Return %") {
+      } else if (col === "Return %") {
         const ret = m["Absolute Return %"];
         if (ret !== null && ret !== undefined) {
           td.innerText = `${ret >= 0 ? "+" : ""}${ret.toFixed(2)}%`;
@@ -1664,6 +2058,7 @@ function openAddStockModal() {
   document.getElementById("modal-stock-title").innerText = "Add New Stock Holding";
   document.getElementById("stock-form").reset();
   document.getElementById("stock-row-idx").value = "";
+  document.getElementById("stock-live-price-helper").innerText = "";
   document.getElementById("btn-stock-submit").innerText = "Add Holding";
   document.getElementById("modal-stock").classList.add("active");
 }
@@ -1675,6 +2070,12 @@ function openEditStockModal(s) {
   document.getElementById("stock-sector").value = s["Sector"] || "";
   document.getElementById("stock-qty").value = s["Qty"];
   document.getElementById("stock-buy-price").value = s["Buy Price"];
+  document.getElementById("stock-current-price").value = s["Current Price"] || "";
+  document.getElementById("stock-live-price-helper").innerText = "";
+  
+  if (s["Scrip Name"]) {
+    fetchLivePriceHelper(s["Scrip Name"]);
+  }
   
   document.getElementById("btn-stock-submit").innerText = "Save Changes";
   document.getElementById("modal-stock").classList.add("active");
@@ -1695,12 +2096,12 @@ async function submitStockForm(e) {
     "Sector":             document.getElementById("stock-sector").value.trim(),
     "Total Quantity":     parseFloat(document.getElementById("stock-qty").value) || 0,
     "Avg Trading Price":  parseFloat(document.getElementById("stock-buy-price").value) || 0,
+    "Current Price":      parseFloat(document.getElementById("stock-current-price").value) || null,
     // For edit compatibility — these map to the same fields the backend reads
     "Scrip Name":         document.getElementById("stock-scrip").value.trim(),
     "Exchange":           "NSE",
     "Qty":                parseFloat(document.getElementById("stock-qty").value) || 0,
     "Buy Price":          parseFloat(document.getElementById("stock-buy-price").value) || 0,
-    "Current Price":      parseFloat(document.getElementById("stock-buy-price").value) || 0,
   };
 
   try {
@@ -1850,6 +2251,24 @@ async function deleteStockHolding(rowIdx) {
   }
 }
 
+async function deleteAllStocks() {
+  if (!confirm("Are you sure you want to delete ALL stock holdings from your portfolio and the underlying Excel file? This action CANNOT be undone.")) return;
+  try {
+    const res = await fetch('/api/stock/delete-all', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'}
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      await fetchPortfolio();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    console.error("Delete all stocks request failed", err);
+  }
+}
+
 // MUTUAL FUND CRUD MODAL INTERACTIONS
 function openAddMfModal() {
   document.getElementById("modal-mf-title").innerText = "Add New Mutual Fund Holding";
@@ -1957,6 +2376,7 @@ function loadSettingsIntoForm() {
     const label = document.createElement("label");
     label.className = "checkbox-label";
     label.innerHTML = `<input type="checkbox" name="stock-col" value="${col}" ${isChecked ? 'checked' : ''}> ${col}`;
+    label.querySelector("input").addEventListener("change", triggerCheckboxToast);
     stChecksContainer.appendChild(label);
   });
 
@@ -1965,6 +2385,7 @@ function loadSettingsIntoForm() {
     const label = document.createElement("label");
     label.className = "checkbox-label";
     label.innerHTML = `<input type="checkbox" name="mf-col" value="${col}" ${isChecked ? 'checked' : ''}> ${col}`;
+    label.querySelector("input").addEventListener("change", triggerCheckboxToast);
     mfChecksContainer.appendChild(label);
   });
   
@@ -2036,7 +2457,7 @@ async function saveCustomSettings(e) {
   renderMfsTable();
   evaluateRiskAlerts();
   
-  alert("Settings saved successfully! Excel formulas and columns have been customised.");
+  showToast("Settings saved successfully!");
 }
 
 async function saveConfigOnServer(config) {
@@ -2475,6 +2896,42 @@ async function clearPortfolioHoldings() {
   } catch (err) {
     console.error("Failed to reset portfolio:", err);
     alert("API connection failed. Ensure Flask app is running!");
+  }
+}
+
+// DEBOUNCE HELPER
+function debounce(func, delay) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), delay);
+  };
+}
+
+// FETCH LIVE STOCK PRICE HELPER FOR MODAL
+async function fetchLivePriceHelper(scripName) {
+  const helper = document.getElementById("stock-live-price-helper");
+  if (!scripName || scripName.trim() === "") {
+    helper.innerText = "";
+    return;
+  }
+  helper.innerText = "Fetching live...";
+  try {
+    const res = await fetch(`/api/stock/live-price?scrip=${encodeURIComponent(scripName.trim())}`);
+    const data = await res.json();
+    if (data.status === "success" && data.price) {
+      helper.innerText = `Live: ₹${data.price.toFixed(2)}`;
+      const priceInput = document.getElementById("stock-current-price");
+      // Only auto-fill if empty or 0 to avoid overwriting user edits
+      if (priceInput && (!priceInput.value || parseFloat(priceInput.value) === 0 || priceInput.value === "")) {
+        priceInput.value = data.price;
+      }
+    } else {
+      helper.innerText = "Live price N/A";
+    }
+  } catch (err) {
+    console.error("Failed to fetch helper price", err);
+    helper.innerText = "";
   }
 }
 
