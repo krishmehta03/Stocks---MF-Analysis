@@ -74,12 +74,13 @@ load_profile_globals()
 
 # Global state for background live price update progress
 price_update_state = {
-    "status": "idle",  # idle, running, completed, error
+    "status": "idle",  # idle, running, completed, error, background_running, locked
     "current_index": 0,
     "total_tickers": 0,
     "current_ticker": "",
     "logs": [],
-    "start_time": None
+    "start_time": None,
+    "last_updated_by_profile": {}  # active profile -> timestamp
 }
 
 def load_config():
@@ -213,6 +214,45 @@ _SECTOR_MAP = {
     "Real Estate":            "Real Estate",
     "Communication Services": "Communication",
 }
+
+_BROAD_SECTOR_MAP = {
+    "automobiles - passenger cars": "Auto",
+    "auto - trucks": "Auto",
+    "steel/sponge iron/pig iron": "Metals",
+    "metal - non ferrous": "Metals",
+    "mining & minerals": "Metals",
+    "power generation/distribution": "Power",
+    "diamond & gold jewellery": "Consumer",
+    "diamond  & gold  jewellery": "Consumer", # Double spaces
+    "etfs": "ETF",
+    "materials": "Materials",
+    "utilities": "Utilities",
+    "textile": "Textile",
+    "bank - public": "Financials",
+    "bank - private": "Financials",
+    "finance/nbfc": "Financials",
+    "banking & finance": "Financials",
+    "financial services": "Financials",
+    "financials": "Financials",
+    "telecommunication - service provider": "Communication",
+    "telecommunication - service  provider": "Communication",
+    "electric equipment": "Industrials",
+    "industrials": "Industrials",
+    "energy": "Energy",
+    "real estate": "Real Estate",
+    "communication services": "Communication",
+    "communication": "Communication",
+    "technology": "Technology",
+    "healthcare": "Healthcare",
+    "other": "ETF"
+}
+
+def get_broad_sector(granular_sector: str) -> str:
+    if not granular_sector:
+        return "ETF"
+    norm = granular_sector.strip().lower()
+    return _BROAD_SECTOR_MAP.get(norm, granular_sector.strip())
+
 
 
 _CUSTOM_TICKER_MAP = {
@@ -535,9 +575,11 @@ def get_portfolio_data():
             exchange = ws[f'B{row}'].value or "NSE"
             raw_sector = ws[f'C{row}'].value
             if not raw_sector or str(raw_sector).strip() == "" or str(raw_sector).strip().lower() == "other":
-                sector = "ETFs"
+                industry = "ETFs"
             else:
-                sector = str(raw_sector).strip()
+                industry = str(raw_sector).strip()
+            
+            sector = get_broad_sector(industry)
             qty = ws[f'D{row}'].value or 0
             buy_price = ws[f'E{row}'].value or 0
             buy_date_raw = ws[f'F{row}'].value
@@ -555,6 +597,8 @@ def get_portfolio_data():
             total_return = pnl + dividends
             
             buy_date_str = format_date_str(buy_date_raw)
+            holding_yrs = get_holding_period_years(buy_date_raw) if buy_date_raw else None
+            holding_type = "LT" if tax_flag == "LTCG" else ("ST" if tax_flag == "STCG" else "")
             
             sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
             drawdown_days = get_days_in_drawdown(sym, buy_price) if sym else 0
@@ -563,10 +607,13 @@ def get_portfolio_data():
                 "row_idx": row,
                 "Scrip Name": str(scrip).strip(),
                 "Exchange": str(exchange).strip(),
-                "Sector": str(sector).strip(),
+                "Sector": sector,
+                "Industry": industry,
                 "Qty": qty,
                 "Buy Price": buy_price,
                 "Buy Date": buy_date_str,
+                "Holding Period Yrs": holding_yrs,
+                "Holding Type": holding_type,
                 "Current Price": current_price,
                 "5Y CAGR": cagr_5y,
                 "Nifty 5Y CAGR": nifty_cagr_5y,
@@ -579,6 +626,7 @@ def get_portfolio_data():
                 "Total Return": round(total_return, 2),
                 "Drawdown Days": drawdown_days
             })
+
 
     # 2. READ MUTUAL FUNDS
     if "📥 MF Data Input" in wb.sheetnames:
@@ -747,75 +795,166 @@ def apply_excel_styles(ws, row):
                 cell.alignment = align_right
 
 # Background thread for live price updates
-def live_price_updater_thread():
-    global price_update_state
-    price_update_state["status"] = "running"
+def run_price_and_nav_update(is_background=False):
+    global price_update_state, EXCEL_FILE, ACTIVE_PROFILE
+    
+    # Avoid overlapping manual/background updates
+    if price_update_state["status"] in ("running", "background_running"):
+        return False
+        
+    price_update_state["status"] = "background_running" if is_background else "running"
     price_update_state["logs"] = []
     price_update_state["start_time"] = time.time()
+    price_update_state["current_index"] = 0
+    price_update_state["total_tickers"] = 0
+    price_update_state["current_ticker"] = ""
     
-    # Capture active profile's excel file at start to prevent race conditions on profile switches
     active_excel_file = EXCEL_FILE
+    active_profile = ACTIVE_PROFILE
     
     try:
         wb = openpyxl.load_workbook(active_excel_file)
-        if "📥 Stock Data Input" not in wb.sheetnames:
-            raise Exception("Stock Data Input sheet not found.")
-            
-        ws = wb["📥 Stock Data Input"]
-        tickers_to_update = []
         
-        # Read active tickers
-        for row in range(4, 1000):
-            scrip = ws[f'A{row}'].value
-            if scrip and str(scrip).strip().upper() != "TOTAL":
-                exchange = ws[f'B{row}'].value or "NSE"
-                tickers_to_update.append((row, str(scrip).strip(), str(exchange).strip()))
-                
-        price_update_state["total_tickers"] = len(tickers_to_update)
-        price_update_state["logs"].append(f"Found {len(tickers_to_update)} stocks to update.")
+        # 1. Read Stocks to update
+        tickers_to_update = []
+        if "📥 Stock Data Input" in wb.sheetnames:
+            ws_stock = wb["📥 Stock Data Input"]
+            for row in range(4, 1000):
+                scrip = ws_stock[f'A{row}'].value
+                if scrip and str(scrip).strip().upper() != "TOTAL":
+                    exchange = ws_stock[f'B{row}'].value or "NSE"
+                    tickers_to_update.append(("stock", row, str(scrip).strip(), str(exchange).strip()))
+                    
+        # 2. Read Mutual Funds to update
+        mf_to_update = []
+        if "📥 MF Data Input" in wb.sheetnames:
+            ws_mf = wb["📥 MF Data Input"]
+            for row in range(4, 1000):
+                fund_name = ws_mf[f'A{row}'].value
+                if fund_name and str(fund_name).strip().upper() != "TOTAL":
+                    mf_to_update.append(("mf", row, str(fund_name).strip(), None))
+                    
+        items_to_update = tickers_to_update + mf_to_update
+        price_update_state["total_tickers"] = len(items_to_update)
+        price_update_state["logs"].append(f"Starting update. Found {len(tickers_to_update)} stocks and {len(mf_to_update)} mutual funds to update.")
         
         updated_count = 0
         
-        for idx, (row, scrip, exchange) in enumerate(tickers_to_update):
+        for idx, (item_type, row, name, exchange) in enumerate(items_to_update):
             price_update_state["current_index"] = idx + 1
-            price_update_state["current_ticker"] = scrip
-            price_update_state["logs"].append(f"Fetching live price for {scrip} ({exchange})...")
-
-            # Resolve company name → Yahoo Finance ticker symbol
-            sym = _resolve_ticker(scrip, exchange)
-            if not sym:
-                price_update_state["logs"].append(f"  -> ❌ Could not resolve ticker symbol.")
-                time.sleep(0.3)
-                continue
-
-            # Fetch price + sector in one call (cached after first hit)
-            info = _yf_info(sym, bypass_cache=True)
-            price  = info["price"]
-            sector = info["sector"]
-
-            if price is not None:
-                ws[f'G{row}'].value = price
-                log_line = f"  -> ✅ ₹{price}  [{sym}]"
-
-                # Auto-fill sector if missing or still default
-                current_sector = str(ws[f'C{row}'].value or "").strip()
-                if current_sector in ("", "Other", "ETFs") and sector:
-                    ws[f'C{row}'].value = sector
-                    log_line += f"  | Sector: {sector}"
-
-                price_update_state["logs"].append(log_line)
-                updated_count += 1
+            price_update_state["current_ticker"] = name
+            
+            if item_type == "stock":
+                price_update_state["logs"].append(f"Fetching live price for stock {name} ({exchange})...")
+                sym = _resolve_ticker(name, exchange)
+                if not sym:
+                    price_update_state["logs"].append(f"  -> ❌ Could not resolve ticker symbol.")
+                    time.sleep(0.1)
+                    continue
+                    
+                info = _yf_info(sym, bypass_cache=True)
+                price = info["price"]
+                sector = info["sector"]
+                
+                if price is not None:
+                    ws_stock = wb["📥 Stock Data Input"]
+                    ws_stock[f'G{row}'].value = price
+                    log_line = f"  -> ✅ ₹{price}  [{sym}]"
+                    
+                    # Auto-fill sector if missing or still default
+                    current_sector = str(ws_stock[f'C{row}'].value or "").strip()
+                    if current_sector in ("", "Other", "ETFs") and sector:
+                        ws_stock[f'C{row}'].value = sector
+                        log_line += f"  | Sector: {sector}"
+                    
+                    price_update_state["logs"].append(log_line)
+                    updated_count += 1
+                else:
+                    price_update_state["logs"].append(f"  -> ❌ Price not available for [{sym}].")
             else:
-                price_update_state["logs"].append(f"  -> ❌ Price not available for [{sym}].")
-
-            time.sleep(0.3)  # small delay between tickers
+                # Mutual Fund
+                price_update_state["logs"].append(f"Fetching live NAV for mutual fund {name}...")
+                code = _resolve_mf_scheme_code(name)
+                if not code:
+                    price_update_state["logs"].append(f"  -> ❌ Could not resolve scheme code.")
+                    time.sleep(0.1)
+                    continue
+                    
+                try:
+                    url = f"https://api.mfapi.in/mf/{code}"
+                    r = requests.get(url, timeout=5)
+                    if r.status_code == 200:
+                        res_data = r.json().get('data', [])
+                        if res_data:
+                            nav = float(res_data[0]['nav'])
+                            ws_mf = wb["📥 MF Data Input"]
+                            ws_mf[f'H{row}'].value = nav
+                            price_update_state["logs"].append(f"  -> ✅ NAV: ₹{nav}")
+                            updated_count += 1
+                        else:
+                            price_update_state["logs"].append(f"  -> ❌ No NAV data found.")
+                    else:
+                        price_update_state["logs"].append(f"  -> ❌ API error ({r.status_code}).")
+                except Exception as e:
+                    price_update_state["logs"].append(f"  -> ❌ Connection error: {e}")
+                    
+            time.sleep(0.3)  # delay between tickers to avoid rate limiting
             
         wb.save(active_excel_file)
         price_update_state["status"] = "completed"
-        price_update_state["logs"].append(f"Successfully updated {updated_count} stock prices and saved Excel file.")
+        price_update_state["last_updated_by_profile"][active_profile] = time.time()
+        price_update_state["logs"].append(f"Successfully updated {updated_count} items and saved Excel file.")
+        return True
+    except PermissionError:
+        price_update_state["status"] = "locked"
+        price_update_state["logs"].append("❌ Excel file is currently open and locked by another program. Will retry shortly.")
+        raise
     except Exception as e:
         price_update_state["status"] = "error"
         price_update_state["logs"].append(f"Critical Error during update: {e}")
+        raise
+
+# Background thread for live price updates (manual trigger wrapper)
+def live_price_updater_thread():
+    try:
+        run_price_and_nav_update(is_background=False)
+    except Exception:
+        pass
+
+# Background daemon loop for automatic updates
+def automatic_price_updater_loop():
+    print("[Auto Price Updater] Starting background automatic price updater loop...")
+    time.sleep(15)  # wait for Flask app to fully spin up
+    
+    while True:
+        try:
+            config = load_config()
+            if config.get("auto_update_prices", True):
+                active_profile = ACTIVE_PROFILE
+                last_updated = price_update_state["last_updated_by_profile"].get(active_profile, 0)
+                now = time.time()
+                
+                # If last update failed because it was locked, retry in 2 minutes (120s)
+                # otherwise wait 15 minutes (900s)
+                if price_update_state["status"] == "locked":
+                    interval = 120
+                else:
+                    interval = 900
+                    
+                if now - last_updated >= interval:
+                    # Only start background run if status is idle, completed, error, or locked
+                    if price_update_state["status"] not in ("running", "background_running"):
+                        print(f"[Auto Price Updater] Running automatic price/NAV update for profile: {active_profile}")
+                        try:
+                            run_price_and_nav_update(is_background=True)
+                        except PermissionError:
+                            print("[Auto Price Updater] Excel file is currently locked. Retrying in 2m.")
+                        except Exception as e:
+                            print(f"[Auto Price Updater] Error in automatic update: {e}")
+        except Exception as e:
+            print(f"[Auto Price Updater] Exception in background loop: {e}")
+            
+        time.sleep(10)  # Check config and state every 10 seconds
 
 @app.route('/')
 def home():
@@ -824,6 +963,9 @@ def home():
 @app.route('/api/portfolio', methods=['GET'])
 def api_portfolio():
     data = get_portfolio_data()
+    # Inject last_updated timestamp
+    if isinstance(data, dict):
+        data["last_updated"] = price_update_state["last_updated_by_profile"].get(ACTIVE_PROFILE)
     return jsonify(data)
 
 # Simple TTL cache for performance data
@@ -1046,15 +1188,17 @@ def sector_contribution():
             exchange = ws[f'B{row}'].value or 'NSE'
             raw_sector = ws[f'C{row}'].value
             if not raw_sector or str(raw_sector).strip() == "" or str(raw_sector).strip().lower() == "other":
-                sector = "ETFs"
+                industry = "ETFs"
             else:
-                sector = str(raw_sector).strip()
+                industry = str(raw_sector).strip()
+            
+            sector = get_broad_sector(industry)
             qty      = ws[f'D{row}'].value or 0
             if float(qty) > 0:
                 holdings.append({
                     'name': str(scrip).strip(),
                     'exchange': str(exchange).strip(),
-                    'sector': str(sector).strip(),
+                    'sector': sector,
                     'qty': float(qty)
                 })
     except Exception as e:
@@ -1295,12 +1439,15 @@ def add_stock():
             current_price = live_price if live_price is not None else avg_price
 
         # Write user data
+        buy_date_raw = data.get("Buy Date")
+        buy_date = parse_date(buy_date_raw) if buy_date_raw else None
+
         ws[f'A{empty_row}'] = company_name
         ws[f'B{empty_row}'] = "NSE"          # Default exchange
         ws[f'C{empty_row}'] = sector
         ws[f'D{empty_row}'] = qty
         ws[f'E{empty_row}'] = avg_price
-        ws[f'F{empty_row}'] = ""             # Buy Date left blank
+        ws[f'F{empty_row}'] = buy_date
         ws[f'G{empty_row}'] = current_price
         ws[f'P{empty_row}'] = 0.0            # Dividends default 0
         
@@ -1563,16 +1710,39 @@ def edit_stock():
                 current_price = existing_price
 
         # Write updated values
+        buy_date_raw = data.get("Buy Date")
+        buy_date = parse_date(buy_date_raw) if buy_date_raw else None
+
         ws[f'A{row_idx}'] = company_name
         ws[f'B{row_idx}'] = "NSE"
         ws[f'C{row_idx}'] = sector
         ws[f'D{row_idx}'] = qty
         ws[f'E{row_idx}'] = avg_price
+        ws[f'F{row_idx}'] = buy_date
         ws[f'G{row_idx}'] = current_price
 
         apply_excel_styles(ws, row_idx)
         wb.save(EXCEL_FILE)
         return jsonify({"status": "success", "message": f"Stock '{company_name}' updated successfully in Excel!"})
+    except PermissionError:
+        return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/stock/save-buy-date', methods=['POST'])
+def save_stock_buy_date():
+    data = request.json
+    row_idx = int(data.get("row_idx"))
+    buy_date_raw = data.get("Buy Date")
+    try:
+        wb = openpyxl.load_workbook(EXCEL_FILE)
+        ws = wb["📥 Stock Data Input"]
+        buy_date = parse_date(buy_date_raw) if buy_date_raw else None
+        ws[f'F{row_idx}'] = buy_date
+        apply_excel_styles(ws, row_idx)
+        wb.save(EXCEL_FILE)
+        return jsonify({"status": "success", "message": "Buy date saved successfully!"})
     except PermissionError:
         return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
     except Exception as e:
@@ -1720,7 +1890,7 @@ def delete_mf():
 @app.route('/api/update-prices', methods=['POST'])
 def update_prices():
     global price_update_state
-    if price_update_state["status"] == "running":
+    if price_update_state["status"] in ("running", "background_running"):
         return jsonify({"status": "error", "message": "Update already in progress."}), 400
         
     threading.Thread(target=live_price_updater_thread, daemon=True).start()
@@ -1728,14 +1898,16 @@ def update_prices():
 
 @app.route('/api/update-status', methods=['GET'])
 def update_status():
-    global price_update_state
+    global price_update_state, ACTIVE_PROFILE
     pct = 0
     if price_update_state["total_tickers"] > 0:
         pct = int((price_update_state["current_index"] / price_update_state["total_tickers"]) * 100)
     
     elapsed = 0
-    if price_update_state["start_time"] and price_update_state["status"] == "running":
+    if price_update_state["start_time"] and price_update_state["status"] in ("running", "background_running"):
         elapsed = round(time.time() - price_update_state["start_time"], 1)
+        
+    last_updated = price_update_state["last_updated_by_profile"].get(ACTIVE_PROFILE)
     
     return jsonify({
         "status": price_update_state["status"],
@@ -1744,6 +1916,7 @@ def update_status():
         "total_tickers": price_update_state["total_tickers"],
         "current_ticker": price_update_state["current_ticker"],
         "elapsed_seconds": elapsed,
+        "last_updated": last_updated,
         "logs": price_update_state["logs"][-15:]  # Return last 15 log entries
     })
 
@@ -2136,4 +2309,6 @@ def rename_profile():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
+        threading.Thread(target=automatic_price_updater_loop, daemon=True).start()
     app.run(debug=True, port=5000)

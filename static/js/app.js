@@ -16,7 +16,7 @@ let contribSortMode = 'contribution';
 
 // Core Constants
 const ALL_STOCK_COLUMNS = [
-  "Scrip Name", "Exchange", "Sector", "Qty", "Buy Price", "Buy Date", 
+  "Scrip Name", "Exchange", "Sector", "Industry", "Qty", "Buy Price", "Buy Date", "Holding Period",
   "Current Price", "5Y CAGR", "Nifty 5Y CAGR", "Invested Value", 
   "Current Value", "P&L", "Return %", "Dividends", "Tax Flag", "Return (₹)"
 ];
@@ -28,7 +28,7 @@ const ALL_MF_COLUMNS = [
 ];
 
 const DEFAULT_STOCK_COLUMNS = [
-  "Scrip Name", "Exchange", "Sector", "Qty", "Buy Price", "Buy Date", 
+  "Scrip Name", "Exchange", "Sector", "Qty", "Buy Price", "Buy Date", "Holding Period",
   "Current Price", "Invested Value", "Current Value", "P&L", "Return %", "Tax Flag"
 ];
 
@@ -82,7 +82,10 @@ function setupEventListeners() {
   }
 
   // Price Scraper Trigger
-  document.getElementById("btn-update-prices-trigger").addEventListener("click", startLivePriceScraper);
+  const updatePricesBtn = document.getElementById("btn-update-prices-trigger");
+  if (updatePricesBtn) {
+    updatePricesBtn.addEventListener("click", startLivePriceScraper);
+  }
   
   // Search Filters
   document.getElementById("stock-search").addEventListener("input", filterStocksTable);
@@ -100,6 +103,17 @@ function setupEventListeners() {
     stockScripInput.addEventListener("input", debounce((e) => {
       fetchLivePriceHelper(e.target.value);
     }, 600));
+  }
+
+  // Delete all confirmation input listener
+  const deleteAllConfirmInput = document.getElementById("delete-all-confirm-input");
+  if (deleteAllConfirmInput) {
+    deleteAllConfirmInput.addEventListener("input", (e) => {
+      const submitBtn = document.getElementById("btn-delete-all-submit");
+      if (submitBtn) {
+        submitBtn.disabled = (e.target.value.trim().toUpperCase() !== "DELETE");
+      }
+    });
   }
 }
 
@@ -1512,6 +1526,8 @@ function renderStocksTable() {
     return;
   }
   
+  let hasMissingBuyDates = false;
+  
   portfolioData.stocks.forEach(s => {
     const tr = document.createElement("tr");
     tr.id = `stock-row-${s.row_idx}`;
@@ -1523,7 +1539,7 @@ function renderStocksTable() {
       // Formatting cells beautifully
       if (col === "Scrip Name") {
         td.innerHTML = `<strong>${rawVal}</strong>`;
-      } else if (col === "Exchange" || col === "Sector") {
+      } else if (col === "Exchange" || col === "Sector" || col === "Industry") {
         td.innerText = rawVal || "-";
         td.style.color = "var(--text-secondary)";
       } else if (col === "Qty") {
@@ -1539,6 +1555,28 @@ function renderStocksTable() {
           if (col === "Return %") td.className = rawVal >= 0 ? 'positive' : 'negative';
         } else {
           td.innerText = "N/A";
+        }
+      } else if (col === "Buy Date") {
+        if (!rawVal || rawVal.trim() === "") {
+          td.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.35rem;" onclick="event.stopPropagation();">
+              <input type="date" class="form-control form-control-sm" id="inline-date-${s.row_idx}" style="padding: 0.2rem 0.4rem; font-size: 0.8rem; min-width: 115px; background: rgba(249, 115, 22, 0.05); border: 1px solid rgba(249, 115, 22, 0.25);">
+              <button class="btn btn-secondary btn-sm" onclick="saveInlineBuyDate(${s.row_idx}, this)" style="padding: 0.25rem 0.45rem; font-size: 0.8rem; background: var(--accent); color: white;" title="Save Date"><i class="fa-solid fa-check"></i></button>
+            </div>
+          `;
+          hasMissingBuyDates = true;
+        } else {
+          td.innerText = rawVal;
+        }
+      } else if (col === "Holding Period") {
+        const yrs = s["Holding Period Yrs"];
+        const type = s["Holding Type"] || "ST";
+        const badgeClass = type === "LT" ? "badge-lt" : "badge-st";
+        if (yrs !== null && yrs !== undefined && !isNaN(yrs)) {
+          const formatted = formatHoldingPeriod(yrs);
+          td.innerHTML = `${formatted} <span class="${badgeClass}">${type}</span>`;
+        } else {
+          td.innerText = "—";
         }
       } else if (col === "Tax Flag") {
         if (rawVal) {
@@ -1564,6 +1602,11 @@ function renderStocksTable() {
     tr.appendChild(tdActions);
     body.appendChild(tr);
   });
+  
+  const banner = document.getElementById("missing-buy-dates-banner");
+  if (banner) {
+    banner.style.display = hasMissingBuyDates ? "flex" : "none";
+  }
 }
 
 // FILTER TABLES
@@ -2058,6 +2101,7 @@ function openAddStockModal() {
   document.getElementById("modal-stock-title").innerText = "Add New Stock Holding";
   document.getElementById("stock-form").reset();
   document.getElementById("stock-row-idx").value = "";
+  document.getElementById("stock-buy-date").value = "";
   document.getElementById("stock-live-price-helper").innerText = "";
   document.getElementById("btn-stock-submit").innerText = "Add Holding";
   document.getElementById("modal-stock").classList.add("active");
@@ -2070,6 +2114,7 @@ function openEditStockModal(s) {
   document.getElementById("stock-sector").value = s["Sector"] || "";
   document.getElementById("stock-qty").value = s["Qty"];
   document.getElementById("stock-buy-price").value = s["Buy Price"];
+  document.getElementById("stock-buy-date").value = s["Buy Date"] || "";
   document.getElementById("stock-current-price").value = s["Current Price"] || "";
   document.getElementById("stock-live-price-helper").innerText = "";
   
@@ -2096,6 +2141,7 @@ async function submitStockForm(e) {
     "Sector":             document.getElementById("stock-sector").value.trim(),
     "Total Quantity":     parseFloat(document.getElementById("stock-qty").value) || 0,
     "Avg Trading Price":  parseFloat(document.getElementById("stock-buy-price").value) || 0,
+    "Buy Date":           document.getElementById("stock-buy-date").value.trim(),
     "Current Price":      parseFloat(document.getElementById("stock-current-price").value) || null,
     // For edit compatibility — these map to the same fields the backend reads
     "Scrip Name":         document.getElementById("stock-scrip").value.trim(),
@@ -2251,8 +2297,29 @@ async function deleteStockHolding(rowIdx) {
   }
 }
 
-async function deleteAllStocks() {
-  if (!confirm("Are you sure you want to delete ALL stock holdings from your portfolio and the underlying Excel file? This action CANNOT be undone.")) return;
+function openDeleteAllModal() {
+  const count = portfolioData && portfolioData.stocks ? portfolioData.stocks.length : 0;
+  document.getElementById("delete-all-count").innerText = count;
+  document.getElementById("delete-all-confirm-input").value = "";
+  document.getElementById("btn-delete-all-submit").disabled = true;
+  document.getElementById("modal-delete-all-confirm").classList.add("active");
+}
+
+function closeDeleteAllModal() {
+  document.getElementById("modal-delete-all-confirm").classList.remove("active");
+}
+
+async function submitDeleteAllStocks() {
+  const confirmVal = document.getElementById("delete-all-confirm-input").value.trim().toUpperCase();
+  if (confirmVal !== "DELETE") {
+    alert("Please type DELETE to confirm.");
+    return;
+  }
+  
+  const btn = document.getElementById("btn-delete-all-submit");
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
+  
   try {
     const res = await fetch('/api/stock/delete-all', {
       method: 'POST',
@@ -2260,12 +2327,77 @@ async function deleteAllStocks() {
     });
     const data = await res.json();
     if (data.status === 'success') {
+      closeDeleteAllModal();
       await fetchPortfolio();
+      showToast("All stock holdings deleted successfully!");
     } else {
       alert("Error: " + data.message);
+      btn.disabled = false;
+      btn.innerHTML = "Permanently Delete All";
     }
   } catch (err) {
     console.error("Delete all stocks request failed", err);
+    alert("Connection error occurred.");
+    btn.disabled = false;
+    btn.innerHTML = "Permanently Delete All";
+  }
+}
+
+function formatHoldingPeriod(yrs) {
+  if (yrs === null || yrs === undefined || isNaN(yrs)) return "—";
+  if (yrs < 0) return "—";
+  
+  const totalDays = Math.round(yrs * 365);
+  if (totalDays < 30) {
+    return `${totalDays} Day${totalDays !== 1 ? 's' : ''}`;
+  }
+  
+  const totalMonths = Math.round(yrs * 12);
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+  
+  let parts = [];
+  if (years > 0) {
+    parts.push(`${years} Yr${years !== 1 ? 's' : ''}`);
+  }
+  if (months > 0) {
+    parts.push(`${months} Mo`);
+  }
+  return parts.join(" ") || "0 Mo";
+}
+
+async function saveInlineBuyDate(rowIdx, btn) {
+  const input = document.getElementById(`inline-date-${rowIdx}`);
+  if (!input || !input.value) {
+    alert("Please select a valid date first.");
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+  
+  try {
+    const res = await fetch('/api/stock/save-buy-date', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        row_idx: rowIdx,
+        "Buy Date": input.value
+      })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      showToast("Buy date saved successfully!");
+      await fetchPortfolio();
+    } else {
+      alert("Error: " + data.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+    }
+  } catch (err) {
+    alert("Connection error while saving date.");
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-check"></i>';
   }
 }
 
@@ -2403,6 +2535,9 @@ function loadSettingsIntoForm() {
   // Custom limits
   document.getElementById("settings-alert-concentration").value = appConfig.custom_alerts.high_concentration_pct;
   document.getElementById("settings-alert-loss").value = appConfig.custom_alerts.high_loss_pct;
+  
+  // Auto update price settings
+  document.getElementById("settings-auto-update").checked = (appConfig.auto_update_prices !== false);
 }
 
 // SAVE CONFIGURATION SETTINGS
@@ -2424,6 +2559,7 @@ async function saveCustomSettings(e) {
   // Map payload
   const payload = {
     theme: activeTheme,
+    auto_update_prices: document.getElementById("settings-auto-update").checked,
     tax_rules: {
       stocks_ltcg_days: parseInt(document.getElementById("settings-stock-ltcg").value),
       mf_ltcg_days: parseInt(document.getElementById("settings-mf-ltcg").value)
@@ -2489,6 +2625,9 @@ async function startLivePriceScraper() {
   }
 }
 
+let localLastUpdatedTimestamp = null;
+let priceStatusTimer = null;
+
 function checkScraperRunningOnStartup() {
   // Query status once to check if running
   fetch('/api/update-status')
@@ -2498,7 +2637,89 @@ function checkScraperRunningOnStartup() {
         showScraperProgressWidget();
         startPollingProgress();
       }
+      
+      if (data.last_updated) {
+        localLastUpdatedTimestamp = data.last_updated;
+      }
+      
+      // Immediately set header badge
+      const dotEl = document.getElementById("price-status-dot");
+      const textEl = document.getElementById("price-status-text");
+      if (dotEl && textEl) {
+        dotEl.className = "status-dot " + data.status;
+        if (data.status === "running") {
+          textEl.innerText = `Updating (${data.progress_pct}%)`;
+        } else if (data.status === "background_running") {
+          textEl.innerText = `Auto-updating (${data.progress_pct}%)`;
+        } else if (data.status === "locked") {
+          textEl.innerText = "Excel Locked (retrying)";
+        } else if (data.status === "error") {
+          textEl.innerText = "Sync Failed";
+        } else {
+          textEl.innerText = data.last_updated 
+            ? `Last updated: ${formatLastUpdated(data.last_updated)}`
+            : "Last updated: Never";
+        }
+      }
+      
+      // Start periodic status checking
+      startPriceStatusPolling();
     });
+}
+
+function startPriceStatusPolling() {
+  if (priceStatusTimer) clearInterval(priceStatusTimer);
+  
+  priceStatusTimer = setInterval(async () => {
+    try {
+      const res = await fetch('/api/update-status');
+      const data = await res.json();
+      
+      const dotEl = document.getElementById("price-status-dot");
+      const textEl = document.getElementById("price-status-text");
+      if (dotEl && textEl) {
+        dotEl.className = "status-dot " + data.status;
+        if (data.status === "running") {
+          textEl.innerText = `Updating (${data.progress_pct}%)`;
+        } else if (data.status === "background_running") {
+          textEl.innerText = `Auto-updating (${data.progress_pct}%)`;
+        } else if (data.status === "locked") {
+          textEl.innerText = "Excel Locked (retrying)";
+        } else if (data.status === "error") {
+          textEl.innerText = "Sync Failed";
+        } else {
+          textEl.innerText = data.last_updated 
+            ? `Last updated: ${formatLastUpdated(data.last_updated)}`
+            : "Last updated: Never";
+        }
+      }
+      
+      // Refresh portfolio if new updates came in
+      if (data.last_updated) {
+        if (localLastUpdatedTimestamp === null) {
+          localLastUpdatedTimestamp = data.last_updated;
+        } else if (data.last_updated > localLastUpdatedTimestamp) {
+          console.log("[Auto Price Updater] Detected newer prices. Refreshing portfolio data...");
+          localLastUpdatedTimestamp = data.last_updated;
+          await fetchPortfolio();
+        }
+      }
+    } catch (err) {
+      console.error("Error polling price status", err);
+    }
+  }, 10000);
+}
+
+function formatLastUpdated(timestamp) {
+  if (!timestamp) return "Never";
+  const diffSec = Math.floor((Date.now() / 1000) - timestamp);
+  if (diffSec < 10) return "Just now";
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return new Date(timestamp * 1000).toLocaleDateString();
 }
 
 function showScraperProgressWidget() {
@@ -2539,6 +2760,11 @@ function startPollingProgress() {
         
         // Refresh tables to see fresh prices
         await fetchPortfolio();
+        
+        // Set local timestamp to match
+        if (data.last_updated) {
+          localLastUpdatedTimestamp = data.last_updated;
+        }
         
         // Auto-dismiss the widget after 3 seconds
         setTimeout(() => {

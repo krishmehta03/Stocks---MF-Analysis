@@ -1,4 +1,5 @@
 {
+  "auto_update_prices": true,
   "custom_alerts": {
     "high_concentration_pct": 20,
     "high_loss_pct": 10
@@ -35,7 +36,7 @@
     "mf_ltcg_days": 365,
     "stocks_ltcg_days": 365
   },
-  "theme": "cyberpunk",
+  "theme": "emerald",
   "widgets": {
     "asset_allocation": true,
     "dividend_yield": true,
