@@ -2909,9 +2909,19 @@ async function fetchProfilesList() {
     const listContainer = document.getElementById("profiles-list-container");
     if (listContainer) {
       listContainer.innerHTML = "";
-      data.profiles.forEach(p => {
+      data.profiles.forEach(pObj => {
+        const p = pObj.name;
+        const hasPin = pObj.has_pin;
         const isActive = p === data.active_profile;
         const isDefault = p === "Default Portfolio";
+        
+        if (isActive) {
+          // Show current-pin input in Settings tab if active profile is protected by a PIN
+          const currentPinGroup = document.getElementById("pin-current-group");
+          if (currentPinGroup) {
+            currentPinGroup.style.display = hasPin ? "block" : "none";
+          }
+        }
         
         const item = document.createElement("div");
         item.className = `profile-item ${isActive ? 'active' : ''}`;
@@ -2920,16 +2930,22 @@ async function fetchProfilesList() {
         item.onclick = (e) => {
           if (e.target.closest('.btn-profile-delete')) return;
           if (e.target.closest('.btn-profile-rename')) return;
-          if (!isActive) switchProfile(p);
+          if (e.target.closest('.btn-profile-pin')) return;
+          if (!isActive) switchProfile(p, hasPin);
         };
         
         item.innerHTML = `
           <div class="profile-item-info">
-            <span class="profile-item-name">${p}</span>
+            <span class="profile-item-name">
+              ${p} ${hasPin ? '<i class="fa-solid fa-lock" style="font-size: 0.75rem; margin-left: 0.35rem; opacity: 0.6;" title="PIN Protected"></i>' : ''}
+            </span>
             ${isActive ? '<span class="profile-item-status"><i class="fa-solid fa-circle-dot"></i> Active Portfolio</span>' : ''}
           </div>
           <div class="profile-item-actions">
             ${!isDefault ? `
+              <button class="btn-profile-pin" title="Change/Set PIN">
+                <i class="fa-solid fa-key"></i>
+              </button>
               <button class="btn-profile-rename" title="Rename Profile">
                 <i class="fa-solid fa-pencil"></i>
               </button>
@@ -2940,19 +2956,26 @@ async function fetchProfilesList() {
           </div>
         `;
         
-        // Bind click events for rename and delete buttons
+        // Bind click events for pin, rename and delete buttons
+        const pinBtn = item.querySelector(".btn-profile-pin");
+        if (pinBtn) {
+          pinBtn.onclick = (e) => {
+            e.stopPropagation();
+            configureProfilePin(p, hasPin);
+          };
+        }
         const renameBtn = item.querySelector(".btn-profile-rename");
         if (renameBtn) {
           renameBtn.onclick = (e) => {
             e.stopPropagation();
-            renameProfile(p);
+            renameProfile(p, hasPin);
           };
         }
         const delBtn = item.querySelector(".btn-profile-delete");
         if (delBtn) {
           delBtn.onclick = (e) => {
             e.stopPropagation();
-            deleteProfile(p);
+            deleteProfile(p, hasPin);
           };
         }
         
@@ -2964,10 +2987,16 @@ async function fetchProfilesList() {
   }
 }
 
-async function renameProfile(oldName) {
+async function renameProfile(oldName, hasPin) {
   if (oldName === "Default Portfolio") {
     alert("The Default Portfolio profile cannot be renamed.");
     return;
+  }
+
+  let pin = "";
+  if (hasPin) {
+    pin = prompt(`Enter security PIN to rename profile "${oldName}":`);
+    if (pin === null) return;
   }
 
   const newName = prompt(`Enter a new name for the profile "${oldName}":`, oldName);
@@ -2977,7 +3006,7 @@ async function renameProfile(oldName) {
     const res = await fetch('/api/profiles/rename', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ old_name: oldName, new_name: newName.trim() })
+      body: JSON.stringify({ old_name: oldName, new_name: newName.trim(), pin: pin })
     });
     const data = await res.json();
     if (data.status === 'success') {
@@ -2994,7 +3023,7 @@ async function renameProfile(oldName) {
   }
 }
 
-async function deleteProfile(profileName) {
+async function deleteProfile(profileName, hasPin) {
   if (profileName === "Default Portfolio") {
     alert("The Default Portfolio profile cannot be deleted.");
     return;
@@ -3004,11 +3033,17 @@ async function deleteProfile(profileName) {
     return;
   }
   
+  let pin = "";
+  if (hasPin) {
+    pin = prompt(`Enter security PIN to delete profile "${profileName}":`);
+    if (pin === null) return;
+  }
+
   try {
     const res = await fetch('/api/profiles/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile_name: profileName })
+      body: JSON.stringify({ profile_name: profileName, pin: pin })
     });
     
     const data = await res.json();
@@ -3033,12 +3068,18 @@ async function deleteProfile(profileName) {
   }
 }
 
-async function switchProfile(profileName) {
+async function switchProfile(profileName, hasPin) {
+  let pin = "";
+  if (hasPin) {
+    pin = prompt(`Enter security PIN to switch to profile "${profileName}":`);
+    if (pin === null) return;
+  }
+
   try {
     const res = await fetch('/api/profiles/select', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile_name: profileName })
+      body: JSON.stringify({ profile_name: profileName, pin: pin })
     });
     const data = await res.json();
     if (data.status === 'success') {
@@ -3065,19 +3106,22 @@ async function switchProfile(profileName) {
 async function submitCreateProfile(e) {
   e.preventDefault();
   const inputEl = document.getElementById("new-profile-input");
+  const pinEl = document.getElementById("new-profile-pin");
   const profileName = inputEl.value.trim();
+  const pinVal = pinEl ? pinEl.value.trim() : "";
   if (!profileName) return;
   
   try {
     const res = await fetch('/api/profiles/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile_name: profileName })
+      body: JSON.stringify({ profile_name: profileName, pin: pinVal })
     });
     const data = await res.json();
     if (data.status === 'success') {
       alert(data.message);
       inputEl.value = "";
+      if (pinEl) pinEl.value = "";
       closeProfileModal();
       
       // Reload entire visual layout & charts instantly from new Excel & config
@@ -3121,6 +3165,75 @@ async function clearPortfolioHoldings() {
     }
   } catch (err) {
     console.error("Failed to reset portfolio:", err);
+    alert("API connection failed. Ensure Flask app is running!");
+  }
+}
+
+async function updateProfilePin() {
+  const currentPinEl = document.getElementById("settings-current-pin");
+  const newPinEl = document.getElementById("settings-new-pin");
+  const newPinConfirmEl = document.getElementById("settings-new-pin-confirm");
+  
+  const currentPin = currentPinEl ? currentPinEl.value : "";
+  const newPin = newPinEl ? newPinEl.value.trim() : "";
+  const newPinConfirm = newPinConfirmEl ? newPinConfirmEl.value.trim() : "";
+  
+  if (newPin !== newPinConfirm) {
+    alert("New PIN and confirmation PIN do not match.");
+    return;
+  }
+  
+  try {
+    const res = await fetch('/api/profiles/set-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_pin: currentPin, new_pin: newPin })
+    });
+    
+    const data = await res.json();
+    if (data.status === 'success') {
+      alert(data.message);
+      // Clear fields
+      if (currentPinEl) currentPinEl.value = "";
+      if (newPinEl) newPinEl.value = "";
+      if (newPinConfirmEl) newPinConfirmEl.value = "";
+      
+      // Refresh profile list (which updates whether the active profile has a pin)
+      await fetchProfilesList();
+    } else {
+      alert("Error setting PIN: " + data.message);
+    }
+  } catch (err) {
+    console.error("Failed to set profile PIN:", err);
+    alert("API connection failed. Ensure Flask app is running!");
+  }
+}
+
+async function configureProfilePin(profileName, hasPin) {
+  let currentPin = "";
+  if (hasPin) {
+    currentPin = prompt(`Enter CURRENT security PIN to confirm authorization for "${profileName}":`);
+    if (currentPin === null) return;
+  }
+  
+  const newPin = prompt(`Enter NEW security PIN for "${profileName}" (leave blank and click OK to disable/remove PIN):`);
+  if (newPin === null) return;
+  
+  try {
+    const res = await fetch('/api/profiles/set-pin-by-name', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_name: profileName, current_pin: currentPin, new_pin: newPin })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      alert(data.message);
+      await fetchProfilesList();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    console.error("Failed to set profile PIN:", err);
     alert("API connection failed. Ensure Flask app is running!");
   }
 }

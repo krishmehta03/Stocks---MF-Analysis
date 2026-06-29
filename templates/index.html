@@ -571,9 +571,35 @@
             </div>
           </div>
 
-          <!-- 5. Advanced Portfolio Actions -->
+          <!-- 5. Profile Security Lock -->
           <div class="form-group" style="margin-bottom: 2rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 2rem;">
-            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">5. Advanced Portfolio Management</label>
+            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">5. Profile PIN Security</label>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Protect your current portfolio with a security PIN. Leave the new PIN field blank to disable protection.</p>
+            
+            <div id="pin-current-group" class="form-group" style="display: none; margin-bottom: 1rem;">
+              <label style="font-size: 0.85rem; color: var(--text-secondary);">Current PIN *</label>
+              <input type="password" class="form-control" id="settings-current-pin" placeholder="Enter current PIN" style="max-width: 200px;" maxlength="6" pattern="\d*">
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">New Security PIN</label>
+                <input type="password" class="form-control" id="settings-new-pin" placeholder="e.g. 1234" style="max-width: 200px;" maxlength="6" pattern="\d*">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">Confirm New PIN</label>
+                <input type="password" class="form-control" id="settings-new-pin-confirm" placeholder="e.g. 1234" style="max-width: 200px;" maxlength="6" pattern="\d*">
+              </div>
+            </div>
+            
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-save-pin" onclick="updateProfilePin()" style="margin-top: 1.25rem;">
+              <i class="fa-solid fa-key"></i> Update PIN Security
+            </button>
+          </div>
+
+          <!-- 6. Advanced Portfolio Actions -->
+          <div class="form-group" style="margin-bottom: 2rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 2rem;">
+            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">6. Advanced Portfolio Management</label>
             <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Perform bulk operations on your active portfolio dataset:</p>
             <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
               <button type="button" class="btn btn-danger" onclick="clearPortfolioHoldings()">
@@ -883,10 +909,16 @@
         
         <!-- Create Profile Form -->
         <form id="create-profile-form" onsubmit="submitCreateProfile(event)">
-          <div class="form-group" style="margin-bottom: 1.5rem;">
+          <div class="form-group" style="margin-bottom: 1.25rem;">
             <label style="font-weight: 700; color: var(--text-primary);">Create New Profile</label>
             <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Initializes a separate portfolio profile & customized settings dashboard:</p>
             <input type="text" class="form-control" id="new-profile-input" placeholder="e.g. Krish Mehta, Mom Portfolio" required>
+          </div>
+          
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label style="font-weight: 700; color: var(--text-primary);">Security PIN (Optional)</label>
+            <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Set a numeric PIN to restrict access to this profile:</p>
+            <input type="password" class="form-control" id="new-profile-pin" placeholder="e.g. 1234" maxlength="6" pattern="\d*">
           </div>
           
           <div style="display: flex; gap: 1rem; justify-content: flex-end;">

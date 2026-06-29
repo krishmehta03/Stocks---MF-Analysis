@@ -18,6 +18,15 @@ yf.data.YfData.user_agent_headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
 }
 import pandas as pd
+import hashlib
+
+def hash_pin(pin):
+    if pin is None:
+        return None
+    pin_str = str(pin).strip()
+    if not pin_str:
+        return None
+    return hashlib.sha256(pin_str.encode('utf-8')).hexdigest()
 
 app = Flask(__name__)
 
@@ -49,9 +58,9 @@ def get_profile_files():
         excel_path = profile_info.get("excel_path")
         config_path = profile_info.get("config_path")
         if excel_path:
-            excel_path = os.path.normpath(excel_path)
+            excel_path = os.path.normpath(excel_path.replace('\\', '/'))
         if config_path:
-            config_path = os.path.normpath(config_path)
+            config_path = os.path.normpath(config_path.replace('\\', '/'))
         return excel_path, config_path, active
     except Exception as e:
         print("Error resolving profile path:", e)
@@ -2066,9 +2075,15 @@ def get_profiles():
         load_profile_globals()  # ensures init
         with open(meta_file, "r") as f:
             meta = json.load(f)
+        profiles_list = []
+        for p_name, p_info in meta.get("profiles", {}).items():
+            profiles_list.append({
+                "name": p_name,
+                "has_pin": p_info.get("pin_hash") is not None
+            })
         return jsonify({
             "active_profile": meta.get("active_profile", "Default Portfolio"),
-            "profiles": list(meta.get("profiles", {}).keys())
+            "profiles": profiles_list
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -2078,6 +2093,7 @@ def select_profile():
     try:
         data = request.json or {}
         name = data.get("profile_name", "").strip()
+        pin = data.get("pin", "")
         if not name:
             return jsonify({"status": "error", "message": "Profile name is required."}), 400
         
@@ -2088,8 +2104,14 @@ def select_profile():
         with open(meta_file, "r") as f:
             meta = json.load(f)
             
-        if name not in meta.get("profiles", {}):
+        profile_data = meta.get("profiles", {}).get(name)
+        if not profile_data:
             return jsonify({"status": "error", "message": f"Profile '{name}' does not exist."}), 404
+            
+        stored_hash = profile_data.get("pin_hash")
+        if stored_hash:
+            if not pin or hash_pin(pin) != stored_hash:
+                return jsonify({"status": "error", "message": "Incorrect PIN. Access denied."}), 401
             
         meta["active_profile"] = name
         with open(meta_file, "w") as f:
@@ -2113,8 +2135,8 @@ def create_profile():
         profile_dir = os.path.join("profiles", safe_name)
         os.makedirs(profile_dir, exist_ok=True)
         
-        new_excel_path = os.path.join(profile_dir, "portfolio.xlsx")
-        new_config_path = os.path.join(profile_dir, "config.json")
+        new_excel_path = os.path.join(profile_dir, "portfolio.xlsx").replace('\\', '/')
+        new_config_path = os.path.join(profile_dir, "config.json").replace('\\', '/')
         
         master_excel = "Stocks & MF Analysis_V3.xlsx"
         master_config = "config.json"
@@ -2171,10 +2193,15 @@ def create_profile():
         with open(meta_file, "r") as f:
             meta = json.load(f)
             
-        meta["profiles"][name] = {
+        pin = data.get("pin", "").strip()
+        profile_info = {
             "excel_path": new_excel_path,
             "config_path": new_config_path
         }
+        if pin:
+            profile_info["pin_hash"] = hash_pin(pin)
+            
+        meta["profiles"][name] = profile_info
         meta["active_profile"] = name
         with open(meta_file, "w") as f:
             json.dump(meta, f, indent=4)
@@ -2208,6 +2235,13 @@ def delete_profile():
             
         if name not in meta.get("profiles", {}):
             return jsonify({"status": "error", "message": f"Profile '{name}' does not exist."}), 404
+            
+        # Verify PIN if profile is locked
+        pin = data.get("pin", "")
+        stored_hash = meta["profiles"][name].get("pin_hash")
+        if stored_hash:
+            if not pin or hash_pin(pin) != stored_hash:
+                return jsonify({"status": "error", "message": "Incorrect PIN. Access denied."}), 401
             
         # Safely delete profile folder under 'profiles/'
         safe_name = "".join([c if c.isalnum() else "_" for c in name]).lower()
@@ -2269,6 +2303,13 @@ def rename_profile():
         if old_name not in meta.get("profiles", {}):
             return jsonify({"status": "error", "message": f"Profile '{old_name}' does not exist."}), 404
 
+        # Verify PIN if profile is locked
+        pin = data.get("pin", "")
+        stored_hash = meta["profiles"][old_name].get("pin_hash")
+        if stored_hash:
+            if not pin or hash_pin(pin) != stored_hash:
+                return jsonify({"status": "error", "message": "Incorrect PIN. Access denied."}), 401
+
         if new_name in meta.get("profiles", {}):
             return jsonify({"status": "error", "message": f"A profile named '{new_name}' already exists."}), 400
 
@@ -2305,6 +2346,93 @@ def rename_profile():
             "message": f"Profile renamed from '{old_name}' to '{new_name}' successfully!",
             "active_profile": meta["active_profile"]
         })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/profiles/set-pin', methods=['POST'])
+def set_profile_pin():
+    try:
+        data = request.json or {}
+        current_pin = data.get("current_pin", "")
+        new_pin = data.get("new_pin", "").strip()
+        
+        meta_file = "profiles_config.json"
+        if not os.path.exists(meta_file):
+            return jsonify({"status": "error", "message": "Profiles meta config not initialized."}), 400
+            
+        with open(meta_file, "r") as f:
+            meta = json.load(f)
+            
+        active = meta.get("active_profile", "Default Portfolio")
+        profile_data = meta.get("profiles", {}).get(active)
+        if not profile_data:
+            return jsonify({"status": "error", "message": "Active profile data not found."}), 404
+            
+        stored_hash = profile_data.get("pin_hash")
+        
+        # Verify current PIN if one is set
+        if stored_hash:
+            if not current_pin or hash_pin(current_pin) != stored_hash:
+                return jsonify({"status": "error", "message": "Incorrect current PIN."}), 401
+                
+        # If new_pin is empty, remove PIN protection
+        if not new_pin:
+            if "pin_hash" in profile_data:
+                del profile_data["pin_hash"]
+            msg = "PIN protection disabled successfully."
+        else:
+            profile_data["pin_hash"] = hash_pin(new_pin)
+            msg = "PIN updated successfully."
+            
+        with open(meta_file, "w") as f:
+            json.dump(meta, f, indent=4)
+            
+        return jsonify({"status": "success", "message": msg})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/profiles/set-pin-by-name', methods=['POST'])
+def set_profile_pin_by_name():
+    try:
+        data = request.json or {}
+        name = data.get("profile_name", "").strip()
+        current_pin = data.get("current_pin", "")
+        new_pin = data.get("new_pin", "").strip()
+        
+        if not name:
+            return jsonify({"status": "error", "message": "Profile name is required."}), 400
+            
+        meta_file = "profiles_config.json"
+        if not os.path.exists(meta_file):
+            return jsonify({"status": "error", "message": "Profiles config not initialized."}), 400
+            
+        with open(meta_file, "r") as f:
+            meta = json.load(f)
+            
+        profile_data = meta.get("profiles", {}).get(name)
+        if not profile_data:
+            return jsonify({"status": "error", "message": f"Profile '{name}' does not exist."}), 404
+            
+        stored_hash = profile_data.get("pin_hash")
+        
+        # Verify current PIN if one is set
+        if stored_hash:
+            if not current_pin or hash_pin(current_pin) != stored_hash:
+                return jsonify({"status": "error", "message": "Incorrect current PIN. Access denied."}), 401
+                
+        # If new_pin is empty, remove PIN protection
+        if not new_pin:
+            if "pin_hash" in profile_data:
+                del profile_data["pin_hash"]
+            msg = f"PIN protection disabled for profile '{name}'."
+        else:
+            profile_data["pin_hash"] = hash_pin(new_pin)
+            msg = f"PIN updated successfully for profile '{name}'."
+            
+        with open(meta_file, "w") as f:
+            json.dump(meta, f, indent=4)
+            
+        return jsonify({"status": "success", "message": msg})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

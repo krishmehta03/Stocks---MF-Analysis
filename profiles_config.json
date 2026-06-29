@@ -7,11 +7,18 @@
         },
         "Krish mehta": {
             "excel_path": "profiles/krish_mehta/portfolio.xlsx",
-            "config_path": "profiles/krish_mehta/config.json"
+            "config_path": "profiles/krish_mehta/config.json",
+            "pin_hash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4"
         },
         "sheehan": {
             "excel_path": "profiles/sheehan/portfolio.xlsx",
-            "config_path": "profiles/sheehan/config.json"
+            "config_path": "profiles/sheehan/config.json",
+            "pin_hash": "f8638b979b2f4f793ddb6dbd197e0ee25a7a6ea32b0ae22f5e3c5d119d839e75"
+        },
+        "test_pin": {
+            "excel_path": "profiles/test_pin/portfolio.xlsx",
+            "config_path": "profiles/test_pin/config.json",
+            "pin_hash": "0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c"
         }
     }
 }
