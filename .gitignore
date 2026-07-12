@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 yfinance_cache.json
 .vscode/
+.env
+.env.*
+!.env.example

@@ -702,23 +702,15 @@ tr:hover td {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Custom Alert Banner */
-.alert-banner {
-  background-color: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #f87171;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
+/* Custom Alert Banner — 4-tier Severity System */
+#alerts-container {
+  margin-bottom: 0.75rem;
 }
 
-.alert-banner-red {
-  background-color: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+/* Critical (40%+ concentration or 35%+ drawdown) — Red */
+.alert-banner-critical {
+  background-color: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
   color: #f87171;
   padding: 0.75rem 1rem;
   border-radius: 8px;
@@ -727,13 +719,14 @@ tr:hover td {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
-.alert-banner-orange {
-  background-color: rgba(249, 115, 22, 0.1);
-  border: 1px solid rgba(249, 115, 22, 0.25);
-  color: #fb923c;
+/* Warning (20-40% concentration or 20-35% drawdown) — Amber */
+.alert-banner-warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   font-size: 0.85rem;
@@ -741,12 +734,13 @@ tr:hover td {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
-.alert-banner-yellow {
+/* Low Severity (10-20% drawdown) — Yellow */
+.alert-banner-low {
   background-color: rgba(234, 179, 8, 0.08);
-  border: 1px solid rgba(234, 179, 8, 0.2);
+  border: 1px solid rgba(234, 179, 8, 0.22);
   color: #facc15;
   padding: 0.75rem 1rem;
   border-radius: 8px;
@@ -755,8 +749,28 @@ tr:hover td {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
+
+/* Info — Blue */
+.alert-banner-info {
+  background-color: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  color: #60a5fa;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Legacy aliases (kept for compatibility) */
+.alert-banner-red    { background-color:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);color:#f87171;padding:0.75rem 1rem;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:0.5rem; }
+.alert-banner-orange { background-color:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;padding:0.75rem 1rem;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:0.5rem; }
+.alert-banner-yellow { background-color:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.22);color:#facc15;padding:0.75rem 1rem;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:0.5rem; }
 
 .alert-review-btn {
   background: rgba(255, 255, 255, 0.08);
@@ -1451,4 +1465,10 @@ select option {
     box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
     transform: scale(0.95);
   }
+}
+
+/* Mutual Fund summary card custom padding */
+#card-mf-value {
+  padding-top: 1.75rem !important;
+  padding-bottom: 1.75rem !important;
 }

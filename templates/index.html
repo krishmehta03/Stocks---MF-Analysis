@@ -1,53 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
+  <script>
+  (async function() {
+    try {
+      window.SUPABASE_URL = '{{ supabase_url }}';
+      window.SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
+      
+      if (!window.SUPABASE_URL || 
+          window.SUPABASE_URL === '') {
+        console.error('Supabase URL missing');
+        return;
+      }
+      
+      const _authClient = window.supabase
+        .createClient(
+          window.SUPABASE_URL, 
+          window.SUPABASE_ANON_KEY
+        );
+      
+      const { data: { session }, error } = 
+        await _authClient.auth.getSession();
+      
+      if (!session) {
+        window.location.replace(
+          '/login?redirectTo=/dashboard'
+        );
+        return;
+      }
+      
+      window.currentUser = session.user;
+      window.currentUserEmail = session.user.email;
+      window.currentUserName = 
+        session.user.user_metadata?.full_name || 
+        session.user.email;
+      window._authClient = _authClient;
+        
+    } catch(err) {
+      console.error('Auth check failed:', err);
+      window.location.replace('/login');
+    }
+  })();
+
+  async function signOut() {
+    try {
+      if (window._authClient) {
+        await window._authClient.auth.signOut();
+      }
+      window.location.href = '/login';
+    } catch(err) {
+      window.location.href = '/login';
+    }
+  }
+
+  document.addEventListener(
+    'DOMContentLoaded', function() {
+      const el = document.getElementById(
+        'current-user-name'
+      );
+      if (el && window.currentUserName) {
+        el.textContent = window.currentUserName;
+      }
+    }
+  );
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portfolio Analysis</title>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
-  <script>
-    window.SUPABASE_URL = '{{ supabase_url }}';
-    window.SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
-    
-    (async function() {
-      const client = window.supabase.createClient(
-        window.SUPABASE_URL, 
-        window.SUPABASE_ANON_KEY
-      );
-      
-      const { data: { session } } = 
-        await client.auth.getSession();
-      
-      if (!session) {
-        window.location.href = '/login?redirectTo=/dashboard';
-      } else {
-        // Store user info globally
-        window.currentUser = session.user;
-        window.currentUserEmail = session.user.email;
-        window.currentUserName = 
-          session.user.user_metadata?.full_name || 
-          session.user.email;
-          
-        // Display logged-in user name
-        document.addEventListener('DOMContentLoaded', () => {
-          const nameEl = document.getElementById('current-user-name');
-          if (nameEl) {
-            nameEl.textContent = window.currentUserName;
-          }
-        });
-      }
-    })();
-
-    async function signOut() {
-      const client = window.supabase.createClient(
-        window.SUPABASE_URL,
-        window.SUPABASE_ANON_KEY
-      );
-      await client.auth.signOut();
-      window.location.href = '/login';
-    }
-  </script>
   
   <!-- FontAwesome for Premium Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -72,11 +92,19 @@
           <span id="price-status-dot" class="status-dot idle"></span>
           <span id="price-status-text" style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 500;">Checking...</span>
         </div>
-        <span id="current-user-name" style="font-size: 0.85rem; color: var(--text-secondary); margin-right: 0.5rem; font-weight: 500;">
+        <span id="current-user-name">
           Loading...
         </span>
-        <button onclick="signOut()" class="logout-btn btn btn-secondary btn-sm" style="margin-right: 0.5rem;">
-          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+        <button onclick="signOut()" 
+          style="background:transparent;
+          border:1px solid rgba(255,255,255,0.2);
+          color:inherit;
+          padding:4px 12px;
+          border-radius:6px;
+          cursor:pointer;
+          font-size:13px;
+          margin-left:8px;">
+          Sign Out
         </button>
         <button class="btn btn-secondary btn-sm" id="btn-profile-manager" onclick="openProfileModal()">
           <i class="fa-solid fa-user-circle"></i> <span id="active-profile-name">Loading...</span>

@@ -36,13 +36,13 @@
     "mf_ltcg_days": 365,
     "stocks_ltcg_days": 365
   },
-  "theme": "ocean",
+  "theme": "rose-gold",
   "widgets": {
     "asset_allocation": true,
     "dividend_yield": true,
     "portfolio_signals": true,
-    "risk_alerts": true,
     "sector_allocation": true,
-    "top_performers": true
+    "top_performers": true,
+    "risk_alerts": false
   }
 }

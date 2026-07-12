@@ -8,19 +8,19 @@
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
   <script>
-    (async function() {
-      const client = window.supabase.createClient(
+  (async function() {
+    try {
+      const _c = window.supabase.createClient(
         '{{ supabase_url }}',
         '{{ supabase_anon_key }}'
       );
       const { data: { session } } = 
-        await client.auth.getSession();
-      
+        await _c.auth.getSession();
       if (session) {
-        // Already logged in → go to dashboard
-        window.location.href = '/dashboard';
+        window.location.replace('/dashboard');
       }
-    })();
+    } catch(e) {}
+  })();
   </script>
   <meta name="description" content="Sign in to your Portfolio Analysis dashboard to manage your investments.">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -274,10 +274,14 @@
           return;
         }
 
-        // Success — redirect
-        const params = new URLSearchParams(window.location.search);
-        const redirectTo = params.get('redirectTo') || '/dashboard';
-        window.location.href = redirectTo;
+        if (!error && data.session) {
+          const params = new URLSearchParams(
+            window.location.search
+          );
+          const redirectTo = 
+            params.get('redirectTo') || '/dashboard';
+          window.location.href = redirectTo;
+        }
 
       } catch (err) {
         showAlert('Something went wrong. Please try again.', 'error');

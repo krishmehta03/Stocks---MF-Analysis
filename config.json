@@ -43,6 +43,6 @@
     "portfolio_signals": true,
     "sector_allocation": true,
     "top_performers": true,
-    "risk_alerts": false
+    "risk_alerts": true
   }
 }
