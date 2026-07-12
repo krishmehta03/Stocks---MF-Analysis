@@ -1103,7 +1103,7 @@ def automatic_price_updater_loop():
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    return render_template('index.html', **_auth_context())
 
 # ─── Authentication Pages ──────────────────────────────────────────────────────
 def _auth_context():
@@ -1131,7 +1131,7 @@ def reset_password_page():
 
 @app.route('/dashboard')
 def dashboard_page():
-    return render_template('index.html')
+    return render_template('index.html', **_auth_context())
 
 @app.route('/api/test-db', methods=['GET'])
 def test_db():
