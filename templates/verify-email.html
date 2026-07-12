@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
 </head>
+
 <body class="auth-page">
 
   <div class="auth-card" style="text-align: center;">
@@ -48,7 +50,7 @@
   </div>
 
   <!-- Supabase JS SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
   <script>
     const SUPABASE_URL = '{{ supabase_url }}';
     const SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
@@ -90,7 +92,7 @@
       clearAlert();
 
       try {
-        const { error } = await supabase.auth.resend({
+        const { error } = await supabaseClient.auth.resend({
           type: 'signup',
           email: userEmail
         });
@@ -124,11 +126,12 @@
     }
 
     /* ── Auto-redirect on auth state change ─ */
-    supabase.auth.onAuthStateChange((event, session) => {
+    supabaseClient.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN') {
         window.location.href = '/dashboard';
       }
     });
   </script>
 </body>
+
 </html>
