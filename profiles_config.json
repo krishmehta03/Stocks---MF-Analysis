@@ -19,6 +19,16 @@
             "excel_path": "profiles/test_pin/portfolio.xlsx",
             "config_path": "profiles/test_pin/config.json",
             "pin_hash": "0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c"
+        },
+        "parishi": {
+            "excel_path": "profiles/parishi/portfolio.xlsx",
+            "config_path": "profiles/parishi/config.json",
+            "pin_hash": "56a3a46a3ba4fb713fd3e4cfa51a5748abf2c2662fefb0b5a863fdef34572255"
+        },
+        "test_agent": {
+            "excel_path": "profiles/test_agent/portfolio.xlsx",
+            "config_path": "profiles/test_agent/config.json",
+            "pin_hash": "888df25ae35772424a560c7152a1de794440e0ea5cfee62828333a456a506e05"
         }
     }
 }
