@@ -286,6 +286,38 @@ def get_broad_sector(granular_sector: str) -> str:
     return _BROAD_SECTOR_MAP.get(norm, granular_sector.strip())
 
 
+def resolve_stock_sector(raw_sector: str, sym: str | None) -> tuple:
+    """
+    Resolve the (sector, industry, is_sector_missing) tuple for a stock.
+    If the raw sector in Excel is missing, 'Other', or 'ETFs', try to look it up
+    from yfinance cache or yfinance info.
+    """
+    raw_clean = str(raw_sector or "").strip()
+    if raw_clean and raw_clean not in ("Other", "ETFs"):
+        return get_broad_sector(raw_clean), raw_clean, False
+        
+    # Try resolving from yfinance
+    if sym:
+        cached_info = _info_cache.get(sym)
+        fetched_sector = None
+        if cached_info and cached_info.get("sector"):
+            fetched_sector = cached_info["sector"]
+        else:
+            try:
+                info = _yf_info(sym)
+                fetched_sector = info.get("sector")
+            except Exception:
+                pass
+                
+        if fetched_sector:
+            industry = _SECTOR_MAP.get(fetched_sector, fetched_sector)
+            return get_broad_sector(industry), industry, False
+            
+    # Default to ETFs/ETF
+    return "ETF", "ETFs", True
+
+
+
 
 _CUSTOM_TICKER_MAP = {
     "NIPPON INDIA LTG": "LTGILTBEES.NS",
@@ -687,17 +719,11 @@ def get_portfolio_data():
                 continue
             
             exchange = ws[f'B{row}'].value or "NSE"
-            raw_sector = ws[f'C{row}'].value
-            is_sector_missing = False
-            if not raw_sector or str(raw_sector).strip() == "":
-                is_sector_missing = True
-                industry = "ETFs"
-            elif str(raw_sector).strip().lower() == "other":
-                industry = "ETFs"
-            else:
-                industry = str(raw_sector).strip()
+            sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
             
-            sector = get_broad_sector(industry)
+            raw_sector = ws[f'C{row}'].value
+            sector, industry, is_sector_missing = resolve_stock_sector(raw_sector, sym)
+            
             qty = ws[f'D{row}'].value or 0
             buy_price = ws[f'E{row}'].value or 0
             buy_date_raw = ws[f'F{row}'].value
@@ -718,7 +744,6 @@ def get_portfolio_data():
             holding_yrs = get_holding_period_years(buy_date_raw) if buy_date_raw else None
             holding_type = "LT" if tax_flag == "LTCG" else ("ST" if tax_flag == "STCG" else "")
             
-            sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
             drawdown_days = get_days_in_drawdown(sym, buy_price, buy_date_raw) if sym else 0
 
             stocks.append({
@@ -1350,20 +1375,19 @@ def sector_contribution():
             if not scrip:
                 break
             exchange = ws[f'B{row}'].value or 'NSE'
-            raw_sector = ws[f'C{row}'].value
-            if not raw_sector or str(raw_sector).strip() == "" or str(raw_sector).strip().lower() == "other":
-                industry = "ETFs"
-            else:
-                industry = str(raw_sector).strip()
+            sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
             
-            sector = get_broad_sector(industry)
+            raw_sector = ws[f'C{row}'].value
+            sector, industry, is_sector_missing = resolve_stock_sector(raw_sector, sym)
+            
             qty      = ws[f'D{row}'].value or 0
             if float(qty) > 0:
                 holdings.append({
                     'name': str(scrip).strip(),
                     'exchange': str(exchange).strip(),
                     'sector': sector,
-                    'qty': float(qty)
+                    'qty': float(qty),
+                    'symbol': sym
                 })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1371,10 +1395,8 @@ def sector_contribution():
     if not holdings:
         return jsonify({'error': 'No holdings found'}), 404
 
-    # Resolve tickers
-    for h in holdings:
-        h['symbol'] = _resolve_ticker(h['name'], h['exchange'])
-    valid = [h for h in holdings if h['symbol']]
+    # Filter valid resolved tickers
+    valid = [h for h in holdings if h.get('symbol')]
 
     if not valid:
         return jsonify({'error': 'Could not resolve any ticker symbols'}), 404
