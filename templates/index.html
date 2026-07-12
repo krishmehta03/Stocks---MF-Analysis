@@ -99,6 +99,9 @@
               ">vs Nifty 50</span>
               <span id="perf-subtitle" style="font-size:0.8rem;color:var(--text-secondary);">Indexed to 100 at start</span>
             </div>
+            <div id="perf-downturn-note" style="display:none; font-size:0.75rem; color:var(--text-secondary); margin-top:0.4rem; font-style:italic;">
+              <i class="fa-solid fa-circle-info"></i> Note: Portfolio return and benchmark return are both negative for this period due to general market downturn.
+            </div>
           </div>
           <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
             <!-- Benchmark selector -->
@@ -141,6 +144,39 @@
             <div style="width:24px;height:2px;background:rgba(148,163,184,0.6);border-radius:2px;border-top:2px dashed rgba(148,163,184,0.6);"></div>
             <span id="perf-bench-legend" style="color:var(--text-secondary);">Nifty 50</span>
           </div>
+        </div>
+      </div>
+
+      <!-- Portfolio Context Strip -->
+      <div id="portfolio-context-strip" class="card" style="
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0.75rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.85rem;
+        background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 8px; flex-wrap: wrap; gap: 1rem;
+      ">
+        <div style="display: flex; align-items: center; gap: 0.4rem;">
+          <span style="color: var(--text-secondary);">Period:</span>
+          <strong id="strip-period" style="color: var(--text-primary);">1M</strong>
+        </div>
+        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.1);"></div>
+        <div style="display: flex; align-items: center; gap: 0.4rem;">
+          <span style="color: var(--text-secondary);">Portfolio Return:</span>
+          <strong id="strip-portfolio-return" class="value">0.00%</strong>
+        </div>
+        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.1);"></div>
+        <div style="display: flex; align-items: center; gap: 0.4rem;">
+          <span style="color: var(--text-secondary);" id="strip-bench-label">Benchmark Return:</span>
+          <strong id="strip-bench-return" class="value">0.00%</strong>
+        </div>
+        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.1);"></div>
+        <div style="display: flex; align-items: center; gap: 0.4rem;">
+          <span style="color: var(--text-secondary);">Alpha:</span>
+          <strong id="strip-alpha" class="value">0.00%</strong>
+        </div>
+        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.1);"></div>
+        <div style="display: flex; align-items: center; gap: 0.4rem; margin-left: auto;">
+          <span style="color: var(--text-secondary);">As of:</span>
+          <strong id="strip-as-of" style="color: var(--text-primary);">-</strong>
         </div>
       </div>
 
@@ -208,9 +244,10 @@
             <span style="color:var(--text-secondary);display:block;margin-bottom:0.2rem;" id="contrib-summary-bench-name">Nifty 50 Return</span>
             <strong id="contrib-summary-bench" class="value" style="font-size:1.1rem;font-family:'Outfit';">0.00%</strong>
           </div>
-          <div>
-            <span style="color:var(--text-secondary);display:block;margin-bottom:0.2rem;">Generated Alpha</span>
+          <div title="Alpha measures your portfolio return vs the selected benchmark for this period" style="cursor: help;">
+            <span style="color:var(--text-secondary);display:block;margin-bottom:0.2rem;" id="contrib-summary-alpha-label">Generated Alpha</span>
             <strong id="contrib-summary-alpha" class="value" style="font-size:1.1rem;font-family:'Outfit';">0.00%</strong>
+            <div id="contrib-downturn-note" style="display:none; font-size:11px; color:var(--text-secondary); margin-top:0.25rem; line-height:1.2;"></div>
           </div>
         </div>
       </div>
@@ -264,6 +301,9 @@
           <h2 style="font-size: 1.25rem; margin-bottom: 1rem;"><i class="fa-solid fa-pie-chart"></i> Sector Allocation</h2>
           <div style="position: relative; height: 300px; display: flex; justify-content: center;">
             <canvas id="chart-sector-allocation"></canvas>
+          </div>
+          <!-- Concentration warning label — shown by JS when any sector ≥ 40% -->
+          <div id="sector-concentration-label" style="display:none; text-align:center; margin-top:0.6rem; font-size:12px; color:#f59e0b; cursor:pointer;" onclick="document.getElementById('alerts-container').scrollIntoView({behavior:'smooth',block:'start'})">
           </div>
         </div>
 
@@ -320,6 +360,11 @@
         <!-- Alert banner for missing buy dates -->
         <div id="missing-buy-dates-banner" class="alert-banner-orange" style="display: none; margin-bottom: 1.5rem;">
           <span><i class="fa-solid fa-circle-exclamation"></i> Some holdings are missing buy dates. Add them now for accurate tax calculations.</span>
+        </div>
+
+        <!-- Alert banner for missing sectors -->
+        <div id="missing-sectors-banner" class="alert-banner-orange" style="display: none; margin-bottom: 1.5rem;">
+          <span><i class="fa-solid fa-triangle-exclamation"></i> <span id="missing-sectors-count">0</span> stocks are missing sector tags — assign them for accurate sector analysis</span>
         </div>
 
         <div class="table-container">
@@ -946,6 +991,46 @@
     <div class="mf-drawer-footer">
       <button class="btn btn-secondary" style="flex:1;" onclick="closeMfDetailDrawer()"><i class="fa-solid fa-times"></i> Close</button>
       <button class="btn" style="flex:1;" id="mf-drawer-edit-btn"><i class="fa-solid fa-edit"></i> Edit Holding</button>
+    </div>
+  </div>
+
+  <!-- MODAL: CUSTOM PROMPT (Replaces native window.prompt) -->
+  <div class="modal-overlay" id="modal-custom-prompt">
+    <div class="modal-content" style="max-width: 400px; border: 1px solid rgba(255, 255, 255, 0.1);">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-circle-question" style="color: var(--accent);"></i> <span id="custom-prompt-title-text">Prompt</span></h3>
+        <button class="modal-close" onclick="closeCustomPrompt()">&times;</button>
+      </div>
+      <div style="padding: 1.25rem 0 0 0;">
+        <p id="custom-prompt-message" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;"></p>
+        
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <input type="text" class="form-control" id="custom-prompt-input" style="text-align: center;">
+        </div>
+        
+        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary" onclick="closeCustomPrompt()">Cancel</button>
+          <button type="button" class="btn" id="btn-custom-prompt-submit" onclick="submitCustomPrompt()">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CUSTOM CONFIRM (Replaces native window.confirm) -->
+  <div class="modal-overlay" id="modal-custom-confirm">
+    <div class="modal-content" style="max-width: 450px; border: 1px solid rgba(255, 255, 255, 0.1);">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-triangle-exclamation" style="color: var(--danger);"></i> <span id="custom-confirm-title-text">Confirm Action</span></h3>
+        <button class="modal-close" onclick="closeCustomConfirm(false)">&times;</button>
+      </div>
+      <div style="padding: 1.25rem 0 0 0;">
+        <p id="custom-confirm-message" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.4;"></p>
+        
+        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary" onclick="closeCustomConfirm(false)">Cancel</button>
+          <button type="button" class="btn btn-danger" onclick="closeCustomConfirm(true)">Confirm</button>
+        </div>
+      </div>
     </div>
   </div>
 
