@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Email — Portfolio Analysis</title>
+  <meta name="description" content="Verify your email to activate your Portfolio Analysis account.">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-page">
+
+  <div class="auth-card" style="text-align: center;">
+    <!-- Logo -->
+    <a href="/" class="auth-logo" style="justify-content: center;">
+      <i class="fa-solid fa-chart-line"></i>
+      <span>Portfolio Analysis</span>
+    </a>
+
+    <!-- Email Icon -->
+    <div class="auth-icon-large">
+      <i class="fa-solid fa-envelope"></i>
+    </div>
+
+    <!-- Heading -->
+    <h1 class="auth-heading" style="text-align: center;">Check your email</h1>
+    <p class="auth-body-text">
+      We've sent a verification link to<br>
+      <strong id="verify-email-display">your email</strong>.<br>
+      Click the link to activate your account.
+    </p>
+
+    <!-- Alert -->
+    <div id="verify-alert" class="auth-alert" style="text-align: left;"></div>
+
+    <!-- Resend button -->
+    <button class="auth-btn-outlined" id="btn-resend" onclick="resendEmail()">
+      <i class="fa-solid fa-rotate-right"></i>
+      <span id="resend-text">Resend email</span>
+    </button>
+
+    <!-- Back link -->
+    <div style="margin-top: 1.5rem;">
+      <a href="/signup" class="auth-back-link" style="justify-content: center;">
+        <i class="fa-solid fa-arrow-left"></i> Wrong email? Go back
+      </a>
+    </div>
+  </div>
+
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = '{{ supabase_url }}';
+    const SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ── Extract email from query params ─── */
+    const params = new URLSearchParams(window.location.search);
+    const userEmail = params.get('email') || '';
+    if (userEmail) {
+      document.getElementById('verify-email-display').textContent = userEmail;
+    }
+
+    let resendCooldown = 0;
+    let cooldownInterval = null;
+
+    /* ── Helpers ──────────────────────────── */
+    function showAlert(msg, type) {
+      const alert = document.getElementById('verify-alert');
+      alert.className = `auth-alert auth-alert-${type} visible`;
+      alert.innerHTML = `<i class="fa-solid fa-${type === 'error' ? 'circle-xmark' : 'circle-check'}"></i> ${msg}`;
+    }
+
+    function clearAlert() {
+      const alert = document.getElementById('verify-alert');
+      alert.className = 'auth-alert';
+      alert.textContent = '';
+    }
+
+    /* ── Resend email ─────────────────────── */
+    async function resendEmail() {
+      if (resendCooldown > 0) return;
+      if (!userEmail) {
+        showAlert('No email address found. Please go back and sign up again.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-resend');
+      btn.disabled = true;
+      clearAlert();
+
+      try {
+        const { error } = await supabase.auth.resend({
+          type: 'signup',
+          email: userEmail
+        });
+
+        if (error) {
+          showAlert('Failed to resend. Please try again.', 'error');
+          btn.disabled = false;
+          return;
+        }
+
+        showAlert('Email sent! Check your inbox.', 'success');
+
+        // Start 60-second cooldown
+        resendCooldown = 60;
+        const resendText = document.getElementById('resend-text');
+
+        cooldownInterval = setInterval(() => {
+          resendCooldown--;
+          if (resendCooldown <= 0) {
+            clearInterval(cooldownInterval);
+            resendText.textContent = 'Resend email';
+            btn.disabled = false;
+          } else {
+            resendText.textContent = `Resend in ${resendCooldown}s...`;
+          }
+        }, 1000);
+      } catch (err) {
+        showAlert('Failed to resend. Please try again.', 'error');
+        btn.disabled = false;
+      }
+    }
+
+    /* ── Auto-redirect on auth state change ─ */
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        window.location.href = '/dashboard';
+      }
+    });
+  </script>
+</body>
+</html>

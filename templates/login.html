@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — Portfolio Analysis</title>
+  <meta name="description" content="Sign in to your Portfolio Analysis dashboard to manage your investments.">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-page">
+
+  <div class="auth-card">
+    <!-- Logo -->
+    <a href="/" class="auth-logo">
+      <i class="fa-solid fa-chart-line"></i>
+      <span>Portfolio Analysis</span>
+    </a>
+
+    <!-- Heading -->
+    <h1 class="auth-heading">Welcome back</h1>
+    <p class="auth-subheading">Sign in to your portfolio</p>
+
+    <!-- Global alert -->
+    <div id="login-alert" class="auth-alert"></div>
+
+    <!-- Success toast from password reset (injected via query param) -->
+
+    <!-- Form -->
+    <form id="login-form" novalidate>
+      <!-- Email -->
+      <div class="auth-form-group">
+        <label for="login-email">Email Address</label>
+        <input type="email" id="login-email" class="auth-input" placeholder="rahul@example.com" required>
+        <div class="auth-field-error" id="err-email"></div>
+      </div>
+
+      <!-- Password -->
+      <div class="auth-form-group">
+        <label for="login-password">Password</label>
+        <div class="auth-input-wrap">
+          <input type="password" id="login-password" class="auth-input" placeholder="Your password" required style="padding-right: 40px;">
+          <button type="button" class="auth-password-toggle" onclick="togglePw('login-password', this)" aria-label="Toggle password visibility">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+        </div>
+        <div class="auth-field-error" id="err-password"></div>
+      </div>
+
+      <!-- Remember me / Forgot password -->
+      <div class="auth-row-between">
+        <div class="auth-checkbox-wrap">
+          <input type="checkbox" id="login-remember">
+          <label for="login-remember">Remember me</label>
+        </div>
+        <a href="/reset-password" class="auth-forgot-link">Forgot password?</a>
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" class="auth-btn-primary" id="btn-login">
+        <span class="auth-btn-text">Sign In</span>
+        <span class="auth-spinner"></span>
+      </button>
+    </form>
+
+    <!-- Divider -->
+    <div class="auth-divider"><span>OR</span></div>
+
+    <!-- Google OAuth -->
+    <button class="auth-btn-google" id="btn-google-login" onclick="googleSignIn()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Continue with Google
+    </button>
+
+    <!-- Bottom link -->
+    <div class="auth-bottom-link">
+      Don't have an account? <a href="/signup">Sign up</a>
+    </div>
+  </div>
+
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = '{{ supabase_url }}';
+    const SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let failedAttempts = 0;
+
+    /* ── Check lockout on load ───────────── */
+    (function checkLockout() {
+      const lockUntil = localStorage.getItem('auth_lockout_until');
+      if (lockUntil && Date.now() < parseInt(lockUntil)) {
+        lockForm(parseInt(lockUntil) - Date.now());
+      }
+      // Show success toast from password reset
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('reset') === 'success') {
+        showToast('Password updated successfully. Please sign in.', 'success');
+        // Clean the URL
+        window.history.replaceState({}, '', '/login');
+      }
+    })();
+
+    /* ── Password toggle ─────────────────── */
+    function togglePw(inputId, btn) {
+      const inp = document.getElementById(inputId);
+      const icon = btn.querySelector('i');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.className = 'fa-solid fa-eye-slash';
+      } else {
+        inp.type = 'password';
+        icon.className = 'fa-solid fa-eye';
+      }
+    }
+
+    /* ── Helpers ──────────────────────────── */
+    function showFieldError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.classList.add('visible');
+      const input = el.closest('.auth-form-group')?.querySelector('.auth-input');
+      if (input) input.classList.add('input-error');
+    }
+
+    function clearErrors() {
+      document.querySelectorAll('.auth-field-error').forEach(el => {
+        el.textContent = '';
+        el.classList.remove('visible');
+      });
+      document.querySelectorAll('.auth-input').forEach(el => el.classList.remove('input-error'));
+      const alert = document.getElementById('login-alert');
+      alert.className = 'auth-alert';
+      alert.textContent = '';
+    }
+
+    function showAlert(msg, type) {
+      const alert = document.getElementById('login-alert');
+      alert.className = `auth-alert auth-alert-${type} visible`;
+      alert.innerHTML = `<i class="fa-solid fa-${type === 'error' ? 'circle-xmark' : type === 'success' ? 'circle-check' : 'circle-info'}"></i> ${msg}`;
+    }
+
+    function setLoading(on) {
+      const btn = document.getElementById('btn-login');
+      const inputs = document.querySelectorAll('#login-form .auth-input, #login-form input[type="checkbox"]');
+      if (on) {
+        btn.classList.add('loading');
+        btn.disabled = true;
+        inputs.forEach(i => i.disabled = true);
+        document.getElementById('btn-google-login').disabled = true;
+      } else {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        inputs.forEach(i => i.disabled = false);
+        document.getElementById('btn-google-login').disabled = false;
+      }
+    }
+
+    function showToast(msg, type) {
+      const toast = document.createElement('div');
+      toast.className = `auth-toast auth-toast-${type}`;
+      toast.innerHTML = `<i class="fa-solid fa-${type === 'success' ? 'circle-check' : 'circle-xmark'}"></i> ${msg}`;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.animation = 'authToastOut 0.3s ease forwards';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    /* ── Lockout ──────────────────────────── */
+    function lockForm(durationMs) {
+      const btn = document.getElementById('btn-login');
+      const inputs = document.querySelectorAll('#login-form .auth-input, #login-form input[type="checkbox"]');
+      btn.disabled = true;
+      inputs.forEach(i => i.disabled = true);
+      document.getElementById('btn-google-login').disabled = true;
+
+      showAlert('Too many failed attempts. Please try again in 15 minutes.', 'error');
+
+      const interval = setInterval(() => {
+        const lockUntil = parseInt(localStorage.getItem('auth_lockout_until') || '0');
+        if (Date.now() >= lockUntil) {
+          clearInterval(interval);
+          btn.disabled = false;
+          inputs.forEach(i => i.disabled = false);
+          document.getElementById('btn-google-login').disabled = false;
+          clearErrors();
+          failedAttempts = 0;
+          localStorage.removeItem('auth_lockout_until');
+        }
+      }, 5000);
+    }
+
+    /* ── Form submit ─────────────────────── */
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearErrors();
+
+      // Check lockout
+      const lockUntil = localStorage.getItem('auth_lockout_until');
+      if (lockUntil && Date.now() < parseInt(lockUntil)) {
+        showAlert('Too many failed attempts. Please try again in 15 minutes.', 'error');
+        return;
+      }
+
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+
+      let valid = true;
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email) { showFieldError('err-email', 'Email is required'); valid = false; }
+      else if (!emailRegex.test(email)) { showFieldError('err-email', 'Please enter a valid email address'); valid = false; }
+
+      if (!password) { showFieldError('err-password', 'Password is required'); valid = false; }
+
+      if (!valid) return;
+
+      setLoading(true);
+
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
+
+        if (error) {
+          failedAttempts++;
+          if (failedAttempts >= 5) {
+            const lockoutTime = Date.now() + (15 * 60 * 1000);
+            localStorage.setItem('auth_lockout_until', lockoutTime.toString());
+            lockForm(15 * 60 * 1000);
+          } else {
+            showAlert('Invalid email or password', 'error');
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Success — redirect
+        const params = new URLSearchParams(window.location.search);
+        const redirectTo = params.get('redirectTo') || '/dashboard';
+        window.location.href = redirectTo;
+
+      } catch (err) {
+        showAlert('Something went wrong. Please try again.', 'error');
+        setLoading(false);
+      }
+    });
+
+    /* ── Google OAuth ─────────────────────── */
+    async function googleSignIn() {
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin + '/dashboard'
+          }
+        });
+        if (error) {
+          showAlert('Google sign-in is not available. Please use email login.', 'error');
+        }
+      } catch (err) {
+        showAlert('Google sign-in failed. Please try again.', 'error');
+      }
+    }
+  </script>
+</body>
+</html>

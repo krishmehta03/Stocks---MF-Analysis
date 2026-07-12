@@ -19,6 +19,10 @@ yf.data.YfData.user_agent_headers = {
 }
 import pandas as pd
 import hashlib
+from dotenv import load_dotenv
+from lib.supabase import get_supabase
+
+load_dotenv()
 
 def hash_pin(pin):
     if pin is None:
@@ -89,14 +93,33 @@ price_update_state = {
     "current_ticker": "",
     "logs": [],
     "start_time": None,
+    "last_failed_time": None,
     "last_updated_by_profile": {}  # active profile -> timestamp
 }
 
 def load_config():
     if not os.path.exists(CONFIG_FILE):
         return {}
-    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Ensure risk_alerts is enabled by default as requested by user
+        if "widgets" not in data:
+            data["widgets"] = {}
+        if data["widgets"].get("risk_alerts") is False or "risk_alerts" not in data["widgets"]:
+            data["widgets"]["risk_alerts"] = True
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+        return data
+    except Exception as e:
+        print(f"Error loading/updating config file: {e}")
+        # fallback
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {}
 
 def save_config(config):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -107,7 +130,7 @@ def parse_date(date_val):
         return None
     if isinstance(date_val, datetime):
         return date_val
-    for fmt in ('%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d'):
+    for fmt in ('%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d %b %Y', '%d %B %Y'):
         try:
             return datetime.strptime(str(date_val).strip(), fmt)
         except ValueError:
@@ -116,7 +139,7 @@ def parse_date(date_val):
 
 def format_date_str(date_val):
     d = parse_date(date_val)
-    return d.strftime('%d-%m-%Y') if d else ""
+    return d.strftime('%d %b %Y') if d else ""
 
 def get_tax_flag(buy_date, threshold_days):
     d = parse_date(buy_date)
@@ -304,6 +327,9 @@ _CUSTOM_TICKER_MAP = {
     "VODAFONE IDEA LIMITED": "IDEA.NS",
     "NHPC LTD": "NHPC.NS",
     "NHPC LIMITED": "NHPC.NS",
+    "VAML": "VAML.NS",
+    "S A I L": "SAIL.NS",
+    "HDFC BANK": "HDFCBANK.NS",
 }
 
 
@@ -498,31 +524,108 @@ def _yf_info(symbol: str, bypass_cache: bool = False) -> dict:
     return result
 
 
-def get_days_in_drawdown(symbol: str, buy_price: float) -> int:
+
+# Indian market holidays (NSE/BSE) — add years as needed
+_INDIAN_MARKET_HOLIDAYS = {
+    # 2024
+    datetime(2024, 1, 26), datetime(2024, 3, 25), datetime(2024, 3, 29),
+    datetime(2024, 4, 14), datetime(2024, 4, 17), datetime(2024, 5, 23),
+    datetime(2024, 6, 17), datetime(2024, 7, 17), datetime(2024, 8, 15),
+    datetime(2024, 10, 2), datetime(2024, 10, 14), datetime(2024, 10, 24),
+    datetime(2024, 11, 1), datetime(2024, 11, 15), datetime(2024, 12, 25),
+    # 2025
+    datetime(2025, 1, 26), datetime(2025, 2, 26), datetime(2025, 3, 14),
+    datetime(2025, 3, 31), datetime(2025, 4, 10), datetime(2025, 4, 14),
+    datetime(2025, 4, 18), datetime(2025, 5, 1), datetime(2025, 8, 15),
+    datetime(2025, 8, 27), datetime(2025, 10, 2), datetime(2025, 10, 2),
+    datetime(2025, 10, 20), datetime(2025, 10, 24), datetime(2025, 11, 5),
+    datetime(2025, 12, 25),
+    # 2026
+    datetime(2026, 1, 26), datetime(2026, 3, 20), datetime(2026, 3, 31),
+    datetime(2026, 4, 3), datetime(2026, 4, 14), datetime(2026, 5, 1),
+    datetime(2026, 7, 6), datetime(2026, 8, 15), datetime(2026, 9, 16),
+    datetime(2026, 10, 2), datetime(2026, 10, 14), datetime(2026, 11, 11),
+    datetime(2026, 12, 25),
+}
+
+def _count_trading_days(start_date: datetime, end_date: datetime) -> int:
+    """Count Mon-Fri trading days between two dates, excluding Indian market holidays."""
+    count = 0
+    d = start_date
+    # Normalize holiday set to date-only for comparison
+    holidays_dates = {h.date() for h in _INDIAN_MARKET_HOLIDAYS}
+    while d.date() <= end_date.date():
+        if d.weekday() < 5 and d.date() not in holidays_dates:  # Mon=0 … Fri=4
+            count += 1
+        d = d.replace(day=d.day + 1) if d.day < 28 else datetime(d.year + (d.month == 12), (d.month % 12) + 1 if d.month < 12 else 1, 1) if d.day >= 28 and d == datetime(d.year, d.month, d.day) else d
+    return count
+
+def _add_one_day(d: datetime) -> datetime:
+    import calendar
+    year, month, day = d.year, d.month, d.day
+    day += 1
+    max_day = calendar.monthrange(year, month)[1]
+    if day > max_day:
+        day = 1
+        month += 1
+        if month > 12:
+            month = 1
+            year += 1
+    return datetime(year, month, day)
+
+def _count_trading_days_v2(start_date: datetime, end_date: datetime) -> int:
+    """Count Mon-Fri trading days between start_date and end_date (inclusive), excluding Indian holidays."""
+    count = 0
+    holidays_dates = {h.date() for h in _INDIAN_MARKET_HOLIDAYS}
+    d = datetime(start_date.year, start_date.month, start_date.day)
+    end = datetime(end_date.year, end_date.month, end_date.day)
+    while d <= end:
+        if d.weekday() < 5 and d.date() not in holidays_dates:
+            count += 1
+        d = _add_one_day(d)
+    return count
+
+
+def get_days_in_drawdown(symbol: str, buy_price: float, buy_date_raw=None) -> int:
     """
     Calculate how many consecutive trading days the stock's closing price has been
-    strictly below the average purchase price (buy_price).
-    Uses caching (1 hour TTL) to prevent rate limits.
+    strictly below the average purchase price (buy_price), anchored at buy_date.
+
+    Returns:
+      >= 0  : trading days in drawdown
+      -1    : buy_date missing, duration cannot be calculated
     """
     if not symbol or not buy_price:
         return 0
-        
+
     cache_key = f"{symbol}|{buy_price}"
     now_ts = time.time()
-    
-    # Check cache
+
+    # Check cache (1 hour TTL)
     if cache_key in _drawdown_cache:
         cached = _drawdown_cache[cache_key]
         if now_ts - cached.get("ts", 0) < 3600:
             return cached.get("days", 0)
-            
+
+    # If no buy_date provided, return sentinel -1 (unknown duration)
+    buy_date = parse_date(buy_date_raw) if buy_date_raw else None
+    if buy_date is None:
+        _drawdown_cache[cache_key] = {"days": -1, "ts": now_ts}
+        save_cache()
+        return -1
+
     days = 0
     try:
         ticker = yf.Ticker(symbol)
-        # Fetch up to 2 years of daily data (safe and fast)
+        # Fetch up to 2 years of daily data
         hist = ticker.history(period="2y")
         if not hist.empty and "Close" in hist.columns:
-            closes = hist["Close"].tolist()
+            # Filter to only rows on/after buy_date
+            hist.index = hist.index.tz_localize(None) if hist.index.tzinfo is not None else hist.index
+            hist_after_buy = hist[hist.index >= pd.Timestamp(buy_date)]
+
+            # Walk backward from today: count consecutive days below buy_price
+            closes = hist_after_buy["Close"].tolist()
             count = 0
             for price in reversed(closes):
                 if price < buy_price:
@@ -532,11 +635,13 @@ def get_days_in_drawdown(symbol: str, buy_price: float) -> int:
             days = count
     except Exception as e:
         print(f"[drawdown calculation] {symbol}: {e}")
-        
+        days = 0
+
     # Update cache
     _drawdown_cache[cache_key] = {"days": days, "ts": now_ts}
     save_cache()
     return days
+
 
 
 def get_yahoo_finance_price(company_name: str, exchange: str) -> float | None:
@@ -583,7 +688,11 @@ def get_portfolio_data():
             
             exchange = ws[f'B{row}'].value or "NSE"
             raw_sector = ws[f'C{row}'].value
-            if not raw_sector or str(raw_sector).strip() == "" or str(raw_sector).strip().lower() == "other":
+            is_sector_missing = False
+            if not raw_sector or str(raw_sector).strip() == "":
+                is_sector_missing = True
+                industry = "ETFs"
+            elif str(raw_sector).strip().lower() == "other":
                 industry = "ETFs"
             else:
                 industry = str(raw_sector).strip()
@@ -610,7 +719,7 @@ def get_portfolio_data():
             holding_type = "LT" if tax_flag == "LTCG" else ("ST" if tax_flag == "STCG" else "")
             
             sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
-            drawdown_days = get_days_in_drawdown(sym, buy_price) if sym else 0
+            drawdown_days = get_days_in_drawdown(sym, buy_price, buy_date_raw) if sym else 0
 
             stocks.append({
                 "row_idx": row,
@@ -618,6 +727,7 @@ def get_portfolio_data():
                 "Exchange": str(exchange).strip(),
                 "Sector": sector,
                 "Industry": industry,
+                "is_sector_missing": is_sector_missing,
                 "Qty": qty,
                 "Buy Price": buy_price,
                 "Buy Date": buy_date_str,
@@ -916,10 +1026,12 @@ def run_price_and_nav_update(is_background=False):
         return True
     except PermissionError:
         price_update_state["status"] = "locked"
+        price_update_state["last_failed_time"] = time.time()
         price_update_state["logs"].append("❌ Excel file is currently open and locked by another program. Will retry shortly.")
         raise
     except Exception as e:
         price_update_state["status"] = "error"
+        price_update_state["last_failed_time"] = time.time()
         price_update_state["logs"].append(f"Critical Error during update: {e}")
         raise
 
@@ -942,24 +1054,23 @@ def automatic_price_updater_loop():
                 active_profile = ACTIVE_PROFILE
                 last_updated = price_update_state["last_updated_by_profile"].get(active_profile, 0)
                 now = time.time()
+                status = price_update_state["status"]
                 
-                # If last update failed because it was locked, retry in 2 minutes (120s)
-                # otherwise wait 15 minutes (900s)
-                if price_update_state["status"] == "locked":
-                    interval = 120
-                else:
-                    interval = 900
-                    
-                if now - last_updated >= interval:
-                    # Only start background run if status is idle, completed, error, or locked
-                    if price_update_state["status"] not in ("running", "background_running"):
-                        print(f"[Auto Price Updater] Running automatic price/NAV update for profile: {active_profile}")
+                if status in ("error", "locked"):
+                    last_failed = price_update_state.get("last_failed_time", 0) or 0
+                    if now - last_failed >= 30:
+                        print(f"[Auto Price Updater] Retrying failed/locked update (status: {status}) for profile {active_profile} after 30 seconds...")
                         try:
                             run_price_and_nav_update(is_background=True)
-                        except PermissionError:
-                            print("[Auto Price Updater] Excel file is currently locked. Retrying in 2m.")
                         except Exception as e:
-                            print(f"[Auto Price Updater] Error in automatic update: {e}")
+                            print(f"[Auto Price Updater] Retry failed: {e}")
+                elif status in ("idle", "completed"):
+                    if now - last_updated >= 900:
+                        print(f"[Auto Price Updater] Running scheduled automatic price/NAV update for profile: {active_profile}")
+                        try:
+                            run_price_and_nav_update(is_background=True)
+                        except Exception as e:
+                            print(f"[Auto Price Updater] Scheduled update failed: {e}")
         except Exception as e:
             print(f"[Auto Price Updater] Exception in background loop: {e}")
             
@@ -968,6 +1079,50 @@ def automatic_price_updater_loop():
 @app.route('/')
 def home():
     return render_template('index.html')
+
+# ─── Authentication Pages ──────────────────────────────────────────────────────
+def _auth_context():
+    """Return Supabase credentials for client-side auth templates."""
+    return {
+        'supabase_url': os.environ.get('SUPABASE_URL', ''),
+        'supabase_anon_key': os.environ.get('SUPABASE_ANON_KEY', ''),
+    }
+
+@app.route('/signup')
+def signup_page():
+    return render_template('signup.html', **_auth_context())
+
+@app.route('/login')
+def login_page():
+    return render_template('login.html', **_auth_context())
+
+@app.route('/verify-email')
+def verify_email_page():
+    return render_template('verify-email.html', **_auth_context())
+
+@app.route('/reset-password')
+def reset_password_page():
+    return render_template('reset-password.html', **_auth_context())
+
+@app.route('/dashboard')
+def dashboard_page():
+    return render_template('index.html')
+
+@app.route('/api/test-db', methods=['GET'])
+def test_db():
+    try:
+        supabase = get_supabase()
+        supabase.table('profiles').select('id', count='exact').limit(1).execute()
+
+        return jsonify({
+            "status": "Connected successfully",
+            "message": "Supabase is working"
+        })
+    except Exception as error:
+        return jsonify({
+            "status": "Connection failed",
+            "error": str(error)
+        }), 500
 
 @app.route('/api/portfolio', methods=['GET'])
 def api_portfolio():
@@ -1521,19 +1676,19 @@ def import_stocks_csv():
         'Company Name': {
             'company name', 'stock name', 'scrip name', 'security name',
             'script name', 'name', 'symbol', 'instrument', 'stock', 'scrip',
-            'security', 'share name', 'script'
+            'security', 'share name', 'script', 'isin name', 'isin_name'
         },
         'Total Quantity': {
             'total quantity', 'quantity', 'qty', 'net qty', 'total qty',
             'holding qty', 'shares', 'units', 'net quantity', 'holding quantity',
-            'balance qty', 'available qty', 'free quantity'
+            'balance qty', 'available qty', 'free quantity', 'current free', 'current_free'
         },
         'Avg Trading Price': {
             'avg trading price', 'average buy price', 'avg buy price',
             'average price', 'avg price', 'avg. price', 'avg cost',
             'average cost', 'avg. cost', 'buy price', 'cost price',
             'avg cost price', 'purchase price', 'average purchase price',
-            'avg purchase price', 'weighted avg price'
+            'avg purchase price', 'weighted avg price', 'rate'
         },
         'Sector': {
             'sector', 'industry', 'category', 'segment'
@@ -1596,6 +1751,10 @@ def import_stocks_csv():
 
         # Get the company cell (could be any column depending on broker format)
         company_cell = row[company_col].strip() if company_col < len(row) else ''
+
+        # Clean broker-specific suffixes (e.g., "BANDHAN BANK LIMITED # EQUITY SHARES" -> "BANDHAN BANK LIMITED")
+        if '#' in company_cell:
+            company_cell = company_cell.split('#')[0].strip()
 
         # Stop on footer/totals rows
         if company_cell.lower() in STOP_KEYWORDS:
@@ -1752,6 +1911,26 @@ def save_stock_buy_date():
         apply_excel_styles(ws, row_idx)
         wb.save(EXCEL_FILE)
         return jsonify({"status": "success", "message": "Buy date saved successfully!"})
+    except PermissionError:
+        return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/stock/save-sector', methods=['POST'])
+def save_stock_sector():
+    data = request.json
+    row_idx = int(data.get("row_idx"))
+    sector = data.get("Sector", "").strip()
+    if not sector:
+        return jsonify({"status": "error", "message": "Sector is required."}), 400
+    try:
+        wb = openpyxl.load_workbook(EXCEL_FILE)
+        ws = wb["📥 Stock Data Input"]
+        ws[f'C{row_idx}'] = sector
+        apply_excel_styles(ws, row_idx)
+        wb.save(EXCEL_FILE)
+        return jsonify({"status": "success", "message": f"Sector updated successfully to '{sector}'!"})
     except PermissionError:
         return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
     except Exception as e:

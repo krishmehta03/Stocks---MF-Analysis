@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up — Portfolio Analysis</title>
+  <meta name="description" content="Create your Portfolio Analysis account and start tracking your investments professionally.">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-page">
+
+  <div class="auth-card">
+    <!-- Logo -->
+    <a href="/" class="auth-logo">
+      <i class="fa-solid fa-chart-line"></i>
+      <span>Portfolio Analysis</span>
+    </a>
+
+    <!-- Heading -->
+    <h1 class="auth-heading">Create your account</h1>
+    <p class="auth-subheading">Start tracking your portfolio professionally</p>
+
+    <!-- Global alert -->
+    <div id="signup-alert" class="auth-alert"></div>
+
+    <!-- Form -->
+    <form id="signup-form" novalidate>
+      <!-- Full Name -->
+      <div class="auth-form-group">
+        <label for="signup-name">Full Name</label>
+        <input type="text" id="signup-name" class="auth-input" placeholder="Rahul Sharma" required>
+        <div class="auth-field-error" id="err-name"></div>
+      </div>
+
+      <!-- Email -->
+      <div class="auth-form-group">
+        <label for="signup-email">Email Address</label>
+        <input type="email" id="signup-email" class="auth-input" placeholder="rahul@example.com" required>
+        <div class="auth-field-error" id="err-email"></div>
+      </div>
+
+      <!-- Password -->
+      <div class="auth-form-group">
+        <label for="signup-password">Password</label>
+        <div class="auth-input-wrap">
+          <input type="password" id="signup-password" class="auth-input" placeholder="Min. 8 characters" required minlength="8" style="padding-right: 40px;">
+          <button type="button" class="auth-password-toggle" onclick="togglePw('signup-password', this)" aria-label="Toggle password visibility">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+        </div>
+        <div class="auth-password-hint"><i class="fa-solid fa-circle-info"></i> Min. 8 characters with at least 1 number</div>
+        <div class="auth-field-error" id="err-password"></div>
+      </div>
+
+      <!-- Confirm Password -->
+      <div class="auth-form-group">
+        <label for="signup-confirm">Confirm Password</label>
+        <div class="auth-input-wrap">
+          <input type="password" id="signup-confirm" class="auth-input" placeholder="Re-enter password" required style="padding-right: 40px;">
+          <button type="button" class="auth-password-toggle" onclick="togglePw('signup-confirm', this)" aria-label="Toggle password visibility">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+        </div>
+        <div class="auth-field-error" id="err-confirm"></div>
+      </div>
+
+      <!-- Terms checkbox -->
+      <div class="auth-checkbox-wrap">
+        <input type="checkbox" id="signup-terms">
+        <label for="signup-terms">I agree to the <a href="#" onclick="return false;">Terms of Service</a> and <a href="#" onclick="return false;">Privacy Policy</a></label>
+      </div>
+      <div class="auth-field-error" id="err-terms" style="margin-top: -0.75rem; margin-bottom: 1rem;"></div>
+
+      <!-- Submit -->
+      <button type="submit" class="auth-btn-primary" id="btn-signup">
+        <span class="auth-btn-text">Create Account</span>
+        <span class="auth-spinner"></span>
+      </button>
+    </form>
+
+    <!-- Divider -->
+    <div class="auth-divider"><span>OR</span></div>
+
+    <!-- Google OAuth -->
+    <button class="auth-btn-google" id="btn-google-signup" onclick="googleSignUp()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Continue with Google
+    </button>
+
+    <!-- Bottom link -->
+    <div class="auth-bottom-link">
+      Already have an account? <a href="/login">Sign in</a>
+    </div>
+  </div>
+
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = '{{ supabase_url }}';
+    const SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ── Password toggle ─────────────────── */
+    function togglePw(inputId, btn) {
+      const inp = document.getElementById(inputId);
+      const icon = btn.querySelector('i');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.className = 'fa-solid fa-eye-slash';
+      } else {
+        inp.type = 'password';
+        icon.className = 'fa-solid fa-eye';
+      }
+    }
+
+    /* ── Helpers ──────────────────────────── */
+    function showFieldError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.classList.add('visible');
+      const input = el.closest('.auth-form-group')?.querySelector('.auth-input');
+      if (input) input.classList.add('input-error');
+    }
+
+    function clearErrors() {
+      document.querySelectorAll('.auth-field-error').forEach(el => {
+        el.textContent = '';
+        el.classList.remove('visible');
+      });
+      document.querySelectorAll('.auth-input').forEach(el => el.classList.remove('input-error'));
+      const alert = document.getElementById('signup-alert');
+      alert.className = 'auth-alert';
+      alert.textContent = '';
+    }
+
+    function showAlert(msg, type) {
+      const alert = document.getElementById('signup-alert');
+      alert.className = `auth-alert auth-alert-${type} visible`;
+      alert.innerHTML = `<i class="fa-solid fa-${type === 'error' ? 'circle-xmark' : 'circle-check'}"></i> ${msg}`;
+    }
+
+    function setLoading(on) {
+      const btn = document.getElementById('btn-signup');
+      const inputs = document.querySelectorAll('#signup-form .auth-input, #signup-form input[type="checkbox"]');
+      if (on) {
+        btn.classList.add('loading');
+        btn.disabled = true;
+        inputs.forEach(i => i.disabled = true);
+        document.getElementById('btn-google-signup').disabled = true;
+      } else {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        inputs.forEach(i => i.disabled = false);
+        document.getElementById('btn-google-signup').disabled = false;
+      }
+    }
+
+    /* ── Form submit ─────────────────────── */
+    document.getElementById('signup-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearErrors();
+
+      const fullName = document.getElementById('signup-name').value.trim();
+      const email = document.getElementById('signup-email').value.trim();
+      const password = document.getElementById('signup-password').value;
+      const confirm = document.getElementById('signup-confirm').value;
+      const terms = document.getElementById('signup-terms').checked;
+
+      let valid = true;
+
+      if (!fullName) { showFieldError('err-name', 'Full name is required'); valid = false; }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email) { showFieldError('err-email', 'Email is required'); valid = false; }
+      else if (!emailRegex.test(email)) { showFieldError('err-email', 'Please enter a valid email address'); valid = false; }
+
+      if (!password) { showFieldError('err-password', 'Password is required'); valid = false; }
+      else if (password.length < 8) { showFieldError('err-password', 'Password must be at least 8 characters'); valid = false; }
+      else if (!/\d/.test(password)) { showFieldError('err-password', 'Password must contain at least 1 number'); valid = false; }
+
+      if (!confirm) { showFieldError('err-confirm', 'Please confirm your password'); valid = false; }
+      else if (password !== confirm) { showFieldError('err-confirm', 'Passwords do not match'); valid = false; }
+
+      if (!terms) { showFieldError('err-terms', 'You must agree to the Terms and Privacy Policy'); valid = false; }
+
+      if (!valid) return;
+
+      setLoading(true);
+
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: { full_name: fullName }
+          }
+        });
+
+        if (error) {
+          const msg = error.message.toLowerCase();
+          if (msg.includes('already registered') || msg.includes('already been registered')) {
+            showAlert('This email is already registered. <a href="/login" style="color:inherit;text-decoration:underline;">Sign in instead?</a>', 'error');
+          } else if (msg.includes('password')) {
+            showAlert('Password must be at least 8 characters with one number', 'error');
+          } else {
+            showAlert('Something went wrong. Please try again.', 'error');
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Success — redirect to verify email
+        window.location.href = '/verify-email?email=' + encodeURIComponent(email);
+      } catch (err) {
+        showAlert('Something went wrong. Please try again.', 'error');
+        setLoading(false);
+      }
+    });
+
+    /* ── Google OAuth ─────────────────────── */
+    async function googleSignUp() {
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin + '/dashboard'
+          }
+        });
+        if (error) {
+          showAlert('Google sign-in is not available. Please use email signup.', 'error');
+        }
+      } catch (err) {
+        showAlert('Google sign-in failed. Please try again.', 'error');
+      }
+    }
+  </script>
+</body>
+</html>
