@@ -55,8 +55,7 @@
       </div>
       <div class="auth-checkbox-wrap">
         <input type="checkbox" id="signup-terms">
-        <label for="signup-terms">I agree to the <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy
-            Policy</a></label>
+        <label for="signup-terms">I agree to the <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a></label>
       </div>
       <div class="auth-field-error" id="err-terms" style="margin-top:-0.75rem;margin-bottom:1rem;"></div>
       <button type="submit" class="auth-btn-primary" id="btn-signup">
@@ -89,9 +88,12 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
   <script>
-    const SUPABASE_URL = '{{ supabase_url }}';
-    const SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.SUPABASE_URL = '{{ supabase_url }}';
+    window.SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
+    window.supabaseClient = window.supabase.createClient(
+      window.SUPABASE_URL,
+      window.SUPABASE_ANON_KEY
+    );
 
     function togglePw(inputId, btn) {
       const inp = document.getElementById(inputId);
@@ -128,3 +130,101 @@
     function showAlert(msg, type) {
       const alert = document.getElementById('signup-alert');
       alert.className = `auth-alert auth-alert-${type} visible`;
+      alert.innerHTML = `<i class="fa-solid fa-${type === 'error' ? 'circle-xmark' : 'circle-check'}"></i> ${msg}`;
+    }
+
+    function setLoading(on) {
+      const btn = document.getElementById('btn-signup');
+      const inputs = document.querySelectorAll('#signup-form .auth-input, #signup-form input[type="checkbox"]');
+      if (on) {
+        btn.classList.add('loading');
+        btn.disabled = true;
+        inputs.forEach(i => i.disabled = true);
+        document.getElementById('btn-google-signup').disabled = true;
+      } else {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        inputs.forEach(i => i.disabled = false);
+        document.getElementById('btn-google-signup').disabled = false;
+      }
+    }
+
+    document.getElementById('signup-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearErrors();
+
+      const fullName = document.getElementById('signup-name').value.trim();
+      const email = document.getElementById('signup-email').value.trim();
+      const password = document.getElementById('signup-password').value;
+      const confirm = document.getElementById('signup-confirm').value;
+      const terms = document.getElementById('signup-terms').checked;
+
+      let valid = true;
+
+      if (!fullName) { showFieldError('err-name', 'Full name is required'); valid = false; }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email) { showFieldError('err-email', 'Email is required'); valid = false; }
+      else if (!emailRegex.test(email)) { showFieldError('err-email', 'Please enter a valid email address'); valid = false; }
+
+      if (!password) { showFieldError('err-password', 'Password is required'); valid = false; }
+      else if (password.length < 8) { showFieldError('err-password', 'Password must be at least 8 characters'); valid = false; }
+      else if (!/\d/.test(password)) { showFieldError('err-password', 'Password must contain at least 1 number'); valid = false; }
+
+      if (!confirm) { showFieldError('err-confirm', 'Please confirm your password'); valid = false; }
+      else if (password !== confirm) { showFieldError('err-confirm', 'Passwords do not match'); valid = false; }
+
+      if (!terms) { showFieldError('err-terms', 'You must agree to the Terms and Privacy Policy'); valid = false; }
+
+      if (!valid) return;
+
+      setLoading(true);
+
+      try {
+        const { data, error } = await window.supabaseClient.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: { full_name: fullName }
+          }
+        });
+
+        if (error) {
+          const msg = error.message.toLowerCase();
+          if (msg.includes('already registered') || msg.includes('already been registered')) {
+            showAlert('This email is already registered. <a href="/login" style="color:inherit;text-decoration:underline;">Sign in instead?</a>', 'error');
+          } else if (msg.includes('password')) {
+            showAlert('Password must be at least 8 characters with one number', 'error');
+          } else {
+            showAlert('Something went wrong. Please try again.', 'error');
+          }
+          setLoading(false);
+          return;
+        }
+
+        window.location.href = '/verify-email?email=' + encodeURIComponent(email);
+      } catch (err) {
+        showAlert('Something went wrong. Please try again.', 'error');
+        setLoading(false);
+      }
+    });
+
+    async function googleSignUp() {
+      try {
+        const { error } = await window.supabaseClient.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin + '/dashboard'
+          }
+        });
+        if (error) {
+          showAlert('Google sign-in is not available. Please use email signup.', 'error');
+        }
+      } catch (err) {
+        showAlert('Google sign-in failed. Please try again.', 'error');
+      }
+    }
+  </script>
+</body>
+
+</html>

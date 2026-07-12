@@ -98,9 +98,12 @@
   <!-- Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
   <script>
-    const SUPABASE_URL = '{{ supabase_url }}';
-    const SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.SUPABASE_URL = '{{ supabase_url }}';
+    window.SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
+    window.supabaseClient = window.supabase.createClient(
+      window.SUPABASE_URL,
+      window.SUPABASE_ANON_KEY
+    );
 
     let failedAttempts = 0;
 
@@ -236,7 +239,7 @@
       setLoading(true);
 
       try {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
+        const { data, error } = await window.supabaseClient.auth.signInWithPassword({
           email: email,
           password: password
         });
@@ -268,7 +271,7 @@
     /* ── Google OAuth ─────────────────────── */
     async function googleSignIn() {
       try {
-        const { error } = await supabaseClient.auth.signInWithOAuth({
+        const { error } = await window.supabaseClient.auth.signInWithOAuth({
           provider: 'google',
           options: {
             redirectTo: window.location.origin + '/dashboard'
