@@ -1,3 +1,19 @@
+// Secure fetch helper to inject Supabase access token in Authorization headers
+async function authorizedFetch(url, options = {}) {
+  options.headers = options.headers || {};
+  if (window._authClient) {
+    try {
+      const { data: { session } } = await window._authClient.auth.getSession();
+      if (session && session.access_token) {
+        options.headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+    } catch (err) {
+      console.error('Error fetching Supabase session:', err);
+    }
+  }
+  return fetch(url, options);
+}
+
 // Global Application State
 let portfolioData = null;
 let appConfig = null;
@@ -152,7 +168,7 @@ function switchTab(tabId) {
 // FETCH SYSTEM DATA
 async function fetchConfig() {
   try {
-    const res = await fetch('/api/config');
+    const res = await authorizedFetch('/api/config');
     appConfig = await res.json();
     applyTheme(appConfig.theme || 'emerald');
     loadSettingsIntoForm();
@@ -163,7 +179,7 @@ async function fetchConfig() {
 
 async function fetchPortfolio() {
   try {
-    const res = await fetch('/api/portfolio');
+    const res = await authorizedFetch('/api/portfolio');
     portfolioData = await res.json();
     
     if (portfolioData.error) {
@@ -420,7 +436,10 @@ function toggleWidgetsVisibility() {
 function renderLeaders() {
   const container = document.getElementById("dashboard-leaders-list");
   container.innerHTML = "";
-  if (!portfolioData || !portfolioData.stocks) return;
+  if (!portfolioData || !portfolioData.stocks || portfolioData.stocks.length === 0) {
+    container.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; padding: 1rem;">No holdings yet</p>`;
+    return;
+  }
   
   const allInvested = portfolioData.stocks.filter(s => (s["Invested Value"] || 0) > 0);
   const qualifiers = allInvested.filter(s => (s["Return %"] || 0) > 10);
@@ -480,7 +499,10 @@ function renderUnderperformers() {
   const container = document.getElementById("dashboard-underperformers-list");
   if (!container) return;
   container.innerHTML = "";
-  if (!portfolioData || !portfolioData.stocks) return;
+  if (!portfolioData || !portfolioData.stocks || portfolioData.stocks.length === 0) {
+    container.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; padding: 1rem;">No holdings yet</p>`;
+    return;
+  }
 
   const allInvested = portfolioData.stocks.filter(s => (s["Invested Value"] || 0) > 0);
   const qualifiers = allInvested.filter(s => (s["Return %"] || 0) < -10);
@@ -785,7 +807,7 @@ async function fetchPerformanceData() {
   if (canvas) canvas.style.display = "none";
   
   try {
-    const res = await fetch(`/api/portfolio/performance?period=${activePeriod}&benchmark=${activeBenchmark}`);
+    const res = await authorizedFetch(`/api/portfolio/performance?period=${activePeriod}&benchmark=${activeBenchmark}`);
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || "Failed to fetch performance data");
@@ -799,7 +821,8 @@ async function fetchPerformanceData() {
   } catch (err) {
     console.error("Error loading performance chart:", err);
     if (loader) {
-      loader.innerHTML = `<span style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || "No data available. Add stock holdings to see performance."}</span>`;
+      const displayMsg = err.message === "No holdings found" ? "Add stocks to see performance chart" : err.message;
+      loader.innerHTML = `<span style="color: var(--text-secondary); font-size: 0.95rem;"><i class="fa-solid fa-chart-line" style="margin-right: 0.5rem;"></i> ${displayMsg}</span>`;
     }
     if (badge) {
       badge.innerText = "No Data";
@@ -1209,7 +1232,7 @@ async function fetchSectorContributionData() {
   if (emptyState) emptyState.style.display = "none";
   
   try {
-    const res = await fetch(`/api/portfolio/sector-contribution?period=${activeContribPeriod}&benchmark=${activeBenchmark}`);
+    const res = await authorizedFetch(`/api/portfolio/sector-contribution?period=${activeContribPeriod}&benchmark=${activeBenchmark}`);
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || "Failed to fetch sector attribution data");
@@ -1220,7 +1243,8 @@ async function fetchSectorContributionData() {
   } catch (err) {
     console.error("Error loading sector contribution:", err);
     if (loader) {
-      loader.innerHTML = `<span style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || "Failed to load sector attribution."}</span>`;
+      const displayMsg = err.message === "No holdings found" ? "Add stocks to see sector breakdown" : err.message;
+      loader.innerHTML = `<span style="color: var(--text-secondary); font-size: 0.95rem;"><i class="fa-solid fa-chart-pie" style="margin-right: 0.5rem;"></i> ${displayMsg}</span>`;
     }
   }
 }
@@ -1762,7 +1786,16 @@ function renderStocksTable() {
   
   // Generate rows
   if (portfolioData.stocks.length === 0) {
-    body.innerHTML = `<tr><td colspan="${visCols.length + 1}" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No stock holdings in Excel file. Click 'Add New Stock' to insert!</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${visCols.length + 1}" style="text-align: center; color: var(--text-secondary); padding: 3rem 1rem;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;">
+        <i class="fa-solid fa-folder-open" style="font-size:2rem;opacity:0.3;"></i>
+        <p style="margin:0;font-size:0.95rem;">No stock holdings found in your database.</p>
+        <div style="display:flex;gap:0.5rem;justify-content:center;">
+          <button class="btn btn-secondary btn-sm" onclick="openAddStockModal()"><i class="fa-solid fa-plus"></i> Add New Stock</button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('csv-file-input').click()"><i class="fa-solid fa-file-import"></i> Import Broker CSV</button>
+        </div>
+      </div>
+    </td></tr>`;
     return;
   }
   
@@ -2318,6 +2351,13 @@ function evaluateRiskAlerts() {
   container.innerHTML = "";
   if (!portfolioData || !appConfig) return;
 
+  const hasHoldings = (portfolioData.stocks && portfolioData.stocks.length > 0) || (portfolioData.mfs && portfolioData.mfs.length > 0);
+  if (!hasHoldings) {
+    container.style.display = "none";
+    return;
+  }
+  container.style.display = "block";
+
   if (appConfig.widgets && appConfig.widgets.risk_alerts === false) {
     return;
   }
@@ -2558,7 +2598,7 @@ async function submitStockForm(e) {
   };
 
   try {
-    const res = await fetch(url, {
+    const res = await authorizedFetch(url, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
@@ -2663,7 +2703,7 @@ async function submitCsvImport() {
     const formData = new FormData();
     formData.append('file', selectedCsvFile);
 
-    const res = await fetch('/api/stock/import-csv', {
+    const res = await authorizedFetch('/api/stock/import-csv', {
       method: 'POST',
       body: formData
     });
@@ -2688,7 +2728,7 @@ async function submitCsvImport() {
 async function deleteStockHolding(rowIdx) {
   if (!confirm("Are you sure you want to delete this stock from your portfolio and the underlying Excel file?")) return;
   try {
-    const res = await fetch('/api/stock/delete', {
+    const res = await authorizedFetch('/api/stock/delete', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({row_idx: rowIdx})
@@ -2728,7 +2768,7 @@ async function submitDeleteAllStocks() {
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
   
   try {
-    const res = await fetch('/api/stock/delete-all', {
+    const res = await authorizedFetch('/api/stock/delete-all', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'}
     });
@@ -2784,7 +2824,7 @@ async function saveInlineBuyDate(rowIdx, btn) {
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
   
   try {
-    const res = await fetch('/api/stock/save-buy-date', {
+    const res = await authorizedFetch('/api/stock/save-buy-date', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -2815,7 +2855,7 @@ async function saveInlineSector(rowIdx, selectElement) {
   selectElement.disabled = true;
   
   try {
-    const res = await fetch('/api/stock/save-sector', {
+    const res = await authorizedFetch('/api/stock/save-sector', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -2890,7 +2930,7 @@ async function submitMfForm(e) {
   };
 
   try {
-    const res = await fetch(url, {
+    const res = await authorizedFetch(url, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
@@ -2910,7 +2950,7 @@ async function submitMfForm(e) {
 async function deleteMfHolding(rowIdx) {
   if (!confirm("Are you sure you want to delete this Mutual Fund holding from your portfolio?")) return;
   try {
-    const res = await fetch('/api/mf/delete', {
+    const res = await authorizedFetch('/api/mf/delete', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({row_idx: rowIdx})
@@ -3034,7 +3074,7 @@ async function saveCustomSettings(e) {
 
 async function saveConfigOnServer(config) {
   try {
-    await fetch('/api/config', {
+    await authorizedFetch('/api/config', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(config)
@@ -3048,7 +3088,7 @@ async function saveConfigOnServer(config) {
 async function startLivePriceScraper() {
   // Trigger update prices background thread
   try {
-    const res = await fetch('/api/update-prices', { method: 'POST' });
+    const res = await authorizedFetch('/api/update-prices', { method: 'POST' });
     const data = await res.json();
     if (data.status === 'success') {
       showScraperProgressWidget();
@@ -3066,7 +3106,7 @@ let priceStatusTimer = null;
 
 function checkScraperRunningOnStartup() {
   // Query status once to check if running
-  fetch('/api/update-status')
+  authorizedFetch('/api/update-status')
     .then(res => res.json())
     .then(data => {
       if (data.status === 'running') {
@@ -3108,7 +3148,7 @@ function startPriceStatusPolling() {
   
   priceStatusTimer = setInterval(async () => {
     try {
-      const res = await fetch('/api/update-status');
+      const res = await authorizedFetch('/api/update-status');
       const data = await res.json();
       
       const dotEl = document.getElementById("price-status-dot");
@@ -3171,7 +3211,7 @@ function startPollingProgress() {
   
   priceUpdateTimer = setInterval(async () => {
     try {
-      const res = await fetch('/api/update-status');
+      const res = await authorizedFetch('/api/update-status');
       const data = await res.json();
       
       // Update UI labels
@@ -3216,7 +3256,7 @@ function startPollingProgress() {
         
         // Auto-dismiss the widget after 10 seconds
         setTimeout(() => {
-          fetch('/api/update-status')
+          authorizedFetch('/api/update-status')
             .then(res => res.json())
             .then(d => {
               if (d.status === 'error') {
@@ -3294,7 +3334,7 @@ async function submitAdvisorMessage() {
   
   // 3. Post to API
   try {
-    const res = await fetch('/api/advisor/chat', {
+    const res = await authorizedFetch('/api/advisor/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: promptText })
@@ -3344,11 +3384,14 @@ function closeProfileModal() {
 
 async function fetchProfilesList() {
   try {
-    const res = await fetch('/api/profiles');
+    const res = await authorizedFetch('/api/profiles');
     const data = await res.json();
     
     // Update header label with profile name
-    document.getElementById("active-profile-name").innerHTML = `<i class="fa-solid fa-user-circle"></i> Profile: ${data.active_profile}`;
+    const activeProfileNameEl = document.getElementById("active-profile-name");
+    if (activeProfileNameEl) {
+      activeProfileNameEl.innerHTML = `<i class="fa-solid fa-user-circle"></i> Profile: ${data.active_profile}`;
+    }
     
     // Populate dynamic profiles list inside modal
     const listContainer = document.getElementById("profiles-list-container");
@@ -3448,7 +3491,7 @@ async function renameProfile(oldName, hasPin) {
   if (!newName || !newName.trim() || newName.trim() === oldName) return;
 
   try {
-    const res = await fetch('/api/profiles/rename', {
+    const res = await authorizedFetch('/api/profiles/rename', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ old_name: oldName, new_name: newName.trim(), pin: pin })
@@ -3486,7 +3529,7 @@ async function deleteProfile(profileName, hasPin) {
   }
 
   try {
-    const res = await fetch('/api/profiles/delete', {
+    const res = await authorizedFetch('/api/profiles/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ profile_name: profileName, pin: pin })
@@ -3522,7 +3565,7 @@ async function switchProfile(profileName, hasPin) {
   }
 
   try {
-    const res = await fetch('/api/profiles/select', {
+    const res = await authorizedFetch('/api/profiles/select', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ profile_name: profileName, pin: pin })
@@ -3558,7 +3601,7 @@ async function submitCreateProfile(e) {
   if (!profileName) return;
   
   try {
-    const res = await fetch('/api/profiles/create', {
+    const res = await authorizedFetch('/api/profiles/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ profile_name: profileName, pin: pinVal })
@@ -3593,7 +3636,7 @@ async function clearPortfolioHoldings() {
   }
   
   try {
-    const res = await fetch('/api/portfolio/reset', {
+    const res = await authorizedFetch('/api/portfolio/reset', {
       method: 'POST'
     });
     
@@ -3630,7 +3673,7 @@ async function updateProfilePin() {
   }
   
   try {
-    const res = await fetch('/api/profiles/set-pin', {
+    const res = await authorizedFetch('/api/profiles/set-pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ current_pin: currentPin, new_pin: newPin })
@@ -3666,7 +3709,7 @@ async function configureProfilePin(profileName, hasPin) {
   if (newPin === null) return;
   
   try {
-    const res = await fetch('/api/profiles/set-pin-by-name', {
+    const res = await authorizedFetch('/api/profiles/set-pin-by-name', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ profile_name: profileName, current_pin: currentPin, new_pin: newPin })
@@ -3702,7 +3745,7 @@ async function fetchLivePriceHelper(scripName) {
   }
   helper.innerText = "Fetching live...";
   try {
-    const res = await fetch(`/api/stock/live-price?scrip=${encodeURIComponent(scripName.trim())}`);
+    const res = await authorizedFetch(`/api/stock/live-price?scrip=${encodeURIComponent(scripName.trim())}`);
     const data = await res.json();
     if (data.status === "success" && data.price) {
       helper.innerText = `Live: ₹${data.price.toFixed(2)}`;

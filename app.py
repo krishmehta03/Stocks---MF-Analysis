@@ -20,9 +20,23 @@ yf.data.YfData.user_agent_headers = {
 import pandas as pd
 import hashlib
 from dotenv import load_dotenv
-from lib.supabase import get_supabase
+from lib.supabase import get_supabase, get_supabase_admin
 
 load_dotenv()
+
+def get_current_user_id():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header.split(" ")[1]
+    try:
+        supabase = get_supabase_admin()
+        response = supabase.auth.get_user(token)
+        if response and response.user:
+            return response.user.id
+    except Exception as e:
+        print(f"Auth error: {e}")
+    return None
 
 def hash_pin(pin):
     if pin is None:
@@ -97,11 +111,26 @@ price_update_state = {
     "last_updated_by_profile": {}  # active profile -> timestamp
 }
 
-def load_config():
-    if not os.path.exists(CONFIG_FILE):
+def get_user_config_path(user_id):
+    if not user_id:
+        return CONFIG_FILE
+    os.makedirs("profiles", exist_ok=True)
+    safe_uid = "".join([c if c.isalnum() else "_" for c in str(user_id)])
+    return f"profiles/config_{safe_uid}.json"
+
+def load_config(user_id=None):
+    path = get_user_config_path(user_id)
+    if not os.path.exists(path):
+        if os.path.exists(CONFIG_FILE) and path != CONFIG_FILE:
+            try:
+                shutil.copy(CONFIG_FILE, path)
+            except Exception:
+                pass
+    
+    if not os.path.exists(path):
         return {}
     try:
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
         # Ensure risk_alerts is enabled by default as requested by user
@@ -109,20 +138,20 @@ def load_config():
             data["widgets"] = {}
         if data["widgets"].get("risk_alerts") is False or "risk_alerts" not in data["widgets"]:
             data["widgets"]["risk_alerts"] = True
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
         return data
     except Exception as e:
-        print(f"Error loading/updating config file: {e}")
-        # fallback
+        print(f"Error loading/updating config file at {path}: {e}")
         try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception:
             return {}
 
-def save_config(config):
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+def save_config(config, user_id=None):
+    path = get_user_config_path(user_id)
+    with open(path, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2)
 
 def parse_date(date_val):
@@ -692,140 +721,128 @@ def get_yahoo_sector(company_name: str, exchange: str) -> str | None:
     return _yf_info(sym)["sector"]
 
 
-# Load Excel data with formula evaluations or fallbacks
-def get_portfolio_data():
-    config = load_config()
+# Load Supabase data with calculations and returns
+def get_portfolio_data(user_id=None):
+    if not user_id:
+        return {"stocks": [], "mfs": [], "summary": {}, "signals": []}
+
+    config = load_config(user_id)
     stock_ltcg_days = config.get("tax_rules", {}).get("stocks_ltcg_days", 365)
     mf_ltcg_days = config.get("tax_rules", {}).get("mf_ltcg_days", 365)
     
-    if not os.path.exists(EXCEL_FILE):
-        return {"error": f"Excel file '{EXCEL_FILE}' not found."}
-        
-    try:
-        # Load workbook (we read values, but we will write formulas)
-        wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
-    except Exception as e:
-        return {"error": f"Failed to load Excel file: {e}"}
-
     stocks = []
     mfs = []
     
+    from lib.supabase_data import get_user_stock_holdings, get_user_mf_holdings
+    
     # 1. READ STOCKS
-    if "📥 Stock Data Input" in wb.sheetnames:
-        ws = wb["📥 Stock Data Input"]
-        for row in range(4, 1000):
-            scrip = ws[f'A{row}'].value
-            if not scrip or str(scrip).strip().upper() == "TOTAL":
-                continue
-            
-            exchange = ws[f'B{row}'].value or "NSE"
-            sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
-            
-            raw_sector = ws[f'C{row}'].value
-            sector, industry, is_sector_missing = resolve_stock_sector(raw_sector, sym)
-            
-            qty = ws[f'D{row}'].value or 0
-            buy_price = ws[f'E{row}'].value or 0
-            buy_date_raw = ws[f'F{row}'].value
-            current_price = ws[f'G{row}'].value or 0
-            cagr_5y = ws[f'H{row}'].value
-            nifty_cagr_5y = ws[f'I{row}'].value
-            dividends = ws[f'P{row}'].value or 0
-            
-            # Formulate computations in Python so user gets real-time values even if Excel cached formula is blank/old
-            invested_value = qty * buy_price
-            current_value = qty * current_price
-            pnl = current_value - invested_value
-            return_pct = (pnl / invested_value) if invested_value > 0 else 0
-            tax_flag = get_tax_flag(buy_date_raw, stock_ltcg_days)
-            total_return = pnl + dividends
-            
-            buy_date_str = format_date_str(buy_date_raw)
-            holding_yrs = get_holding_period_years(buy_date_raw) if buy_date_raw else None
-            holding_type = "LT" if tax_flag == "LTCG" else ("ST" if tax_flag == "STCG" else "")
-            
-            drawdown_days = get_days_in_drawdown(sym, buy_price, buy_date_raw) if sym else 0
+    db_stocks = get_user_stock_holdings(user_id)
+    for s in db_stocks:
+        scrip = s.get('scrip_name')
+        exchange = s.get('exchange', 'NSE') or 'NSE'
+        sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
+        
+        raw_sector = s.get('sector')
+        sector, industry, is_sector_missing = resolve_stock_sector(raw_sector, sym)
+        
+        qty = s.get('quantity') or 0
+        buy_price = float(s.get('buy_price') or 0)
+        buy_date_raw = s.get('buy_date')
+        current_price = float(s.get('current_price') or 0) if s.get('current_price') is not None else buy_price
+        
+        cagr_5y = None
+        nifty_cagr_5y = None
+        dividends = 0.0
+        
+        invested_value = qty * buy_price
+        current_value = qty * current_price
+        pnl = current_value - invested_value
+        return_pct = (pnl / invested_value) if invested_value > 0 else 0
+        tax_flag = get_tax_flag(buy_date_raw, stock_ltcg_days)
+        total_return = pnl + dividends
+        
+        buy_date_str = format_date_str(buy_date_raw) if buy_date_raw else ""
+        holding_yrs = get_holding_period_years(buy_date_raw) if buy_date_raw else None
+        holding_type = "LT" if tax_flag == "LTCG" else ("ST" if tax_flag == "STCG" else "")
+        
+        drawdown_days = get_days_in_drawdown(sym, buy_price, buy_date_raw) if sym else 0
 
-            stocks.append({
-                "row_idx": row,
-                "Scrip Name": str(scrip).strip(),
-                "Exchange": str(exchange).strip(),
-                "Sector": sector,
-                "Industry": industry,
-                "is_sector_missing": is_sector_missing,
-                "Qty": qty,
-                "Buy Price": buy_price,
-                "Buy Date": buy_date_str,
-                "Holding Period Yrs": holding_yrs,
-                "Holding Type": holding_type,
-                "Current Price": current_price,
-                "5Y CAGR": cagr_5y,
-                "Nifty 5Y CAGR": nifty_cagr_5y,
-                "Invested Value": round(invested_value, 2),
-                "Current Value": round(current_value, 2),
-                "P&L": round(pnl, 2),
-                "Return %": round(return_pct * 100, 2),
-                "Dividends": round(dividends, 2),
-                "Tax Flag": tax_flag,
-                "Total Return": round(total_return, 2),
-                "Drawdown Days": drawdown_days
-            })
-
+        stocks.append({
+            "row_idx": str(s.get('id')),
+            "Scrip Name": str(scrip).strip(),
+            "Exchange": str(exchange).strip(),
+            "Sector": sector,
+            "Industry": industry,
+            "is_sector_missing": is_sector_missing,
+            "Qty": qty,
+            "Buy Price": buy_price,
+            "Buy Date": buy_date_str,
+            "Holding Period Yrs": holding_yrs,
+            "Holding Type": holding_type,
+            "Current Price": current_price,
+            "5Y CAGR": cagr_5y,
+            "Nifty 5Y CAGR": nifty_cagr_5y,
+            "Invested Value": round(invested_value, 2),
+            "Current Value": round(current_value, 2),
+            "P&L": round(pnl, 2),
+            "Return %": round(return_pct * 100, 2),
+            "Dividends": round(dividends, 2),
+            "Tax Flag": tax_flag,
+            "Total Return": round(total_return, 2),
+            "Drawdown Days": drawdown_days
+        })
 
     # 2. READ MUTUAL FUNDS
-    if "📥 MF Data Input" in wb.sheetnames:
-        ws = wb["📥 MF Data Input"]
-        for row in range(4, 1000):
-            fund_name = ws[f'A{row}'].value
-            if not fund_name or str(fund_name).strip().upper() == "TOTAL":
-                continue
-                
-            amc = ws[f'B{row}'].value or "Other"
-            category = ws[f'C{row}'].value or "Other"
-            sub_category = ws[f'D{row}'].value or "Other"
-            units = ws[f'E{row}'].value or 0
-            buy_nav = ws[f'F{row}'].value or 0
-            buy_date_raw = ws[f'G{row}'].value
-            current_nav = ws[f'H{row}'].value or 0
-            benchmark_return = ws[f'I{row}'].value
-            expense_ratio = ws[f'J{row}'].value or 0
-            
-            invested_value = units * buy_nav
-            current_value = units * current_nav
-            pnl = current_value - invested_value
-            return_pct = (pnl / invested_value) if invested_value > 0 else 0
-            tax_flag = get_tax_flag(buy_date_raw, mf_ltcg_days)
-            holding_yrs = get_holding_period_years(buy_date_raw)
-            holding_type = "LT" if tax_flag == "LTCG" else "ST"
-            xirr_pct = compute_xirr(invested_value, current_value, buy_date_raw)
-            estimated_tax = compute_mf_tax(pnl, tax_flag)
-            investment_type = ws[f'K{row}'].value or "Lumpsum"
-            
-            buy_date_str = format_date_str(buy_date_raw)
-            
-            mfs.append({
-                "row_idx": row,
-                "Fund Name": str(fund_name).strip(),
-                "AMC": str(amc).strip(),
-                "Category": str(category).strip(),
-                "Sub-Category": str(sub_category).strip(),
-                "Units Held": units,
-                "Buy NAV": buy_nav,
-                "Buy Date": buy_date_str,
-                "Current NAV": current_nav,
-                "Benchmark 1Y Return %": benchmark_return,
-                "Expense Ratio %": expense_ratio,
-                "Invested Value": round(invested_value, 2),
-                "Current Value": round(current_value, 2),
-                "P&L": round(pnl, 2),
-                "Absolute Return %": round(return_pct * 100, 2),
-                "Tax Flag": tax_flag,
-                "XIRR %": xirr_pct,
-                "Holding Period Yrs": holding_yrs,
-                "Holding Type": holding_type,
-                "Estimated Tax": estimated_tax,
-                "Investment Type": str(investment_type).strip()
-            })
+    db_mfs = get_user_mf_holdings(user_id)
+    for m in db_mfs:
+        fund_name = m.get('fund_name')
+        amc = m.get('amc') or 'Other'
+        category = m.get('category') or 'Other'
+        sub_category = m.get('sub_category') or 'Other'
+        units = float(m.get('units_held') or 0)
+        buy_nav = float(m.get('buy_nav') or 0)
+        buy_date_raw = m.get('purchase_date')
+        current_nav = float(m.get('current_nav') or 0) if m.get('current_nav') is not None else buy_nav
+        
+        benchmark_return = None
+        expense_ratio = 0.0
+        
+        invested_value = units * buy_nav
+        current_value = units * current_nav
+        pnl = current_value - invested_value
+        return_pct = (pnl / invested_value) if invested_value > 0 else 0
+        tax_flag = get_tax_flag(buy_date_raw, mf_ltcg_days)
+        holding_yrs = get_holding_period_years(buy_date_raw) if buy_date_raw else 0
+        holding_type = "LT" if tax_flag == "LTCG" else "ST"
+        xirr_pct = compute_xirr(invested_value, current_value, buy_date_raw) if buy_date_raw else None
+        estimated_tax = compute_mf_tax(pnl, tax_flag)
+        investment_type = "Lumpsum"
+        
+        buy_date_str = format_date_str(buy_date_raw) if buy_date_raw else ""
+        
+        mfs.append({
+            "row_idx": str(m.get('id')),
+            "Fund Name": str(fund_name).strip(),
+            "AMC": str(amc).strip(),
+            "Category": str(category).strip(),
+            "Sub-Category": str(sub_category).strip(),
+            "Units Held": units,
+            "Buy NAV": buy_nav,
+            "Buy Date": buy_date_str,
+            "Current NAV": current_nav,
+            "Benchmark 1Y Return %": benchmark_return,
+            "Expense Ratio %": expense_ratio,
+            "Invested Value": round(invested_value, 2),
+            "Current Value": round(current_value, 2),
+            "P&L": round(pnl, 2),
+            "Absolute Return %": round(return_pct * 100, 2),
+            "Tax Flag": tax_flag,
+            "XIRR %": xirr_pct,
+            "Holding Period Yrs": holding_yrs,
+            "Holding Type": holding_type,
+            "Estimated Tax": estimated_tax,
+            "Investment Type": str(investment_type).strip()
+        })
 
     # Calculations for summary stats
     total_stock_invested = sum(s["Invested Value"] for s in stocks)
@@ -861,39 +878,48 @@ def get_portfolio_data():
     total_portfolio_pnl = total_portfolio_value - total_portfolio_invested
     total_portfolio_return_pct = (total_portfolio_pnl / total_portfolio_invested * 100) if total_portfolio_invested > 0 else 0
     
+    # Risk signals: read from Excel if exists, else return empty list
     signals = []
-    if "⚠️ Risk & Signals" in wb.sheetnames:
-        ws_sig = wb["⚠️ Risk & Signals"]
-        for row in range(18, 1000):
-            scrip = ws_sig[f'A{row}'].value
-            if not scrip or scrip == 0:
-                continue
-            
-            cur_val = ws_sig[f'B{row}'].value
-            ret_pct = ws_sig[f'C{row}'].value
-            xirr = ws_sig[f'D{row}'].value
-            vs_nifty = ws_sig[f'E{row}'].value
-            sig_name = ws_sig[f'F{row}'].value
-            priority = ws_sig[f'G{row}'].value
-            rec_action = ws_sig[f'H{row}'].value
-            
-            # Format return percentage (sometimes openpyxl returns raw decimal like 0.3647 or percentage 36.47)
-            if isinstance(ret_pct, (int, float)):
-                if abs(ret_pct) < 1.0:
-                    ret_pct = round(ret_pct * 100, 2)
-                else:
-                    ret_pct = round(ret_pct, 2)
-            
-            signals.append({
-                "Scrip Name": str(scrip).strip(),
-                "Current Value": round(cur_val, 2) if isinstance(cur_val, (int, float)) else cur_val,
-                "Return %": ret_pct,
-                "XIRR %": round(xirr * 100, 2) if isinstance(xirr, (int, float)) else xirr,
-                "vs Nifty": vs_nifty,
-                "Signal": str(sig_name).strip() if sig_name else "",
-                "Priority": str(priority).strip() if priority else "",
-                "Recommended Action": str(rec_action).strip() if rec_action else ""
-            })
+    if os.path.exists(EXCEL_FILE):
+        try:
+            wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
+            if "⚠️ Risk & Signals" in wb.sheetnames:
+                ws_sig = wb["⚠️ Risk & Signals"]
+                for row in range(18, 1000):
+                    scrip = ws_sig[f'A{row}'].value
+                    if not scrip or scrip == 0:
+                        continue
+                    
+                    cur_val = ws_sig[f'B{row}'].value
+                    ret_pct = ws_sig[f'C{row}'].value
+                    xirr = ws_sig[f'D{row}'].value
+                    vs_nifty = ws_sig[f'E{row}'].value
+                    sig_name = ws_sig[f'F{row}'].value
+                    priority = ws_sig[f'G{row}'].value
+                    rec_action = ws_sig[f'H{row}'].value
+                    
+                    if isinstance(ret_pct, (int, float)):
+                        if abs(ret_pct) < 1.0:
+                            ret_pct = round(ret_pct * 100, 2)
+                        else:
+                            ret_pct = round(ret_pct, 2)
+                    
+                    signals.append({
+                        "Scrip Name": str(scrip).strip(),
+                        "Current Value": round(cur_val, 2) if isinstance(cur_val, (int, float)) else cur_val,
+                        "Return %": ret_pct,
+                        "XIRR %": round(xirr * 100, 2) if isinstance(xirr, (int, float)) else xirr,
+                        "vs Nifty": vs_nifty,
+                        "Signal": str(sig_name).strip() if sig_name else "",
+                        "Priority": str(priority).strip() if priority else "",
+                        "Recommended Action": str(rec_action).strip() if rec_action else ""
+                    })
+        except Exception as e:
+            print(f"Error loading risk signals: {e}")
+
+    # Filter signals to only include scrips the user actually holds
+    user_scrips = {s["Scrip Name"].strip().lower() for s in stocks}
+    signals = [sig for sig in signals if sig["Scrip Name"].strip().lower() in user_scrips]
 
     return {
         "stocks": stocks,
@@ -939,60 +965,67 @@ def apply_excel_styles(ws, row):
                 cell.alignment = align_right
 
 # Background thread for live price updates
-def run_price_and_nav_update(is_background=False):
-    global price_update_state, EXCEL_FILE, ACTIVE_PROFILE
+def run_price_and_nav_update(user_id, is_background=False):
+    global price_update_state
     
-    # Avoid overlapping manual/background updates
-    if price_update_state["status"] in ("running", "background_running"):
+    if "users" not in price_update_state:
+        price_update_state["users"] = {}
+        
+    user_state = price_update_state["users"].setdefault(user_id, {
+        "status": "idle",
+        "logs": [],
+        "start_time": 0,
+        "current_index": 0,
+        "total_tickers": 0,
+        "current_ticker": ""
+    })
+    
+    # Avoid overlapping updates for this user
+    if user_state["status"] in ("running", "background_running"):
         return False
         
-    price_update_state["status"] = "background_running" if is_background else "running"
-    price_update_state["logs"] = []
-    price_update_state["start_time"] = time.time()
-    price_update_state["current_index"] = 0
-    price_update_state["total_tickers"] = 0
-    price_update_state["current_ticker"] = ""
-    
-    active_excel_file = EXCEL_FILE
-    active_profile = ACTIVE_PROFILE
+    user_state["status"] = "background_running" if is_background else "running"
+    user_state["logs"] = []
+    user_state["start_time"] = time.time()
+    user_state["current_index"] = 0
+    user_state["total_tickers"] = 0
+    user_state["current_ticker"] = ""
     
     try:
-        wb = openpyxl.load_workbook(active_excel_file)
+        from lib.supabase_data import get_user_stock_holdings, get_user_mf_holdings, update_stock_prices, update_mf_holding
         
         # 1. Read Stocks to update
+        db_stocks = get_user_stock_holdings(user_id)
         tickers_to_update = []
-        if "📥 Stock Data Input" in wb.sheetnames:
-            ws_stock = wb["📥 Stock Data Input"]
-            for row in range(4, 1000):
-                scrip = ws_stock[f'A{row}'].value
-                if scrip and str(scrip).strip().upper() != "TOTAL":
-                    exchange = ws_stock[f'B{row}'].value or "NSE"
-                    tickers_to_update.append(("stock", row, str(scrip).strip(), str(exchange).strip()))
-                    
+        for s in db_stocks:
+            scrip = s.get('scrip_name')
+            if scrip:
+                exchange = s.get('exchange', 'NSE') or 'NSE'
+                tickers_to_update.append(("stock", s.get('id'), str(scrip).strip(), str(exchange).strip()))
+                
         # 2. Read Mutual Funds to update
+        db_mfs = get_user_mf_holdings(user_id)
         mf_to_update = []
-        if "📥 MF Data Input" in wb.sheetnames:
-            ws_mf = wb["📥 MF Data Input"]
-            for row in range(4, 1000):
-                fund_name = ws_mf[f'A{row}'].value
-                if fund_name and str(fund_name).strip().upper() != "TOTAL":
-                    mf_to_update.append(("mf", row, str(fund_name).strip(), None))
-                    
+        for m in db_mfs:
+            fund_name = m.get('fund_name')
+            if fund_name:
+                mf_to_update.append(("mf", m.get('id'), str(fund_name).strip(), None))
+                
         items_to_update = tickers_to_update + mf_to_update
-        price_update_state["total_tickers"] = len(items_to_update)
-        price_update_state["logs"].append(f"Starting update. Found {len(tickers_to_update)} stocks and {len(mf_to_update)} mutual funds to update.")
+        user_state["total_tickers"] = len(items_to_update)
+        user_state["logs"].append(f"Starting update. Found {len(tickers_to_update)} stocks and {len(mf_to_update)} mutual funds to update.")
         
         updated_count = 0
         
-        for idx, (item_type, row, name, exchange) in enumerate(items_to_update):
-            price_update_state["current_index"] = idx + 1
-            price_update_state["current_ticker"] = name
+        for idx, (item_type, row_id, name, exchange) in enumerate(items_to_update):
+            user_state["current_index"] = idx + 1
+            user_state["current_ticker"] = name
             
             if item_type == "stock":
-                price_update_state["logs"].append(f"Fetching live price for stock {name} ({exchange})...")
+                user_state["logs"].append(f"Fetching live price for stock {name} ({exchange})...")
                 sym = _resolve_ticker(name, exchange)
                 if not sym:
-                    price_update_state["logs"].append(f"  -> ❌ Could not resolve ticker symbol.")
+                    user_state["logs"].append(f"  -> ❌ Could not resolve ticker symbol.")
                     time.sleep(0.1)
                     continue
                     
@@ -1001,26 +1034,26 @@ def run_price_and_nav_update(is_background=False):
                 sector = info["sector"]
                 
                 if price is not None:
-                    ws_stock = wb["📥 Stock Data Input"]
-                    ws_stock[f'G{row}'].value = price
+                    update_stock_prices(user_id, [{'scrip_name': name, 'current_price': price}])
                     log_line = f"  -> ✅ ₹{price}  [{sym}]"
                     
-                    # Auto-fill sector if missing or still default
-                    current_sector = str(ws_stock[f'C{row}'].value or "").strip()
+                    # Auto-fill sector if missing
+                    existing_stock = next((s for s in db_stocks if s.get('id') == row_id), None)
+                    current_sector = str(existing_stock.get('sector') or "").strip() if existing_stock else ""
                     if current_sector in ("", "Other", "ETFs") and sector:
-                        ws_stock[f'C{row}'].value = sector
+                        from lib.supabase_data import update_stock_holding
+                        update_stock_holding(user_id, row_id, {'Sector': sector})
                         log_line += f"  | Sector: {sector}"
                     
-                    price_update_state["logs"].append(log_line)
+                    user_state["logs"].append(log_line)
                     updated_count += 1
                 else:
-                    price_update_state["logs"].append(f"  -> ❌ Price not available for [{sym}].")
+                    user_state["logs"].append(f"  -> ❌ Price not available for [{sym}].")
             else:
-                # Mutual Fund
-                price_update_state["logs"].append(f"Fetching live NAV for mutual fund {name}...")
+                user_state["logs"].append(f"Fetching live NAV for mutual fund {name}...")
                 code = _resolve_mf_scheme_code(name)
                 if not code:
-                    price_update_state["logs"].append(f"  -> ❌ Could not resolve scheme code.")
+                    user_state["logs"].append(f"  -> ❌ Could not resolve scheme code.")
                     time.sleep(0.1)
                     continue
                     
@@ -1031,39 +1064,32 @@ def run_price_and_nav_update(is_background=False):
                         res_data = r.json().get('data', [])
                         if res_data:
                             nav = float(res_data[0]['nav'])
-                            ws_mf = wb["📥 MF Data Input"]
-                            ws_mf[f'H{row}'].value = nav
-                            price_update_state["logs"].append(f"  -> ✅ NAV: ₹{nav}")
+                            update_mf_holding(user_id, row_id, {'Current NAV': nav})
+                            user_state["logs"].append(f"  -> ✅ NAV: ₹{nav}")
                             updated_count += 1
                         else:
-                            price_update_state["logs"].append(f"  -> ❌ No NAV data found.")
+                            user_state["logs"].append(f"  -> ❌ No NAV data found.")
                     else:
-                        price_update_state["logs"].append(f"  -> ❌ API error ({r.status_code}).")
+                        user_state["logs"].append(f"  -> ❌ API error ({r.status_code}).")
                 except Exception as e:
-                    price_update_state["logs"].append(f"  -> ❌ Connection error: {e}")
+                    user_state["logs"].append(f"  -> ❌ Connection error: {e}")
                     
-            time.sleep(0.3)  # delay between tickers to avoid rate limiting
+            time.sleep(0.3)
             
-        wb.save(active_excel_file)
-        price_update_state["status"] = "completed"
-        price_update_state["last_updated_by_profile"][active_profile] = time.time()
-        price_update_state["logs"].append(f"Successfully updated {updated_count} items and saved Excel file.")
+        user_state["status"] = "completed"
+        price_update_state["last_updated_by_profile"][user_id] = time.time()
+        user_state["logs"].append(f"Successfully updated {updated_count} items and saved to Supabase.")
         return True
-    except PermissionError:
-        price_update_state["status"] = "locked"
-        price_update_state["last_failed_time"] = time.time()
-        price_update_state["logs"].append("❌ Excel file is currently open and locked by another program. Will retry shortly.")
-        raise
     except Exception as e:
-        price_update_state["status"] = "error"
-        price_update_state["last_failed_time"] = time.time()
-        price_update_state["logs"].append(f"Critical Error during update: {e}")
+        user_state["status"] = "error"
+        user_state["last_failed_time"] = time.time()
+        user_state["logs"].append(f"Critical Error during update: {e}")
         raise
 
 # Background thread for live price updates (manual trigger wrapper)
-def live_price_updater_thread():
+def live_price_updater_thread(user_id):
     try:
-        run_price_and_nav_update(is_background=False)
+        run_price_and_nav_update(user_id, is_background=False)
     except Exception:
         pass
 
@@ -1074,32 +1100,26 @@ def automatic_price_updater_loop():
     
     while True:
         try:
-            config = load_config()
-            if config.get("auto_update_prices", True):
-                active_profile = ACTIVE_PROFILE
-                last_updated = price_update_state["last_updated_by_profile"].get(active_profile, 0)
-                now = time.time()
-                status = price_update_state["status"]
-                
-                if status in ("error", "locked"):
-                    last_failed = price_update_state.get("last_failed_time", 0) or 0
-                    if now - last_failed >= 30:
-                        print(f"[Auto Price Updater] Retrying failed/locked update (status: {status}) for profile {active_profile} after 30 seconds...")
+            from lib.supabase import get_supabase_admin
+            supabase = get_supabase_admin()
+            res = supabase.table('profiles').select('id').execute()
+            user_ids = [item['id'] for item in res.data] if res.data else []
+            
+            for user_id in user_ids:
+                user_config = load_config(user_id)
+                if user_config.get("auto_update_prices", True):
+                    last_updated = price_update_state["last_updated_by_profile"].get(user_id, 0)
+                    now = time.time()
+                    if now - last_updated >= 900: # 15 minutes
+                        print(f"[Auto Price Updater] Running scheduled automatic price/NAV update for user: {user_id}")
                         try:
-                            run_price_and_nav_update(is_background=True)
+                            run_price_and_nav_update(user_id, is_background=True)
                         except Exception as e:
-                            print(f"[Auto Price Updater] Retry failed: {e}")
-                elif status in ("idle", "completed"):
-                    if now - last_updated >= 900:
-                        print(f"[Auto Price Updater] Running scheduled automatic price/NAV update for profile: {active_profile}")
-                        try:
-                            run_price_and_nav_update(is_background=True)
-                        except Exception as e:
-                            print(f"[Auto Price Updater] Scheduled update failed: {e}")
+                            print(f"[Auto Price Updater] Scheduled update failed for user {user_id}: {e}")
         except Exception as e:
             print(f"[Auto Price Updater] Exception in background loop: {e}")
             
-        time.sleep(10)  # Check config and state every 10 seconds
+        time.sleep(60)  # Check every 60 seconds
 
 @app.route('/')
 def home():
@@ -1151,22 +1171,47 @@ def test_db():
 
 @app.route('/api/portfolio', methods=['GET'])
 def api_portfolio():
-    data = get_portfolio_data()
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    data = get_portfolio_data(user_id)
     # Inject last_updated timestamp
     if isinstance(data, dict):
-        data["last_updated"] = price_update_state["last_updated_by_profile"].get(ACTIVE_PROFILE)
+        data["last_updated"] = price_update_state["last_updated_by_profile"].get(user_id)
     return jsonify(data)
 
-# Simple TTL cache for performance data
+# Simple TTL cache for performance and sector contribution data
 _perf_cache = {}   # key -> (timestamp, payload)
 _PERF_TTL   = 600  # 10-minute cache
 
+_contrib_cache = {}  # key -> (timestamp, payload)
+_CONTRIB_TTL = 600
+
+def clear_user_caches(user_id):
+    if not user_id:
+        return
+    perf_keys = [k for k in _perf_cache.keys() if str(k).endswith(f"|{user_id}")]
+    for k in perf_keys:
+        _perf_cache.pop(k, None)
+    contrib_keys = [k for k in _contrib_cache.keys() if str(k).endswith(f"|{user_id}")]
+    for k in contrib_keys:
+        _contrib_cache.pop(k, None)
+
 @app.route('/api/portfolio/performance', methods=['GET'])
 def portfolio_performance():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    from lib.supabase_data import get_user_stock_holdings, get_user_mf_holdings
+    stock_holdings_db = get_user_stock_holdings(user_id)
+    if not stock_holdings_db:
+        return jsonify({"error": "No holdings found"}), 404
+
     period    = request.args.get('period',    '1M')
     benchmark = request.args.get('benchmark', 'nifty50')
 
-    cache_key = f"{period}|{benchmark}|{EXCEL_FILE}"
+    cache_key = f"{period}|{benchmark}|{user_id}"
     if cache_key in _perf_cache:
         ts, payload = _perf_cache[cache_key]
         if time.time() - ts < _PERF_TTL:
@@ -1189,37 +1234,31 @@ def portfolio_performance():
     }
     bench_sym, bench_name = BENCH_MAP.get(benchmark, ('^NSEI', 'Nifty 50'))
 
-    # Read current holdings from Excel
+    # Read current holdings from Supabase
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
+        from lib.supabase_data import get_user_stock_holdings, get_user_mf_holdings
         
         # 1. Read Stocks
+        db_stocks = stock_holdings_db
         stock_holdings = []
-        if '📥 Stock Data Input' in wb.sheetnames:
-            ws_s = wb['📥 Stock Data Input']
-            for row in range(4, 1000):
-                scrip = ws_s[f'A{row}'].value
-                if not scrip or str(scrip).strip().upper() == "TOTAL":
-                    break
-                exchange = ws_s[f'B{row}'].value or 'NSE'
-                qty      = ws_s[f'D{row}'].value or 0
-                if float(qty) > 0:
-                    stock_holdings.append({'name': str(scrip).strip(),
-                                           'exchange': str(exchange).strip(),
-                                           'qty': float(qty)})
+        for s in db_stocks:
+            scrip = s.get('scrip_name')
+            exchange = s.get('exchange', 'NSE') or 'NSE'
+            qty = s.get('quantity') or 0
+            if float(qty) > 0:
+                stock_holdings.append({'name': str(scrip).strip(),
+                                       'exchange': str(exchange).strip(),
+                                       'qty': float(qty)})
         
         # 2. Read Mutual Funds
+        db_mfs = get_user_mf_holdings(user_id)
         mf_holdings = []
-        if '📥 MF Data Input' in wb.sheetnames:
-            ws_m = wb['📥 MF Data Input']
-            for row in range(4, 1000):
-                fund_name = ws_m[f'A{row}'].value
-                if not fund_name or str(fund_name).strip().upper() == "TOTAL":
-                    break
-                units     = ws_m[f'E{row}'].value or 0
-                if float(units) > 0:
-                    mf_holdings.append({'name': str(fund_name).strip(),
-                                        'qty': float(units)})
+        for m in db_mfs:
+            fund_name = m.get('fund_name')
+            units = m.get('units_held') or 0
+            if float(units) > 0:
+                mf_holdings.append({'name': str(fund_name).strip(),
+                                    'qty': float(units)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1337,15 +1376,21 @@ def portfolio_performance():
     _perf_cache[cache_key] = (time.time(), payload)
     return jsonify(payload)
 
-_contrib_cache = {}
-_CONTRIB_TTL = 600
-
 @app.route('/api/portfolio/sector-contribution', methods=['GET'])
 def sector_contribution():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    from lib.supabase_data import get_user_stock_holdings
+    stock_holdings_db = get_user_stock_holdings(user_id)
+    if not stock_holdings_db:
+        return jsonify({"error": "No holdings found"}), 404
+
     period    = request.args.get('period',    '1M')
     benchmark = request.args.get('benchmark', 'nifty50')
 
-    cache_key = f"{period}|{benchmark}|{EXCEL_FILE}"
+    cache_key = f"{period}|{benchmark}|{user_id}"
     if cache_key in _contrib_cache:
         ts, payload = _contrib_cache[cache_key]
         if time.time() - ts < _CONTRIB_TTL:
@@ -1367,20 +1412,16 @@ def sector_contribution():
     bench_sym, bench_name = BENCH_MAP.get(benchmark, ('^NSEI', 'Nifty 50'))
 
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
-        ws = wb['📥 Stock Data Input']
+        from lib.supabase_data import get_user_stock_holdings
+        db_stocks = stock_holdings_db
         holdings = []
-        for row in range(4, 1000):
-            scrip = ws[f'A{row}'].value
-            if not scrip:
-                break
-            exchange = ws[f'B{row}'].value or 'NSE'
+        for s in db_stocks:
+            scrip = s.get('scrip_name')
+            exchange = s.get('exchange', 'NSE') or 'NSE'
+            qty = s.get('quantity') or 0
+            raw_sector = s.get('sector')
             sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
-            
-            raw_sector = ws[f'C{row}'].value
             sector, industry, is_sector_missing = resolve_stock_sector(raw_sector, sym)
-            
-            qty      = ws[f'D{row}'].value or 0
             if float(qty) > 0:
                 holdings.append({
                     'name': str(scrip).strip(),
@@ -1568,11 +1609,15 @@ def reset_portfolio():
 
 @app.route('/api/config', methods=['GET', 'POST'])
 def api_config():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
     if request.method == 'GET':
-        return jsonify(load_config())
+        return jsonify(load_config(user_id))
     else:
         new_config = request.json
-        save_config(new_config)
+        save_config(new_config, user_id)
         return jsonify({"status": "success", "config": new_config})
 
 @app.route('/api/stock/live-price', methods=['GET'])
@@ -1589,16 +1634,12 @@ def get_live_stock_price():
 
 @app.route('/api/stock/add', methods=['POST'])
 def add_stock():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        ws = wb["📥 Stock Data Input"]
-        
-        # Find first empty row
-        empty_row = 4
-        while ws[f'A{empty_row}'].value is not None:
-            empty_row += 1
-        
+        from lib.supabase_data import add_stock_holding
         company_name = data.get("Company Name", "").strip()
         sector       = data.get("Sector", "Other").strip() or "Other"
         qty          = float(data.get("Total Quantity", 0) or 0)
@@ -1610,7 +1651,7 @@ def add_stock():
             if fetched_sector:
                 sector = fetched_sector
 
-        # Resolve Current Price: user provided -> live price -> avg_price fallback
+        # Resolve Current Price
         current_price = data.get("Current Price")
         if current_price is not None and str(current_price).strip() != "":
             try:
@@ -1624,44 +1665,39 @@ def add_stock():
             live_price = get_yahoo_finance_price(company_name, "NSE")
             current_price = live_price if live_price is not None else avg_price
 
-        # Write user data
         buy_date_raw = data.get("Buy Date")
         buy_date = parse_date(buy_date_raw) if buy_date_raw else None
+        
+        sym = _resolve_ticker(company_name, "NSE")
+        sector, industry, is_sector_missing = resolve_stock_sector(sector, sym)
 
-        ws[f'A{empty_row}'] = company_name
-        ws[f'B{empty_row}'] = "NSE"          # Default exchange
-        ws[f'C{empty_row}'] = sector
-        ws[f'D{empty_row}'] = qty
-        ws[f'E{empty_row}'] = avg_price
-        ws[f'F{empty_row}'] = buy_date
-        ws[f'G{empty_row}'] = current_price
-        ws[f'P{empty_row}'] = 0.0            # Dividends default 0
-        
-        # Write formulas so Excel auto-calculates
-        ws[f'J{empty_row}'] = f'=D{empty_row}*E{empty_row}'
-        ws[f'K{empty_row}'] = f'=D{empty_row}*G{empty_row}'
-        ws[f'L{empty_row}'] = f'=K{empty_row}-J{empty_row}'
-        ws[f'M{empty_row}'] = f'=IF(J{empty_row}=0,0,L{empty_row}/J{empty_row})'
-        ws[f'Q{empty_row}'] = f'=IF(ISBLANK(F{empty_row}),"",IF(TODAY()-F{empty_row}>365,"LTCG","STCG"))'
-        ws[f'R{empty_row}'] = f'=L{empty_row}+IF(ISNUMBER(P{empty_row}),P{empty_row},0)'
-        
-        apply_excel_styles(ws, empty_row)
-        wb.save(EXCEL_FILE)
-        return jsonify({"status": "success", "message": f"Stock '{company_name}' added successfully to Excel!"})
-    except PermissionError:
-        return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
+        holding_data = {
+            'Scrip Name': company_name,
+            'Exchange': 'NSE',
+            'Sector': sector,
+            'Industry': industry,
+            'Qty': qty,
+            'Buy Price': avg_price,
+            'Buy Date': buy_date.strftime('%Y-%m-%d') if buy_date else None,
+            'Current Price': current_price
+        }
+
+        res = add_stock_holding(user_id, holding_data)
+        if res:
+            clear_user_caches(user_id)
+            return jsonify({"status": "success", "message": f"Stock '{company_name}' added successfully to Supabase!"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to add stock to Supabase."}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route('/api/stock/import-csv', methods=['POST'])
 def import_stocks_csv():
-    """
-    Accepts a multipart/form-data upload of the broker CSV file.
-    Parses the 'Equity Holdings Details' section and extracts:
-      Company Name, Sector, Total Quantity, Avg Trading Price
-    then writes each valid row into the active profile's Excel sheet.
-    """
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
     if 'file' not in request.files:
         return jsonify({"status": "error", "message": "No file uploaded. Please attach a CSV file."}), 400
 
@@ -1669,7 +1705,6 @@ def import_stocks_csv():
     if not uploaded_file.filename.lower().endswith('.csv'):
         return jsonify({"status": "error", "message": "Invalid file type. Please upload a .csv file."}), 400
 
-    # ── Try multiple encodings to read the file robustly ─────────────────────
     raw_bytes = uploaded_file.read()
     content = None
     used_encoding = None
@@ -1684,16 +1719,12 @@ def import_stocks_csv():
     if content is None:
         return jsonify({"status": "error", "message": "Could not decode the CSV file. Please save it as UTF-8 and try again."}), 400
 
-    # Parse CSV — use newline='' equivalent via StringIO so \r\n is handled by csv module
     try:
         reader = csv.reader(io.StringIO(content, newline=''))
         rows = list(reader)
     except Exception as e:
         return jsonify({"status": "error", "message": f"Failed to parse CSV: {e}"}), 400
 
-    # ── Broker-agnostic column synonym map ────────────────────────────────────
-    # Different brokers use different column names for the same data.
-    # Map each logical field to all known lowercase synonyms across brokers.
     SYNONYMS = {
         'Company Name': {
             'company name', 'stock name', 'scrip name', 'security name',
@@ -1717,29 +1748,24 @@ def import_stocks_csv():
         }
     }
 
-    # ── Locate the header row by matching synonyms ────────────────────────────
     header_row_idx = None
-    col_map = {}  # logical field name → 0-based column index
+    col_map = {}
 
     for i, row in enumerate(rows):
         norm = [cell.strip().lower() for cell in row]
-
-        # Check if this row contains at least the 3 required logical fields
         matched = {}
         for logical_field, synonyms in SYNONYMS.items():
             for idx, cell in enumerate(norm):
                 if cell in synonyms:
                     matched[logical_field] = idx
-                    break  # take the first matching column for this field
+                    break
 
-        # We require Company Name + Total Quantity + Avg Trading Price
         if all(f in matched for f in ('Company Name', 'Total Quantity', 'Avg Trading Price')):
             header_row_idx = i
             col_map = matched
             break
 
     if header_row_idx is None:
-        # Build a helpful debug snippet
         preview_lines = []
         for i, row in enumerate(rows[:20]):
             first_cells = ", ".join(f'"{c.strip()}"' for c in row[:4] if c.strip())
@@ -1756,8 +1782,6 @@ def import_stocks_csv():
             )
         }), 400
 
-    # ── Extract data rows ─────────────────────────────────────────────────────
-    # Footer/summary keywords that signal end of real data
     STOP_KEYWORDS = {'total', 'grand total', 'sub total', 'subtotal', 'summary', ''}
 
     imported_stocks = []
@@ -1767,35 +1791,25 @@ def import_stocks_csv():
     sector_col  = col_map.get('Sector')
 
     for row in rows[header_row_idx + 1:]:
-        # Stop on completely blank rows
         if not row or not any(cell.strip() for cell in row):
             break
 
-        # Get the company cell (could be any column depending on broker format)
         company_cell = row[company_col].strip() if company_col < len(row) else ''
-
-        # Clean broker-specific suffixes (e.g., "BANDHAN BANK LIMITED # EQUITY SHARES" -> "BANDHAN BANK LIMITED")
         if '#' in company_cell:
             company_cell = company_cell.split('#')[0].strip()
 
-        # Stop on footer/totals rows
         if company_cell.lower() in STOP_KEYWORDS:
             break
 
-        # Skip rows where company cell is empty or looks like a sub-header
         if not company_cell:
             continue
 
         try:
-            # Safely read qty — handle comma-formatted numbers like "1,000"
             qty_raw   = row[qty_col].strip().replace(',', '') if qty_col < len(row) else ''
             qty       = float(qty_raw) if qty_raw else 0.0
-
-            # Safely read price — handle comma-formatted numbers
             price_raw = row[price_col].strip().replace(',', '') if price_col < len(row) else ''
             avg_price = float(price_raw) if price_raw else 0.0
 
-            # Sector is optional
             sector = ''
             if sector_col is not None and sector_col < len(row):
                 sector = row[sector_col].strip()
@@ -1807,21 +1821,13 @@ def import_stocks_csv():
                 'Avg Trading Price': avg_price
             })
         except (ValueError, IndexError):
-            continue  # skip malformed/unexpected rows
+            continue
 
     if not imported_stocks:
         return jsonify({"status": "error", "message": "No valid stock data found in the uploaded CSV."}), 400
 
-    # ── Write to Excel ────────────────────────────────────────────────────────
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        ws = wb["📥 Stock Data Input"]
-
-        # Find first empty row
-        empty_row = 4
-        while ws[f'A{empty_row}'].value is not None:
-            empty_row += 1
-
+        from lib.supabase_data import add_stock_holding
         added = 0
         skipped = 0
         for stock in imported_stocks:
@@ -1830,57 +1836,55 @@ def import_stocks_csv():
             qty       = stock["Total Quantity"]
             avg_price = stock["Avg Trading Price"]
 
-            # Skip rows with zero quantity (demat bonus shares, locked shares, etc.)
             if qty <= 0:
                 skipped += 1
                 continue
 
-            ws[f'A{empty_row}'] = company
-            ws[f'B{empty_row}'] = "NSE"
-            ws[f'C{empty_row}'] = sector
-            ws[f'D{empty_row}'] = qty
-            ws[f'E{empty_row}'] = avg_price
-            ws[f'F{empty_row}'] = ""
-            ws[f'G{empty_row}'] = avg_price  # current price = avg price initially
-            ws[f'P{empty_row}'] = 0.0
+            sym = _resolve_ticker(company, "NSE")
+            sector, industry, is_sector_missing = resolve_stock_sector(sector, sym)
 
-            ws[f'J{empty_row}'] = f'=D{empty_row}*E{empty_row}'
-            ws[f'K{empty_row}'] = f'=D{empty_row}*G{empty_row}'
-            ws[f'L{empty_row}'] = f'=K{empty_row}-J{empty_row}'
-            ws[f'M{empty_row}'] = f'=IF(J{empty_row}=0,0,L{empty_row}/J{empty_row})'
-            ws[f'Q{empty_row}'] = f'=IF(ISBLANK(F{empty_row}),"",IF(TODAY()-F{empty_row}>365,"LTCG","STCG"))'
-            ws[f'R{empty_row}'] = f'=L{empty_row}+IF(ISNUMBER(P{empty_row}),P{empty_row},0)'
+            holding_data = {
+                'Scrip Name': company,
+                'Exchange': 'NSE',
+                'Sector': sector,
+                'Industry': industry,
+                'Qty': qty,
+                'Buy Price': avg_price,
+                'Buy Date': None,
+                'Current Price': avg_price
+            }
+            res = add_stock_holding(user_id, holding_data)
+            if res:
+                added += 1
+            else:
+                skipped += 1
 
-            apply_excel_styles(ws, empty_row)
-            empty_row += 1
-            added += 1
+        if added > 0:
+            clear_user_caches(user_id)
 
-        wb.save(EXCEL_FILE)
-        msg = f"Successfully imported {added} stock(s) from CSV!"
+        msg = f"Successfully imported {added} stock(s) from CSV to Supabase!"
         if skipped > 0:
-            msg += f" ({skipped} rows skipped — zero quantity or invalid data.)"
+            msg += f" ({skipped} rows skipped — zero quantity or write error.)"
         return jsonify({"status": "success", "message": msg, "imported": added, "skipped": skipped})
-
-    except PermissionError:
-        return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
 @app.route('/api/stock/edit', methods=['POST'])
 def edit_stock():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = int(data.get("row_idx"))
+    row_idx = data.get("row_idx")
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        ws = wb["📥 Stock Data Input"]
-        
-        # Accept new 4-field format; fall back to old keys for compatibility
+        from lib.supabase_data import update_stock_holding
         company_name = (data.get("Company Name") or data.get("Scrip Name", "")).strip()
         sector       = (data.get("Sector", "Other") or "Other").strip()
         qty          = float(data.get("Total Quantity") or data.get("Qty", 0) or 0)
         avg_price    = float(data.get("Avg Trading Price") or data.get("Buy Price", 0) or 0)
 
-        # Resolve Current Price: user provided -> live price -> keep existing -> avg_price fallback
+        # Resolve Current Price
         current_price = data.get("Current Price")
         if current_price is not None and str(current_price).strip() != "":
             try:
@@ -1891,254 +1895,333 @@ def edit_stock():
             current_price = None
 
         if current_price is None:
-            old_scrip = ws[f'A{row_idx}'].value
-            existing_price = ws[f'G{row_idx}'].value
-            if str(old_scrip).strip().upper() != company_name.upper() or existing_price is None or existing_price == 0:
+            from lib.supabase_data import get_user_stock_holdings
+            holdings = get_user_stock_holdings(user_id)
+            existing = next((h for h in holdings if str(h['id']) == row_idx), None)
+            existing_price = float(existing['current_price']) if existing and existing.get('current_price') is not None else None
+            
+            if existing and existing.get('scrip_name', '').upper() != company_name.upper() or existing_price is None or existing_price == 0:
                 live_price = get_yahoo_finance_price(company_name, "NSE")
                 current_price = live_price if live_price is not None else avg_price
             else:
                 current_price = existing_price
 
-        # Write updated values
         buy_date_raw = data.get("Buy Date")
         buy_date = parse_date(buy_date_raw) if buy_date_raw else None
+        
+        sym = _resolve_ticker(company_name, "NSE")
+        sector, industry, is_sector_missing = resolve_stock_sector(sector, sym)
 
-        ws[f'A{row_idx}'] = company_name
-        ws[f'B{row_idx}'] = "NSE"
-        ws[f'C{row_idx}'] = sector
-        ws[f'D{row_idx}'] = qty
-        ws[f'E{row_idx}'] = avg_price
-        ws[f'F{row_idx}'] = buy_date
-        ws[f'G{row_idx}'] = current_price
+        holding_data = {
+            'Scrip Name': company_name,
+            'Exchange': 'NSE',
+            'Sector': sector,
+            'Industry': industry,
+            'Qty': qty,
+            'Buy Price': avg_price,
+            'Buy Date': buy_date.strftime('%Y-%m-%d') if buy_date else None,
+            'Current Price': current_price
+        }
 
-        apply_excel_styles(ws, row_idx)
-        wb.save(EXCEL_FILE)
-        return jsonify({"status": "success", "message": f"Stock '{company_name}' updated successfully in Excel!"})
-    except PermissionError:
-        return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
+        res = update_stock_holding(user_id, row_idx, holding_data)
+        if res:
+            clear_user_caches(user_id)
+            return jsonify({"status": "success", "message": f"Stock '{company_name}' updated successfully in Supabase!"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to update stock in Supabase."}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route('/api/stock/save-buy-date', methods=['POST'])
 def save_stock_buy_date():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = int(data.get("row_idx"))
+    row_idx = data.get("row_idx")
     buy_date_raw = data.get("Buy Date")
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        ws = wb["📥 Stock Data Input"]
+        from lib.supabase_data import update_stock_holding
         buy_date = parse_date(buy_date_raw) if buy_date_raw else None
-        ws[f'F{row_idx}'] = buy_date
-        apply_excel_styles(ws, row_idx)
-        wb.save(EXCEL_FILE)
-        return jsonify({"status": "success", "message": "Buy date saved successfully!"})
-    except PermissionError:
-        return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
+        
+        res = update_stock_holding(user_id, row_idx, {
+            'Buy Date': buy_date.strftime('%Y-%m-%d') if buy_date else None
+        })
+        if res:
+            clear_user_caches(user_id)
+            return jsonify({"status": "success", "message": "Buy date saved successfully to Supabase!"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to save buy date"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route('/api/stock/save-sector', methods=['POST'])
 def save_stock_sector():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = int(data.get("row_idx"))
+    row_idx = data.get("row_idx")
     sector = data.get("Sector", "").strip()
     if not sector:
         return jsonify({"status": "error", "message": "Sector is required."}), 400
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        ws = wb["📥 Stock Data Input"]
-        ws[f'C{row_idx}'] = sector
-        apply_excel_styles(ws, row_idx)
-        wb.save(EXCEL_FILE)
-        return jsonify({"status": "success", "message": f"Sector updated successfully to '{sector}'!"})
-    except PermissionError:
-        return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
+        from lib.supabase_data import update_stock_holding
+        res = update_stock_holding(user_id, row_idx, {
+            'Sector': sector
+        })
+        if res:
+            clear_user_caches(user_id)
+            return jsonify({"status": "success", "message": f"Sector updated successfully to '{sector}' in Supabase!"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to save sector"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route('/api/stock/delete', methods=['POST'])
 def delete_stock():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = int(data.get("row_idx"))
+    row_idx = data.get("row_idx")
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        ws = wb["📥 Stock Data Input"]
-        ws.delete_rows(row_idx, 1)
-        wb.save(EXCEL_FILE)
-        return jsonify({"status": "success", "message": "Stock holding deleted from Excel!"})
-    except PermissionError:
-        return jsonify({"status": "error", "message": "The Excel file 'Stocks & MF Analysis_V3.xlsx' is currently open in Microsoft Excel or another program. Please close Excel and try again!"}), 423
+        from lib.supabase_data import delete_stock_holding
+        success = delete_stock_holding(user_id, row_idx)
+        if success:
+            clear_user_caches(user_id)
+            return jsonify({"status": "success", "message": "Stock holding deleted from Supabase!"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to delete stock from Supabase."}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route('/api/stock/delete-all', methods=['POST'])
 def delete_all_stocks():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        if "📥 Stock Data Input" in wb.sheetnames:
-            ws = wb["📥 Stock Data Input"]
-            ws.delete_rows(4, 1000)
-            wb.save(EXCEL_FILE)
-            return jsonify({"status": "success", "message": "All stock holdings deleted successfully!"})
-        else:
-            return jsonify({"status": "error", "message": "Stock Data Input sheet not found."}), 404
-    except PermissionError:
-        return jsonify({"status": "error", "message": "The Excel file is currently open in Microsoft Excel. Please close it and try again!"}), 423
+        supabase = get_supabase_admin()
+        supabase.table('stock_holdings').delete().eq('user_id', user_id).execute()
+        clear_user_caches(user_id)
+        return jsonify({"status": "success", "message": "All stock holdings deleted successfully from Supabase!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route('/api/mf/add', methods=['POST'])
 def add_mf():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        ws = wb["📥 MF Data Input"]
+        from lib.supabase_data import add_mf_holding
+        fund_name = data.get("Fund Name", "").strip()
+        amc       = data.get("AMC", "Other").strip()
+        category  = data.get("Category", "Other").strip()
+        sub_cat   = data.get("Sub-Category", "Other").strip()
+        units     = float(data.get("Units Held", 0) or 0)
+        buy_nav   = float(data.get("Buy NAV", 0) or 0)
         
-        # Find first empty row
-        empty_row = 4
-        while ws[f'A{empty_row}'].value is not None:
-            empty_row += 1
-            
-        # Write user data
-        ws[f'A{empty_row}'] = data.get("Fund Name", "")
-        ws[f'B{empty_row}'] = data.get("AMC", "Other")
-        ws[f'C{empty_row}'] = data.get("Category", "Other")
-        ws[f'D{empty_row}'] = data.get("Sub-Category", "Other")
-        ws[f'E{empty_row}'] = float(data.get("Units Held", 0))
-        ws[f'F{empty_row}'] = float(data.get("Buy NAV", 0))
-        
+        current_nav = data.get("Current NAV")
+        if current_nav is not None and str(current_nav).strip() != "":
+            current_nav = float(current_nav)
+        else:
+            current_nav = None
+
+        if current_nav is None:
+            code = _resolve_mf_scheme_code(fund_name)
+            if code:
+                try:
+                    url = f"https://api.mfapi.in/mf/{code}"
+                    r = requests.get(url, timeout=5)
+                    if r.status_code == 200:
+                        res_data = r.json().get('data', [])
+                        if res_data:
+                            current_nav = float(res_data[0]['nav'])
+                except Exception:
+                    pass
+            if current_nav is None:
+                current_nav = buy_nav
+
         buy_date_str = data.get("Buy Date", "")
         parsed_d = parse_date(buy_date_str)
-        if parsed_d:
-            ws[f'G{empty_row}'] = parsed_d
-            ws[f'G{empty_row}'].number_format = 'yyyy-mm-dd'
+        buy_date = parsed_d.strftime('%Y-%m-%d') if parsed_d else None
+
+        holding_data = {
+            'Fund Name': fund_name,
+            'AMC': amc,
+            'Category': category,
+            'Sub-Category': sub_cat,
+            'Units Held': units,
+            'Buy NAV': buy_nav,
+            'Current NAV': current_nav,
+            'Buy Date': buy_date
+        }
+
+        res = add_mf_holding(user_id, holding_data)
+        if res:
+            clear_user_caches(user_id)
+            return jsonify({"status": "success", "message": "Mutual Fund added successfully to Supabase!"})
         else:
-            ws[f'G{empty_row}'] = ""
-            
-        ws[f'H{empty_row}'] = float(data.get("Current NAV", data.get("Buy NAV", 0)))
-        
-        bench = data.get("Benchmark 1Y Return %")
-        ws[f'I{empty_row}'] = float(bench) if bench else None
-        
-        expense = data.get("Expense Ratio %")
-        ws[f'J{empty_row}'] = float(expense) if expense else 0
-        
-        # Write formulas to Excel columns K, L, M, N, Q so Excel updates automatically
-        ws[f'K{empty_row}'] = f'=E{empty_row}*F{empty_row}'
-        ws[f'L{empty_row}'] = f'=E{empty_row}*H{empty_row}'
-        ws[f'M{empty_row}'] = f'=L{empty_row}-K{empty_row}'
-        ws[f'N{empty_row}'] = f'=IF(K{empty_row}=0,0,M{empty_row}/K{empty_row})'
-        ws[f'Q{empty_row}'] = f'=IF(ISBLANK(G{empty_row}),"",IF(TODAY()-G{empty_row}>365,"LTCG","STCG"))'
-        
-        apply_excel_styles(ws, empty_row)
-        wb.save(EXCEL_FILE)
-        return jsonify({"status": "success", "message": "Mutual Fund added successfully to Excel!"})
-    except PermissionError:
-        return jsonify({"status": "error", "message": "The Excel file 'Stocks & MF Analysis_V3.xlsx' is currently open in Microsoft Excel or another program. Please close Excel and try again!"}), 423
+            return jsonify({"status": "error", "message": "Failed to add Mutual Fund"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/mf/edit', methods=['POST'])
 def edit_mf():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = int(data.get("row_idx"))
+    row_idx = data.get("row_idx")
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        ws = wb["📥 MF Data Input"]
-        
-        ws[f'A{row_idx}'] = data.get("Fund Name", "")
-        ws[f'B{row_idx}'] = data.get("AMC", "Other")
-        ws[f'C{row_idx}'] = data.get("Category", "Other")
-        ws[f'D{row_idx}'] = data.get("Sub-Category", "Other")
-        ws[f'E{row_idx}'] = float(data.get("Units Held", 0))
-        ws[f'F{row_idx}'] = float(data.get("Buy NAV", 0))
-        
+        from lib.supabase_data import update_mf_holding
+        fund_name = data.get("Fund Name", "").strip()
+        amc       = data.get("AMC", "Other").strip()
+        category  = data.get("Category", "Other").strip()
+        sub_cat   = data.get("Sub-Category", "Other").strip()
+        units     = float(data.get("Units Held", 0) or 0)
+        buy_nav   = float(data.get("Buy NAV", 0) or 0)
+
+        current_nav = data.get("Current NAV")
+        if current_nav is not None and str(current_nav).strip() != "":
+            current_nav = float(current_nav)
+        else:
+            current_nav = None
+
+        if current_nav is None:
+            code = _resolve_mf_scheme_code(fund_name)
+            if code:
+                try:
+                    url = f"https://api.mfapi.in/mf/{code}"
+                    r = requests.get(url, timeout=5)
+                    if r.status_code == 200:
+                        res_data = r.json().get('data', [])
+                        if res_data:
+                            current_nav = float(res_data[0]['nav'])
+                except Exception:
+                    pass
+            if current_nav is None:
+                current_nav = buy_nav
+
         buy_date_str = data.get("Buy Date", "")
         parsed_d = parse_date(buy_date_str)
-        if parsed_d:
-            ws[f'G{row_idx}'] = parsed_d
-            ws[f'G{row_idx}'].number_format = 'yyyy-mm-dd'
+        buy_date = parsed_d.strftime('%Y-%m-%d') if parsed_d else None
+
+        holding_data = {
+            'Fund Name': fund_name,
+            'AMC': amc,
+            'Category': category,
+            'Sub-Category': sub_cat,
+            'Units Held': units,
+            'Buy NAV': buy_nav,
+            'Current NAV': current_nav,
+            'Buy Date': buy_date
+        }
+
+        res = update_mf_holding(user_id, row_idx, holding_data)
+        if res:
+            clear_user_caches(user_id)
+            return jsonify({"status": "success", "message": "Mutual Fund updated successfully in Supabase!"})
         else:
-            ws[f'G{row_idx}'] = ""
-            
-        ws[f'H{row_idx}'] = float(data.get("Current NAV", 0))
-        
-        bench = data.get("Benchmark 1Y Return %")
-        ws[f'I{row_idx}'] = float(bench) if bench else None
-        
-        expense = data.get("Expense Ratio %")
-        ws[f'J{row_idx}'] = float(expense) if expense else 0
-        
-        apply_excel_styles(ws, row_idx)
-        wb.save(EXCEL_FILE)
-        return jsonify({"status": "success", "message": "Mutual Fund updated successfully in Excel!"})
-    except PermissionError:
-        return jsonify({"status": "error", "message": "The Excel file 'Stocks & MF Analysis_V3.xlsx' is currently open in Microsoft Excel or another program. Please close Excel and try again!"}), 423
+            return jsonify({"status": "error", "message": "Failed to update Mutual Fund"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/mf/delete', methods=['POST'])
 def delete_mf():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = int(data.get("row_idx"))
+    row_idx = data.get("row_idx")
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        ws = wb["📥 MF Data Input"]
-        ws.delete_rows(row_idx, 1)
-        wb.save(EXCEL_FILE)
-        return jsonify({"status": "success", "message": "Mutual Fund holding deleted from Excel!"})
-    except PermissionError:
-        return jsonify({"status": "error", "message": "The Excel file 'Stocks & MF Analysis_V3.xlsx' is currently open in Microsoft Excel or another program. Please close Excel and try again!"}), 423
+        from lib.supabase_data import delete_mf_holding
+        success = delete_mf_holding(user_id, row_idx)
+        if success:
+            clear_user_caches(user_id)
+            return jsonify({"status": "success", "message": "Mutual Fund holding deleted from Supabase!"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to delete mutual fund"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/update-prices', methods=['POST'])
 def update_prices():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
     global price_update_state
-    if price_update_state["status"] in ("running", "background_running"):
+    if "users" not in price_update_state:
+        price_update_state["users"] = {}
+        
+    user_state = price_update_state["users"].get(user_id, {})
+    if user_state.get("status") in ("running", "background_running"):
         return jsonify({"status": "error", "message": "Update already in progress."}), 400
         
-    threading.Thread(target=live_price_updater_thread, daemon=True).start()
+    threading.Thread(target=live_price_updater_thread, args=(user_id,), daemon=True).start()
     return jsonify({"status": "success", "message": "Live price update started in the background."})
 
 @app.route('/api/update-status', methods=['GET'])
 def update_status():
-    global price_update_state, ACTIVE_PROFILE
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    global price_update_state
+    if "users" not in price_update_state:
+        price_update_state["users"] = {}
+        
+    user_state = price_update_state["users"].setdefault(user_id, {
+        "status": "idle",
+        "logs": [],
+        "start_time": 0,
+        "current_index": 0,
+        "total_tickers": 0,
+        "current_ticker": ""
+    })
+    
     pct = 0
-    if price_update_state["total_tickers"] > 0:
-        pct = int((price_update_state["current_index"] / price_update_state["total_tickers"]) * 100)
+    if user_state["total_tickers"] > 0:
+        pct = int((user_state["current_index"] / user_state["total_tickers"]) * 100)
     
     elapsed = 0
-    if price_update_state["start_time"] and price_update_state["status"] in ("running", "background_running"):
-        elapsed = round(time.time() - price_update_state["start_time"], 1)
+    if user_state["start_time"] and user_state["status"] in ("running", "background_running"):
+        elapsed = round(time.time() - user_state["start_time"], 1)
         
-    last_updated = price_update_state["last_updated_by_profile"].get(ACTIVE_PROFILE)
+    last_updated = price_update_state["last_updated_by_profile"].get(user_id)
     
     return jsonify({
-        "status": price_update_state["status"],
+        "status": user_state["status"],
         "progress_pct": pct,
-        "current_index": price_update_state["current_index"],
-        "total_tickers": price_update_state["total_tickers"],
-        "current_ticker": price_update_state["current_ticker"],
+        "current_index": user_state["current_index"],
+        "total_tickers": user_state["total_tickers"],
+        "current_ticker": user_state["current_ticker"],
         "elapsed_seconds": elapsed,
         "last_updated": last_updated,
-        "logs": price_update_state["logs"][-15:]  # Return last 15 log entries
+        "logs": user_state["logs"][-15:]
     })
 
 @app.route('/api/advisor/chat', methods=['POST'])
 def advisor_chat():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"response": "Unauthorized. Please log in first."}), 401
     try:
         data = request.json or {}
         prompt = data.get("prompt", "").strip().lower()
         if not prompt:
             return jsonify({"response": "I didn't receive any investment query. Please write what's on your mind!"})
         
-        portfolio = get_portfolio_data()
+        portfolio = get_portfolio_data(user_id)
         stocks = portfolio.get("stocks", [])
         stocks = [s for s in stocks if s["Scrip Name"] != "TOTAL"]
         summary = portfolio.get("summary", {})
