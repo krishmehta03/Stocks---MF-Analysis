@@ -267,3 +267,50 @@ body.auth-page::before {
   .auth-input { font-size: 16px; }
   .auth-row-between { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
 }
+
+/* ── Subscription Plan Badge ─────────────────────────────────────────────── */
+.plan-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  transition: all 0.3s ease;
+  vertical-align: middle;
+}
+
+.plan-free {
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.plan-pro {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+.plan-wealth {
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  color: #fff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(253, 160, 133, 0.4);
+}
+
+/* ── Locked Feature State ────────────────────────────────────────────────── */
+.locked-feature {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  position: relative;
+  pointer-events: auto;
+}
+
+.locked-feature::after {
+  content: ' 🔒';
+  font-size: 11px;
+}

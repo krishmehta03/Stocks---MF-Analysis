@@ -46,6 +46,101 @@ def hash_pin(pin):
         return None
     return hashlib.sha256(pin_str.encode('utf-8')).hexdigest()
 
+PLAN_LIMITS = {
+    "free": {
+        "max_stocks": 10,
+        "max_mf": 3,
+        "live_price_update": False,
+        "alerts": False,
+        "ai_advisor": False,
+        "sector_contribution": False,
+        "benchmark_comparison": False,
+        "tax_reports": False,
+        "export_csv": False,
+        "multiple_profiles": False
+    },
+    "pro": {
+        "max_stocks": -1,  # unlimited
+        "max_mf": -1,      # unlimited
+        "live_price_update": True,
+        "alerts": True,
+        "ai_advisor": True,
+        "sector_contribution": True,
+        "benchmark_comparison": True,
+        "tax_reports": True,
+        "export_csv": True,
+        "multiple_profiles": True
+    },
+    "wealth": {
+        "max_stocks": -1,
+        "max_mf": -1,
+        "live_price_update": True,
+        "alerts": True,
+        "ai_advisor": True,
+        "sector_contribution": True,
+        "benchmark_comparison": True,
+        "tax_reports": True,
+        "export_csv": True,
+        "multiple_profiles": True
+    }
+}
+
+def get_user_plan(user_id: str) -> str:
+    """Get user's current plan from Supabase"""
+    try:
+        supabase = get_supabase()
+        result = supabase.table('profiles')\
+            .select('plan')\
+            .eq('id', user_id)\
+            .single()\
+            .execute()
+        return result.data.get('plan', 'free')
+    except Exception:
+        return 'free'
+
+def check_plan_limit(
+    user_id: str, 
+    feature: str
+) -> bool:
+    """
+    Returns True if user can access feature.
+    Returns False if feature is locked.
+    """
+    plan = get_user_plan(user_id)
+    limits = PLAN_LIMITS.get(plan, 
+                             PLAN_LIMITS['free'])
+    return limits.get(feature, False)
+
+def check_stock_limit(user_id: str) -> dict:
+    """
+    Check if user can add more stocks.
+    Returns {allowed: bool, current: int, 
+             max: int, plan: str}
+    """
+    plan = get_user_plan(user_id)
+    limits = PLAN_LIMITS.get(plan, 
+                             PLAN_LIMITS['free'])
+    max_stocks = limits['max_stocks']
+    
+    if max_stocks == -1:
+        return {
+            "allowed": True,
+            "current": 0,
+            "max": -1,
+            "plan": plan
+        }
+    
+    from lib.supabase_data import get_user_stock_holdings
+    current = len(get_user_stock_holdings(user_id))
+    
+    return {
+        "allowed": current < max_stocks,
+        "current": current,
+        "max": max_stocks,
+        "plan": plan
+    }
+
+
 app = Flask(__name__)
 
 # Multi-Profile System File Resolver
@@ -1180,6 +1275,78 @@ def api_portfolio():
         data["last_updated"] = price_update_state["last_updated_by_profile"].get(user_id)
     return jsonify(data)
 
+@app.route('/api/user/plan', methods=['GET'])
+def get_user_plan_api():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({
+            "status": "error",
+            "message": "Unauthorized"
+        }), 401
+    
+    plan = get_user_plan(user_id)
+    limits = PLAN_LIMITS.get(plan, 
+                             PLAN_LIMITS['free'])
+    
+    from lib.supabase_data import \
+        get_user_stock_holdings, \
+        get_user_mf_holdings
+    
+    current_stocks = len(
+        get_user_stock_holdings(user_id))
+    current_mf = len(
+        get_user_mf_holdings(user_id))
+    
+    return jsonify({
+        "plan": plan,
+        "limits": limits,
+        "usage": {
+            "stocks": current_stocks,
+            "mf": current_mf
+        }
+    })
+
+@app.route('/api/admin/update-plan', methods=['POST'])
+def admin_update_plan():
+    # Simple admin endpoint to manually
+    # upgrade users during testing
+    # (will be replaced by Razorpay 
+    #  webhook in production)
+    
+    admin_key = request.headers.get(
+        'X-Admin-Key', '')
+    if admin_key != os.environ.get(
+        'ADMIN_SECRET_KEY', 'changeme'):
+        return jsonify({
+            "status": "error",
+            "message": "Unauthorized"
+        }), 401
+    
+    data = request.json
+    user_email = data.get('email')
+    new_plan = data.get('plan', 'pro')
+    
+    try:
+        supabase = get_supabase()
+        
+        # Get user id from email
+        result = supabase.table('profiles')\
+            .update({'plan': new_plan})\
+            .eq('email', user_email)\
+            .execute()
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Plan updated to {new_plan} for {user_email}"
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
+
 # Simple TTL cache for performance and sector contribution data
 _perf_cache = {}   # key -> (timestamp, payload)
 _PERF_TTL   = 600  # 10-minute cache
@@ -1637,6 +1804,16 @@ def add_stock():
     user_id = get_current_user_id()
     if not user_id:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    limit_check = check_stock_limit(user_id)
+    if not limit_check["allowed"]:
+        return jsonify({
+            "status": "error",
+            "message": f"Free plan limit reached. You have {limit_check['current']}/{limit_check['max']} stocks. Upgrade to Pro for unlimited stocks.",
+            "upgrade_required": True,
+            "feature": "max_stocks"
+        }), 403
+        
     data = request.json
     try:
         from lib.supabase_data import add_stock_holding
@@ -2215,6 +2392,36 @@ def advisor_chat():
     user_id = get_current_user_id()
     if not user_id:
         return jsonify({"response": "Unauthorized. Please log in first."}), 401
+        
+    if not check_plan_limit(user_id, 'ai_advisor'):
+        return jsonify({
+            "response": """
+            <div style='text-align:center; 
+                 padding: 2rem;'>
+              <i class='fa-solid fa-lock' 
+                 style='font-size:2rem; 
+                 color:var(--accent);
+                 margin-bottom:1rem;
+                 display:block;'></i>
+              <strong>AI Advisor is a Pro feature</strong>
+              <p style='color:var(--text-secondary);
+                   margin-top:0.5rem;'>
+                Upgrade to Pro to get personalized 
+                AI-powered investment advice.
+              </p>
+              <a href='/account' 
+                 style='display:inline-block;
+                 margin-top:1rem;
+                 padding:8px 20px;
+                 background:var(--accent);
+                 color:white;
+                 border-radius:6px;
+                 text-decoration:none;'>
+                Upgrade to Pro
+              </a>
+            </div>
+            """
+        })
     try:
         data = request.json or {}
         prompt = data.get("prompt", "").strip().lower()

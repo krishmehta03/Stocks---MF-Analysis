@@ -54,14 +54,105 @@
     }
   }
 
+  async function getAuthHeaders() {
+    if (window._authClient) {
+      try {
+        const { data: { session } } = await window._authClient.auth.getSession();
+        if (session && session.access_token) {
+          return { 'Authorization': `Bearer ${session.access_token}` };
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return {};
+  }
+
+  async function loadUserPlan() {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/user/plan', { headers });
+      const data = await res.json();
+      
+      window.userPlan = data.plan;
+      window.planLimits = data.limits;
+      window.planUsage = data.usage;
+      
+      applyPlanGating();
+    } catch(err) {
+      console.error('Plan check failed:', err);
+      window.userPlan = 'free';
+    }
+  }
+
+  function applyPlanGating() {
+    const plan = window.userPlan || 'free';
+    const limits = window.planLimits || {};
+    
+    // Show plan badge in header
+    const badge = document.getElementById('plan-badge');
+    if (badge) {
+      badge.textContent = plan.toUpperCase();
+      badge.className = `plan-badge plan-${plan}`;
+    }
+    
+    // Gate AI Advisor tab
+    if (!limits.ai_advisor) {
+      const aiTab = document.querySelector('[data-tab="ai-advisor"]');
+      if (aiTab) {
+        aiTab.classList.add('locked-feature');
+        aiTab.setAttribute('title', 'Upgrade to Pro');
+      }
+    }
+    
+    // Show stock limit warning
+    if (limits.max_stocks > 0) {
+      const usage = window.planUsage || {};
+      const current = usage.stocks || 0;
+      const max = limits.max_stocks;
+      
+      if (current >= max - 2) {
+        showPlanLimitWarning(
+          `You're using ${current}/${max} stocks on the Free plan.`,
+          'Upgrade to Pro for unlimited stocks.'
+        );
+      }
+    }
+    
+    // Hide live price update for free users
+    if (!limits.live_price_update) {
+      const updateBtn = document.getElementById('btn-update-prices');
+      if (updateBtn) {
+        updateBtn.disabled = true;
+        updateBtn.title = 'Live prices — Pro feature';
+        updateBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Update Prices (Pro)';
+      }
+    }
+  }
+
+  function showPlanLimitWarning(msg, cta) {
+    const banner = document.getElementById('plan-limit-banner');
+    if (banner) {
+      banner.innerHTML = `
+        <i class="fa-solid fa-circle-info"></i>
+        ${msg}
+        <a href="/account" 
+           style="color:var(--accent);
+           margin-left:8px;
+           text-decoration:underline;">
+          ${cta}
+        </a>`;
+      banner.style.display = 'block';
+    }
+  }
+
   document.addEventListener(
     'DOMContentLoaded', function() {
-      const el = document.getElementById(
-        'current-user-name'
-      );
+      const el = document.getElementById('current-user-name');
       if (el && window.currentUserName) {
         el.textContent = window.currentUserName;
       }
+      loadUserPlan();
     }
   );
   </script>
@@ -77,6 +168,7 @@
   
   <!-- Custom Premium Style -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
 </head>
 <body class="theme-emerald">
 
@@ -91,9 +183,14 @@
         <div id="price-status-container" style="display: flex; align-items: center; gap: 0.5rem; margin-right: 0.5rem; background: rgba(255,255,255,0.02); padding: 0.4rem 0.75rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
           <span id="price-status-dot" class="status-dot idle"></span>
           <span id="price-status-text" style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 500;">Checking...</span>
+          <button id="btn-update-prices" style="display:none; background:transparent; border:1px solid rgba(255,255,255,0.15); color:var(--text-secondary); padding:2px 10px; border-radius:6px; cursor:pointer; font-size:11px; margin-left:4px;"
+            title="Update live prices"><i class="fa-solid fa-rotate-right"></i> Update Prices</button>
         </div>
         <span id="current-user-name">
           Loading...
+        </span>
+        <span id="plan-badge" class="plan-badge plan-free" style="margin-left: 6px; vertical-align: middle;">
+          FREE
         </span>
         <button onclick="signOut()" 
           style="background:transparent;
@@ -135,6 +232,17 @@
     <!-- Alert Banners for concentration and loss -->
     <div id="alerts-container"></div>
 
+    <div id="plan-limit-banner" 
+      style="display:none;
+      background:rgba(99,102,241,0.1);
+      border:1px solid rgba(99,102,241,0.3);
+      border-radius:8px;
+      padding:10px 16px;
+      margin-bottom:12px;
+      font-size:13px;
+      color:var(--text-secondary);">
+    </div>
+
     <!-- Nav Tabs Navigation -->
     <div class="nav-tabs">
       <button class="tab-btn active" onclick="switchTab('dashboard')">
@@ -149,7 +257,7 @@
       <button class="tab-btn" onclick="switchTab('signals')">
         <i class="fa-solid fa-triangle-exclamation"></i> Risk & Signals
       </button>
-      <button class="tab-btn" onclick="switchTab('advisor')">
+      <button class="tab-btn" data-tab="ai-advisor" onclick="switchTab('advisor')">
         <i class="fa-solid fa-user-tie"></i> AI Advisor
       </button>
       <button class="tab-btn" onclick="switchTab('settings')">

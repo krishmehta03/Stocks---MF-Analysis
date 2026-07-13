@@ -1472,3 +1472,48 @@ select option {
   padding-top: 1.75rem !important;
   padding-bottom: 1.75rem !important;
 }
+
+.plan-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.plan-free {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.plan-pro {
+  background: linear-gradient(
+    135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+}
+
+.plan-wealth {
+  background: linear-gradient(
+    135deg, #f6d365, #fda085);
+  color: white;
+  border: none;
+}
+
+.locked-feature {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  position: relative;
+  pointer-events: none; /* Make tab link unclickable */
+}
+
+.locked-feature::after {
+  content: '🔒';
+  margin-left: 4px;
+  font-size: 10px;
+}
+

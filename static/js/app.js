@@ -2604,6 +2604,10 @@ async function submitStockForm(e) {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
+    if (data.upgrade_required) {
+      showUpgradeModal(data.feature);
+      return;
+    }
     if (data.status === 'success') {
       closeStockModal();
       await fetchPortfolio();
@@ -2613,6 +2617,62 @@ async function submitStockForm(e) {
   } catch (err) {
     alert("API connection failed. Ensure Flask app is running!");
   }
+}
+
+function showUpgradeModal(feature) {
+  const modal = document.createElement('div');
+  modal.innerHTML = `
+    <div style="position:fixed;top:0;left:0;
+      width:100%;height:100%;
+      background:rgba(0,0,0,0.7);
+      z-index:9999;
+      display:flex;align-items:center;
+      justify-content:center;">
+      <div style="background:var(--bg-card);
+        border:1px solid var(--border);
+        border-radius:12px;
+        padding:2rem;
+        max-width:400px;
+        text-align:center;">
+        <i class="fa-solid fa-lock" 
+          style="font-size:2.5rem;
+          color:var(--accent);
+          margin-bottom:1rem;
+          display:block;"></i>
+        <h3 style="margin-bottom:0.5rem; color:var(--text-primary);">
+          Upgrade to Pro
+        </h3>
+        <p style="color:var(--text-secondary);
+          margin-bottom:1.5rem;">
+          You've reached the free plan limit 
+          of 10 stocks. Upgrade to Pro for 
+          unlimited stocks and all features.
+        </p>
+        <div style="display:flex;gap:12px;
+          justify-content:center;">
+          <button onclick="window.location.href='/account'"
+            style="background:var(--accent);
+            color:white;border:none;
+            padding:10px 24px;
+            border-radius:8px;
+            cursor:pointer;
+            font-weight:600;">
+            Upgrade to Pro — ₹199/month
+          </button>
+          <button onclick="this.closest('div[style*=fixed]').remove()"
+            style="background:transparent;
+            border:1px solid var(--border);
+            color:var(--text-secondary);
+            padding:10px 24px;
+            border-radius:8px;
+            cursor:pointer;">
+            Maybe later
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
 }
 
 // ─── CSV IMPORT MODAL ──────────────────────────────────────────────────────────
