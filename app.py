@@ -86,16 +86,21 @@ PLAN_LIMITS = {
 }
 
 def get_user_plan(user_id: str) -> str:
-    """Get user's current plan from Supabase"""
+    """Get user's current plan from Supabase (uses admin client to bypass RLS)"""
     try:
-        supabase = get_supabase()
+        # Must use admin client — anon client is blocked by RLS on the profiles table
+        # when called server-side without a user session context.
+        supabase = get_supabase_admin()
         result = supabase.table('profiles')\
             .select('plan')\
             .eq('id', user_id)\
             .single()\
             .execute()
-        return result.data.get('plan', 'free')
-    except Exception:
+        plan = result.data.get('plan', 'free') if result.data else 'free'
+        print(f"[get_user_plan] user_id={user_id} -> plan={plan}")
+        return plan
+    except Exception as e:
+        print(f"[get_user_plan] ERROR for user_id={user_id}: {e}")
         return 'free'
 
 def check_plan_limit(
