@@ -70,8 +70,16 @@
 
   async function loadUserPlan() {
     try {
+      // Clear any locally cached plan values
+      localStorage.removeItem('userPlan');
+      sessionStorage.removeItem('userPlan');
+
       const headers = await getAuthHeaders();
-      const res = await fetch('/api/user/plan', { headers });
+      // Cache-bust so the browser always fetches fresh data
+      const res = await fetch(
+        '/api/user/plan?t=' + Date.now(),
+        { headers, cache: 'no-store' }
+      );
       const data = await res.json();
       
       window.userPlan = data.plan;

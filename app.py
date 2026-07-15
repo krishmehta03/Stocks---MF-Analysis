@@ -1297,7 +1297,7 @@ def get_user_plan_api():
     current_mf = len(
         get_user_mf_holdings(user_id))
     
-    return jsonify({
+    response = jsonify({
         "plan": plan,
         "limits": limits,
         "usage": {
@@ -1305,6 +1305,9 @@ def get_user_plan_api():
             "mf": current_mf
         }
     })
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 @app.route('/api/admin/update-plan', methods=['POST'])
 def admin_update_plan():
