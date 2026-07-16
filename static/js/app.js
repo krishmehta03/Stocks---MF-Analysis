@@ -2204,31 +2204,19 @@ function renderRiskSignals() {
   
   const signals = portfolioData.signals || [];
   
-  let gCount = 0;
-  let lCount = 0;
-  let underCount = 0;
-  
-  signals.forEach(s => {
-    const sig = s["Signal"] ? s["Signal"].toLowerCase() : "";
-    const priority = s["Priority"] ? s["Priority"].toLowerCase() : "";
-    const ret = s["Return %"];
-    
-    // Increment counts for the summary widget cards
-    if (sig.includes("strong") || ret > 20) {
-      gCount++;
-    } else if (sig.includes("loss") || ret < 0) {
-      lCount++;
-    } else if (sig.includes("tiny") || priority.includes("medium") || priority.includes("high")) {
-      underCount++;
-    }
-  });
+  // Summary counters — computed from all stock holdings (not just signals list)
+  const allStocks = portfolioData.stocks || [];
+  const totalStockVal = allStocks.reduce((sum, s) => sum + (s["Current Value"] || 0), 0);
+  const gCount     = allStocks.filter(s => (s["Return %"] || 0) > 20).length;
+  const lCount     = allStocks.filter(s => (s["Return %"] || 0) < 0).length;
+  const underCount = allStocks.filter(s => (s["Return %"] || 0) < -10).length;
 
   document.getElementById("signal-cnt-gainers").innerText = gCount;
   document.getElementById("signal-cnt-losers").innerText = lCount;
   document.getElementById("signal-cnt-under").innerText = underCount;
   
   if (signals.length === 0) {
-    body.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">No action signals found in Excel sheet. Check back later!</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">No action signals yet. Add buy dates to your holdings for accurate signals.</td></tr>`;
     return;
   }
   
@@ -2238,14 +2226,18 @@ function renderRiskSignals() {
     
     // Styled rows based on priority levels
     let rowClass = "";
-    let priorityBadge = "ltcg"; // blue
-    
-    if (s["Priority"].includes("HIGH")) {
+    let priorityBadge = "ltcg"; // blue = LOW
+
+    const priority = (s["Priority"] || "").toUpperCase();
+    if (priority === "CRITICAL") {
       rowClass = "priority-high-row";
-      priorityBadge = "stcg"; // red
-    } else if (s["Priority"].includes("MEDIUM")) {
+      priorityBadge = "stcg";         // red
+    } else if (priority === "HIGH") {
+      rowClass = "priority-high-row";
+      priorityBadge = "stcg";         // red
+    } else if (priority === "MEDIUM") {
       rowClass = "priority-medium-row";
-      priorityBadge = "warning-badge"; // yellow badge
+      priorityBadge = "warning-badge"; // yellow
     }
     
     if (rowClass) tr.className = rowClass;
@@ -2271,12 +2263,15 @@ function renderRiskSignals() {
     }
     tr.appendChild(tdRet);
     
-    // 4. Signal Type
+    // 4. Signal Type badge
     const tdSig = document.createElement("td");
-    let sigBadgeClass = "badge ltcg";
-    if (s["Signal"].includes("Tiny")) sigBadgeClass = "badge warning-badge";
-    if (s["Signal"].includes("Loss")) sigBadgeClass = "badge stcg";
-    tdSig.innerHTML = `<span class="${sigBadgeClass}">${s["Signal"] || "Active"}</span>`;
+    const sigName = s["Signal"] || "Active";
+    let sigBadgeClass = "badge ltcg";          // default: blue
+    if (sigName.includes("Critical"))    sigBadgeClass = "badge stcg";         // red
+    if (sigName.includes("Underperform")) sigBadgeClass = "badge stcg";         // red
+    if (sigName.includes("Concentration")) sigBadgeClass = "badge warning-badge"; // yellow
+    if (sigName.includes("Strong"))      sigBadgeClass = "badge ltcg";          // green-ish/blue
+    tdSig.innerHTML = `<span class="${sigBadgeClass}">${sigName}</span>`;
     tr.appendChild(tdSig);
     
     // 5. Priority Level

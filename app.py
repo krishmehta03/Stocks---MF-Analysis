@@ -980,48 +980,70 @@ def get_portfolio_data(user_id=None):
     total_portfolio_pnl = total_portfolio_value - total_portfolio_invested
     total_portfolio_return_pct = (total_portfolio_pnl / total_portfolio_invested * 100) if total_portfolio_invested > 0 else 0
     
-    # Risk signals: read from Excel if exists, else return empty list
+    # Risk signals: computed dynamically from Supabase holdings
     signals = []
-    if os.path.exists(EXCEL_FILE):
-        try:
-            wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
-            if "⚠️ Risk & Signals" in wb.sheetnames:
-                ws_sig = wb["⚠️ Risk & Signals"]
-                for row in range(18, 1000):
-                    scrip = ws_sig[f'A{row}'].value
-                    if not scrip or scrip == 0:
-                        continue
-                    
-                    cur_val = ws_sig[f'B{row}'].value
-                    ret_pct = ws_sig[f'C{row}'].value
-                    xirr = ws_sig[f'D{row}'].value
-                    vs_nifty = ws_sig[f'E{row}'].value
-                    sig_name = ws_sig[f'F{row}'].value
-                    priority = ws_sig[f'G{row}'].value
-                    rec_action = ws_sig[f'H{row}'].value
-                    
-                    if isinstance(ret_pct, (int, float)):
-                        if abs(ret_pct) < 1.0:
-                            ret_pct = round(ret_pct * 100, 2)
-                        else:
-                            ret_pct = round(ret_pct, 2)
-                    
-                    signals.append({
-                        "Scrip Name": str(scrip).strip(),
-                        "Current Value": round(cur_val, 2) if isinstance(cur_val, (int, float)) else cur_val,
-                        "Return %": ret_pct,
-                        "XIRR %": round(xirr * 100, 2) if isinstance(xirr, (int, float)) else xirr,
-                        "vs Nifty": vs_nifty,
-                        "Signal": str(sig_name).strip() if sig_name else "",
-                        "Priority": str(priority).strip() if priority else "",
-                        "Recommended Action": str(rec_action).strip() if rec_action else ""
-                    })
-        except Exception as e:
-            print(f"Error loading risk signals: {e}")
+    total_stock_value_for_signals = sum(s["Current Value"] for s in stocks)
+    for s in stocks:
+        scrip      = s["Scrip Name"]
+        cur_val    = s["Current Value"]
+        ret_pct    = s["Return %"]
+        weight_pct = (cur_val / total_stock_value_for_signals * 100) if total_stock_value_for_signals > 0 else 0
 
-    # Filter signals to only include scrips the user actually holds
-    user_scrips = {s["Scrip Name"].strip().lower() for s in stocks}
-    signals = [sig for sig in signals if sig["Scrip Name"].strip().lower() in user_scrips]
+        # Critical Loss: return below -30%
+        if ret_pct < -30:
+            signals.append({
+                "Scrip Name": scrip,
+                "Current Value": cur_val,
+                "Return %": ret_pct,
+                "XIRR %": None,
+                "vs Nifty": None,
+                "Signal": "Critical Loss",
+                "Priority": "CRITICAL",
+                "Recommended Action": "Exit immediately or average down with caution"
+            })
+        # Underperformer: return between -30% and -10%
+        elif ret_pct < -10:
+            signals.append({
+                "Scrip Name": scrip,
+                "Current Value": cur_val,
+                "Return %": ret_pct,
+                "XIRR %": None,
+                "vs Nifty": None,
+                "Signal": "Underperformer",
+                "Priority": "HIGH",
+                "Recommended Action": "Review thesis and consider exit"
+            })
+        # Strong Performer: return above 20%
+        elif ret_pct > 20:
+            signals.append({
+                "Scrip Name": scrip,
+                "Current Value": cur_val,
+                "Return %": ret_pct,
+                "XIRR %": None,
+                "vs Nifty": None,
+                "Signal": "Strong Performer",
+                "Priority": "LOW",
+                "Recommended Action": "Consider booking partial profits"
+            })
+
+        # Concentration Risk: position weight above 20% of stock portfolio
+        if weight_pct > 20:
+            # Avoid duplicate if already added above — check by scrip + signal combo
+            already_added = any(
+                sig["Scrip Name"] == scrip and sig["Signal"] == "Concentration Risk"
+                for sig in signals
+            )
+            if not already_added:
+                signals.append({
+                    "Scrip Name": scrip,
+                    "Current Value": cur_val,
+                    "Return %": ret_pct,
+                    "XIRR %": None,
+                    "vs Nifty": round(weight_pct, 1),
+                    "Signal": "Concentration Risk",
+                    "Priority": "HIGH",
+                    "Recommended Action": f"Reduce position size (currently {weight_pct:.1f}% of portfolio)"
+                })
 
     return {
         "stocks": stocks,
