@@ -1028,7 +1028,21 @@ def get_portfolio_data(user_id=None):
             if _PRIORITY_ORDER.get(sig_priority, 0) > _PRIORITY_ORDER.get(signals_by_stock[scrip]["Priority"], 0):
                 signals_by_stock[scrip]["Priority"] = sig_priority
 
-    signals = list(signals_by_stock.values())
+    # Convert to final list — join multi-signals per stock into plain strings
+    signals = []
+    for entry in signals_by_stock.values():
+        sig_str    = " + ".join(entry["Signals"])
+        action_str = " • ".join(entry["Actions"])
+        signals.append({
+            "Scrip Name":         entry["Scrip Name"],
+            "Current Value":      entry["Current Value"],
+            "Return %":           entry["Return %"],
+            "Signal":             sig_str,
+            "Signals":            entry["Signals"],   # keep list for JS multi-badge
+            "Priority":           entry["Priority"],
+            "Recommended Action": action_str,
+            "Actions":            entry["Actions"],   # keep list for JS join
+        })
 
     return {
         "stocks": stocks,
