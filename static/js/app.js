@@ -2220,14 +2220,13 @@ function renderRiskSignals() {
     return;
   }
   
-  // Render table rows
+  // Render table rows — one row per stock, multiple badges per row
   signals.forEach(s => {
     const tr = document.createElement("tr");
-    
-    // Styled rows based on priority levels
+
+    // Row & priority badge colour based on highest priority
     let rowClass = "";
     let priorityBadge = "ltcg"; // blue = LOW
-
     const priority = (s["Priority"] || "").toUpperCase();
     if (priority === "CRITICAL") {
       rowClass = "priority-high-row";
@@ -2239,53 +2238,61 @@ function renderRiskSignals() {
       rowClass = "priority-medium-row";
       priorityBadge = "warning-badge"; // yellow
     }
-    
     if (rowClass) tr.className = rowClass;
-    
+
     // 1. Scrip
     const tdScrip = document.createElement("td");
     tdScrip.innerHTML = `<strong>${s["Scrip Name"]}</strong>`;
     tr.appendChild(tdScrip);
-    
-    // 2. Value
+
+    // 2. Current Value
     const tdVal = document.createElement("td");
     tdVal.innerText = formatINR(s["Current Value"]);
     tr.appendChild(tdVal);
-    
-    // 3. Return
+
+    // 3. Return %
     const tdRet = document.createElement("td");
     const rVal = s["Return %"];
-    if (typeof rVal === 'number') {
+    if (typeof rVal === "number") {
       tdRet.innerText = `${rVal.toFixed(2)}%`;
-      tdRet.className = rVal >= 0 ? 'positive' : 'negative';
+      tdRet.className = rVal >= 0 ? "positive" : "negative";
     } else {
       tdRet.innerText = rVal || "0.00%";
     }
     tr.appendChild(tdRet);
-    
-    // 4. Signal Type badge
+
+    // 4. Signal badges — one badge per signal type
     const tdSig = document.createElement("td");
-    const sigName = s["Signal"] || "Active";
-    let sigBadgeClass = "badge ltcg";          // default: blue
-    if (sigName.includes("Critical"))    sigBadgeClass = "badge stcg";         // red
-    if (sigName.includes("Underperform")) sigBadgeClass = "badge stcg";         // red
-    if (sigName.includes("Concentration")) sigBadgeClass = "badge warning-badge"; // yellow
-    if (sigName.includes("Strong"))      sigBadgeClass = "badge ltcg";          // green-ish/blue
-    tdSig.innerHTML = `<span class="${sigBadgeClass}">${sigName}</span>`;
+    tdSig.style.display = "flex";
+    tdSig.style.flexWrap = "wrap";
+    tdSig.style.gap = "4px";
+    tdSig.style.alignItems = "center";
+    const sigList = Array.isArray(s["Signals"]) ? s["Signals"] : [s["Signal"] || "Active"];
+    sigList.forEach(sigName => {
+      const badge = document.createElement("span");
+      let cls = "badge ltcg";                           // default: teal/blue
+      if (sigName.includes("Critical"))     cls = "badge stcg";          // red
+      if (sigName.includes("Underperform")) cls = "badge stcg";          // red
+      if (sigName.includes("Concentration")) cls = "badge warning-badge"; // yellow
+      badge.className = cls;
+      badge.textContent = sigName;
+      tdSig.appendChild(badge);
+    });
     tr.appendChild(tdSig);
-    
+
     // 5. Priority Level
     const tdPriority = document.createElement("td");
-    tdPriority.innerHTML = `<span class="badge ${priorityBadge}">${s["Priority"] || "LOW"}</span>`;
+    tdPriority.innerHTML = `<span class="badge ${priorityBadge}">${priority || "LOW"}</span>`;
     tr.appendChild(tdPriority);
-    
-    // 6. Action Recommendation
+
+    // 6. Recommended Actions — all joined with " • "
     const tdAction = document.createElement("td");
-    tdAction.innerText = s["Recommended Action"] || "-";
+    const actionList = Array.isArray(s["Actions"]) ? s["Actions"] : [s["Recommended Action"] || "-"];
+    tdAction.innerText = actionList.join(" \u2022 ");
     tdAction.style.fontSize = "0.85rem";
     tdAction.style.color = "var(--text-secondary)";
     tr.appendChild(tdAction);
-    
+
     body.appendChild(tr);
   });
 }

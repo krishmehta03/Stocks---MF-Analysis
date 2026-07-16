@@ -980,70 +980,55 @@ def get_portfolio_data(user_id=None):
     total_portfolio_pnl = total_portfolio_value - total_portfolio_invested
     total_portfolio_return_pct = (total_portfolio_pnl / total_portfolio_invested * 100) if total_portfolio_invested > 0 else 0
     
-    # Risk signals: computed dynamically from Supabase holdings
-    signals = []
+    # Risk signals: computed dynamically from Supabase holdings, merged per stock
+    _PRIORITY_ORDER = {"CRITICAL": 3, "HIGH": 2, "LOW": 1}
+    signals_by_stock: dict = {}
     total_stock_value_for_signals = sum(s["Current Value"] for s in stocks)
+
     for s in stocks:
         scrip      = s["Scrip Name"]
         cur_val    = s["Current Value"]
         ret_pct    = s["Return %"]
         weight_pct = (cur_val / total_stock_value_for_signals * 100) if total_stock_value_for_signals > 0 else 0
 
+        raw_signals = []  # (signal_type, priority, action)
+
         # Critical Loss: return below -30%
         if ret_pct < -30:
-            signals.append({
-                "Scrip Name": scrip,
-                "Current Value": cur_val,
-                "Return %": ret_pct,
-                "XIRR %": None,
-                "vs Nifty": None,
-                "Signal": "Critical Loss",
-                "Priority": "CRITICAL",
-                "Recommended Action": "Exit immediately or average down with caution"
-            })
+            raw_signals.append(("Critical Loss", "CRITICAL", "Exit immediately or average down with caution"))
         # Underperformer: return between -30% and -10%
         elif ret_pct < -10:
-            signals.append({
-                "Scrip Name": scrip,
-                "Current Value": cur_val,
-                "Return %": ret_pct,
-                "XIRR %": None,
-                "vs Nifty": None,
-                "Signal": "Underperformer",
-                "Priority": "HIGH",
-                "Recommended Action": "Review thesis and consider exit"
-            })
+            raw_signals.append(("Underperformer", "HIGH", "Review thesis and consider exit"))
         # Strong Performer: return above 20%
         elif ret_pct > 20:
-            signals.append({
+            raw_signals.append(("Strong Performer", "LOW", "Consider booking partial profits"))
+
+        # Concentration Risk: position weight above 20% of stock portfolio (independent check)
+        if weight_pct > 20:
+            raw_signals.append(("Concentration Risk", "HIGH",
+                                f"Reduce position size (currently {weight_pct:.1f}% of portfolio)"))
+
+        if not raw_signals:
+            continue  # stock is within normal range — no signal needed
+
+        if scrip not in signals_by_stock:
+            signals_by_stock[scrip] = {
                 "Scrip Name": scrip,
                 "Current Value": cur_val,
                 "Return %": ret_pct,
-                "XIRR %": None,
-                "vs Nifty": None,
-                "Signal": "Strong Performer",
+                "Signals": [],
                 "Priority": "LOW",
-                "Recommended Action": "Consider booking partial profits"
-            })
+                "Actions": []
+            }
 
-        # Concentration Risk: position weight above 20% of stock portfolio
-        if weight_pct > 20:
-            # Avoid duplicate if already added above — check by scrip + signal combo
-            already_added = any(
-                sig["Scrip Name"] == scrip and sig["Signal"] == "Concentration Risk"
-                for sig in signals
-            )
-            if not already_added:
-                signals.append({
-                    "Scrip Name": scrip,
-                    "Current Value": cur_val,
-                    "Return %": ret_pct,
-                    "XIRR %": None,
-                    "vs Nifty": round(weight_pct, 1),
-                    "Signal": "Concentration Risk",
-                    "Priority": "HIGH",
-                    "Recommended Action": f"Reduce position size (currently {weight_pct:.1f}% of portfolio)"
-                })
+        for sig_type, sig_priority, sig_action in raw_signals:
+            signals_by_stock[scrip]["Signals"].append(sig_type)
+            signals_by_stock[scrip]["Actions"].append(sig_action)
+            # Escalate to highest priority seen
+            if _PRIORITY_ORDER.get(sig_priority, 0) > _PRIORITY_ORDER.get(signals_by_stock[scrip]["Priority"], 0):
+                signals_by_stock[scrip]["Priority"] = sig_priority
+
+    signals = list(signals_by_stock.values())
 
     return {
         "stocks": stocks,
