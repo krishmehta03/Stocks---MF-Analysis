@@ -1819,7 +1819,7 @@ function renderStocksTable() {
           td.innerHTML = `
             <div style="display: flex; flex-direction: column; gap: 0.35rem;" onclick="event.stopPropagation();">
               <span style="color: #f97316; font-size: 0.8rem; font-weight: 600;"><i class="fa-solid fa-triangle-exclamation"></i> Sector not assigned</span>
-              <select class="form-control form-control-sm" onchange="saveInlineSector(${s.row_idx}, this)" style="padding: 0.2rem 0.4rem; font-size: 0.8rem; background: rgba(249, 115, 22, 0.05); border: 1px solid rgba(249, 115, 22, 0.25); color: var(--text-primary); border-radius: 4px;">
+              <select class="form-control form-control-sm" onchange="saveInlineSector('${s.row_idx}', this)" style="padding: 0.2rem 0.4rem; font-size: 0.8rem; background: rgba(249, 115, 22, 0.05); border: 1px solid rgba(249, 115, 22, 0.25); color: var(--text-primary); border-radius: 4px;">
                 <option value="">Select Sector...</option>
                 ${SECTOR_CHOICES.map(sec => `<option value="${sec}">${sec}</option>`).join("")}
               </select>
@@ -1857,7 +1857,7 @@ function renderStocksTable() {
           td.innerHTML = `
             <div style="display: flex; align-items: center; gap: 0.35rem;" onclick="event.stopPropagation();">
               <input type="date" class="form-control form-control-sm" id="inline-date-${s.row_idx}" style="padding: 0.2rem 0.4rem; font-size: 0.8rem; min-width: 115px; background: rgba(249, 115, 22, 0.05); border: 1px solid rgba(249, 115, 22, 0.25);">
-              <button class="btn btn-secondary btn-sm" onclick="saveInlineBuyDate(${s.row_idx}, this)" style="padding: 0.25rem 0.45rem; font-size: 0.8rem; background: var(--accent); color: white;" title="Save Date"><i class="fa-solid fa-check"></i></button>
+              <button class="btn btn-secondary btn-sm" onclick="saveInlineBuyDate('${s.row_idx}', this)" style="padding: 0.25rem 0.45rem; font-size: 0.8rem; background: var(--accent); color: white;" title="Save Date"><i class="fa-solid fa-check"></i></button>
             </div>
           `;
           hasMissingBuyDates = true;
@@ -1892,7 +1892,7 @@ function renderStocksTable() {
     tdActions.innerHTML = `
       <div style="display: flex; gap: 0.5rem;">
         <button class="btn btn-secondary btn-sm" onclick="openEditStockModal(${JSON.stringify(s).replace(/"/g, '&quot;')})" title="Edit"><i class="fa-solid fa-edit"></i></button>
-        <button class="btn btn-danger btn-sm" onclick="deleteStockHolding(${s.row_idx})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="deleteStockHolding('${s.row_idx}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
       </div>
     `;
     tr.appendChild(tdActions);
@@ -2082,7 +2082,7 @@ function renderMfsTable() {
       <div style="display: flex; gap: 0.5rem;">
         <button class="btn btn-secondary btn-sm" onclick="openMfDetailDrawer(${mJson})" title="View Details"><i class="fa-solid fa-eye"></i></button>
         <button class="btn btn-secondary btn-sm" onclick="openEditMfModal(${mJson})" title="Edit"><i class="fa-solid fa-edit"></i></button>
-        <button class="btn btn-danger btn-sm" onclick="deleteMfHolding(${m.row_idx})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMfHolding('${m.row_idx}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
       </div>
     `;
     tr.appendChild(tdActions);
@@ -2584,6 +2584,7 @@ async function submitStockForm(e) {
   
   const payload = {
     row_idx: rowIdx,
+    holding_id: rowIdx,
     "Company Name":       document.getElementById("stock-scrip").value.trim(),
     "Sector":             document.getElementById("stock-sector").value.trim(),
     "Total Quantity":     parseFloat(document.getElementById("stock-qty").value) || 0,
@@ -2786,12 +2787,13 @@ async function submitCsvImport() {
 }
 
 async function deleteStockHolding(rowIdx) {
-  if (!confirm("Are you sure you want to delete this stock from your portfolio and the underlying Excel file?")) return;
+  if (!confirm("Are you sure you want to delete this stock from your portfolio?")) return;
+  console.log('Deleting stock with id:', rowIdx);
   try {
     const res = await authorizedFetch('/api/stock/delete', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({row_idx: rowIdx})
+      body: JSON.stringify({ holding_id: rowIdx, row_idx: rowIdx })
     });
     const data = await res.json();
     if (data.status === 'success') {
@@ -2976,6 +2978,7 @@ async function submitMfForm(e) {
   
   const payload = {
     row_idx: rowIdx,
+    holding_id: rowIdx,
     "Fund Name": document.getElementById("mf-name").value,
     AMC: document.getElementById("mf-amc").value,
     Category: document.getElementById("mf-category").value,
@@ -3009,11 +3012,12 @@ async function submitMfForm(e) {
 
 async function deleteMfHolding(rowIdx) {
   if (!confirm("Are you sure you want to delete this Mutual Fund holding from your portfolio?")) return;
+  console.log('Deleting MF with id:', rowIdx);
   try {
     const res = await authorizedFetch('/api/mf/delete', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({row_idx: rowIdx})
+      body: JSON.stringify({ holding_id: rowIdx, row_idx: rowIdx })
     });
     const data = await res.json();
     if (data.status === 'success') {

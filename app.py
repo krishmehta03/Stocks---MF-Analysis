@@ -868,6 +868,7 @@ def get_portfolio_data(user_id=None):
         drawdown_days = get_days_in_drawdown(sym, buy_price, buy_date_raw) if sym else 0
 
         stocks.append({
+            "id": str(s.get('id')),
             "row_idx": str(s.get('id')),
             "Scrip Name": str(scrip).strip(),
             "Exchange": str(exchange).strip(),
@@ -921,6 +922,7 @@ def get_portfolio_data(user_id=None):
         buy_date_str = format_date_str(buy_date_raw) if buy_date_raw else ""
         
         mfs.append({
+            "id": str(m.get('id')),
             "row_idx": str(m.get('id')),
             "Fund Name": str(fund_name).strip(),
             "AMC": str(amc).strip(),
@@ -2061,7 +2063,9 @@ def edit_stock():
     if not user_id:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = data.get("row_idx")
+    row_idx = (data.get("row_idx") or
+               data.get("holding_id") or
+               data.get("id"))
     try:
         from lib.supabase_data import update_stock_holding
         company_name = (data.get("Company Name") or data.get("Scrip Name", "")).strip()
@@ -2124,7 +2128,9 @@ def save_stock_buy_date():
     if not user_id:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = data.get("row_idx")
+    row_idx = (data.get("row_idx") or
+               data.get("holding_id") or
+               data.get("id"))
     buy_date_raw = data.get("Buy Date")
     try:
         from lib.supabase_data import update_stock_holding
@@ -2148,7 +2154,9 @@ def save_stock_sector():
     if not user_id:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = data.get("row_idx")
+    row_idx = (data.get("row_idx") or
+               data.get("holding_id") or
+               data.get("id"))
     sector = data.get("Sector", "").strip()
     if not sector:
         return jsonify({"status": "error", "message": "Sector is required."}), 400
@@ -2172,10 +2180,14 @@ def delete_stock():
     if not user_id:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = data.get("row_idx")
+    holding_id = (data.get("holding_id") or
+                  data.get("row_idx") or
+                  data.get("id"))
+    if not holding_id:
+        return jsonify({"status": "error", "message": "holding_id required"}), 400
     try:
         from lib.supabase_data import delete_stock_holding
-        success = delete_stock_holding(user_id, row_idx)
+        success = delete_stock_holding(user_id, holding_id)
         if success:
             clear_user_caches(user_id)
             return jsonify({"status": "success", "message": "Stock holding deleted from Supabase!"})
@@ -2265,7 +2277,9 @@ def edit_mf():
     if not user_id:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = data.get("row_idx")
+    row_idx = (data.get("row_idx") or
+               data.get("holding_id") or
+               data.get("id"))
     try:
         from lib.supabase_data import update_mf_holding
         fund_name = data.get("Fund Name", "").strip()
@@ -2326,10 +2340,14 @@ def delete_mf():
     if not user_id:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
     data = request.json
-    row_idx = data.get("row_idx")
+    holding_id = (data.get("holding_id") or
+                  data.get("row_idx") or
+                  data.get("id"))
+    if not holding_id:
+        return jsonify({"status": "error", "message": "holding_id required"}), 400
     try:
         from lib.supabase_data import delete_mf_holding
-        success = delete_mf_holding(user_id, row_idx)
+        success = delete_mf_holding(user_id, holding_id)
         if success:
             clear_user_caches(user_id)
             return jsonify({"status": "success", "message": "Mutual Fund holding deleted from Supabase!"})
