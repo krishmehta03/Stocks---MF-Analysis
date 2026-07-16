@@ -2417,170 +2417,195 @@ def update_status():
 def advisor_chat():
     user_id = get_current_user_id()
     if not user_id:
-        return jsonify({"response": "Unauthorized. Please log in first."}), 401
-        
+        return jsonify({"response": "Please login to use AI Advisor."}), 401
+
     if not check_plan_limit(user_id, 'ai_advisor'):
-        return jsonify({
-            "response": """
-            <div style='text-align:center; 
-                 padding: 2rem;'>
-              <i class='fa-solid fa-lock' 
-                 style='font-size:2rem; 
-                 color:var(--accent);
-                 margin-bottom:1rem;
-                 display:block;'></i>
+        return jsonify({"response": """
+            <div style='text-align:center;padding:2rem;'>
+              <i class='fa-solid fa-lock' style='font-size:2rem;color:var(--accent);margin-bottom:1rem;display:block;'></i>
               <strong>AI Advisor is a Pro feature</strong>
-              <p style='color:var(--text-secondary);
-                   margin-top:0.5rem;'>
-                Upgrade to Pro to get personalized 
-                AI-powered investment advice.
-              </p>
-              <a href='/account' 
-                 style='display:inline-block;
-                 margin-top:1rem;
-                 padding:8px 20px;
-                 background:var(--accent);
-                 color:white;
-                 border-radius:6px;
-                 text-decoration:none;'>
-                Upgrade to Pro
-              </a>
-            </div>
-            """
-        })
+              <p style='color:var(--text-secondary);margin-top:0.5rem;'>Upgrade to Pro to get personalised AI-powered investment advice.</p>
+              <a href='/account' style='display:inline-block;margin-top:1rem;padding:8px 20px;background:var(--accent);color:white;border-radius:6px;text-decoration:none;'>Upgrade to Pro</a>
+            </div>"""})
+
     try:
-        data = request.json or {}
+        data   = request.json or {}
         prompt = data.get("prompt", "").strip().lower()
         if not prompt:
             return jsonify({"response": "I didn't receive any investment query. Please write what's on your mind!"})
-        
-        portfolio = get_portfolio_data(user_id)
-        stocks = portfolio.get("stocks", [])
-        stocks = [s for s in stocks if s["Scrip Name"] != "TOTAL"]
-        summary = portfolio.get("summary", {})
-        
-        total_val = summary.get("total_portfolio_value", 0)
-        total_ret = summary.get("total_portfolio_return_pct", 0)
-        total_pnl = summary.get("total_portfolio_pnl", 0)
-        
-        # Identify key stats
-        active_stocks = len(stocks)
-        hyundai_cv = 0
-        idea_cv = 0
-        coalindia_cv = 0
-        titan_cv = 0
-        vedl_cv = 0
-        
-        hyundai_ret = 0
-        idea_ret = 0
-        
-        for s in stocks:
-            scrip = s["Scrip Name"]
-            cv = s["Current Value"]
-            ret = s["Return %"]
-            if scrip == "HYUNDAI":
-                hyundai_cv = cv
-                hyundai_ret = ret
-            elif scrip == "IDEA":
-                idea_cv = cv
-                idea_ret = ret
-            elif scrip == "COALINDIA":
-                coalindia_cv = cv
-            elif scrip == "TITAN":
-                titan_cv = cv
-            elif scrip == "VEDL":
-                vedl_cv = cv
 
-        hyundai_wt = (hyundai_cv / total_val * 100) if total_val > 0 else 0
-        idea_wt = (idea_cv / total_val * 100) if total_val > 0 else 0
-        top5_wt = ((hyundai_cv + idea_cv + coalindia_cv + titan_cv + vedl_cv) / total_val * 100) if total_val > 0 else 0
-        
+        # ── Pull live data directly from Supabase ─────────────────────────────
+        from lib.supabase_data import get_user_stock_holdings, get_user_mf_holdings
+        raw_stocks = get_user_stock_holdings(user_id)
+        raw_mfs    = get_user_mf_holdings(user_id)
+
+        # ── Build enriched stock list ─────────────────────────────────────────
+        stocks = []
+        for s in raw_stocks:
+            scrip     = str(s.get('scrip_name') or '').strip()
+            qty       = float(s.get('quantity') or 0)
+            buy_p     = float(s.get('buy_price') or 0)
+            cur_p     = float(s.get('current_price') or buy_p or 0)
+            invested  = round(qty * buy_p, 2)
+            cur_val   = round(qty * cur_p, 2)
+            pnl       = round(cur_val - invested, 2)
+            ret_pct   = round((pnl / invested * 100) if invested > 0 else 0, 2)
+            stocks.append({
+                "Scrip Name":     scrip,
+                "Sector":         str(s.get('sector') or 'Other').strip(),
+                "Invested Value": invested,
+                "Current Value":  cur_val,
+                "P&L":            pnl,
+                "Return %":       ret_pct,
+            })
+
+        # ── MF totals ─────────────────────────────────────────────────────────
+        mf_invested = sum(float(m.get('units_held') or 0) * float(m.get('buy_nav') or 0)     for m in raw_mfs)
+        mf_val      = sum(float(m.get('units_held') or 0) * float(m.get('current_nav') or m.get('buy_nav') or 0) for m in raw_mfs)
+
+        # ── Portfolio-level summary ───────────────────────────────────────────
+        total_stock_val  = sum(s["Current Value"] for s in stocks)
+        total_val        = total_stock_val + mf_val
+        total_invested   = sum(s["Invested Value"] for s in stocks) + mf_invested
+        total_pnl        = round(total_val - total_invested, 2)
+        total_ret        = round((total_pnl / total_invested * 100) if total_invested > 0 else 0, 2)
+        active_stocks    = len(stocks)
+        active_mfs       = len(raw_mfs)
+
+        # ── Concentration: top-5 by current value ────────────────────────────
+        by_val  = sorted(stocks, key=lambda x: x["Current Value"], reverse=True)
+        top5    = by_val[:5]
+        top5_wt = round((sum(s["Current Value"] for s in top5) / total_val * 100) if total_val > 0 else 0, 2)
+        top1    = top5[0] if top5 else None
+        top2    = top5[1] if len(top5) > 1 else None
+        top1_wt = round((top1["Current Value"] / total_val * 100) if top1 and total_val > 0 else 0, 2)
+        top2_wt = round((top2["Current Value"] / total_val * 100) if top2 and total_val > 0 else 0, 2)
+
+        # ── Best / worst performers ───────────────────────────────────────────
+        worst3 = sorted(stocks, key=lambda x: x["Return %"])[:3]
+        best3  = sorted(stocks, key=lambda x: x["Return %"], reverse=True)[:3]
+        best_str  = ", ".join(f"<strong>{s['Scrip Name']} (+{s['Return %']:.1f}%)</strong>" for s in best3)  if best3  else "N/A"
+        worst_str = ", ".join(f"<strong>{s['Scrip Name']} ({s['Return %']:.1f}%)</strong>"  for s in worst3) if worst3 else "N/A"
+
+        # ── Sector gaps ───────────────────────────────────────────────────────
+        covered = {s["Sector"].lower() for s in stocks}
+        missing_sectors = [k for k in ["Technology", "Healthcare", "Consumer Staples", "Financials"]
+                           if not any(k.lower() in c for c in covered)]
+
+        # ── Portfolio beta proxy ──────────────────────────────────────────────
+        _BETA = {"Technology": 1.1, "Financials": 1.0, "Banking & Finance": 1.0,
+                 "Energy": 0.9, "Materials": 1.2, "Auto": 1.15,
+                 "Consumer Discretionary": 1.05, "Consumer Staples": 0.7,
+                 "Healthcare": 0.75, "Industrials": 1.1, "Communication": 1.0, "ETF": 1.0}
+        wb = sum(_BETA.get(s["Sector"], 1.0) * s["Current Value"] for s in stocks)
+        portfolio_beta = round((wb / total_stock_val) if total_stock_val > 0 else 1.0, 2)
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # RESPONSE BRANCHES
+        # ═══════════════════════════════════════════════════════════════════════
         if "concentration" in prompt or "risk" in prompt or "audit" in prompt:
+            top5_names = " + ".join(s["Scrip Name"] for s in top5) or "N/A"
+            rows = ""
+            if top1:
+                flag = " — exceeds the safe 10% institutional ceiling" if top1_wt > 10 else ""
+                rows += f"<li><strong>Top Holding ({top1['Scrip Name']}):</strong> <strong>{top1_wt:.2f}%</strong> of AUM (₹{top1['Current Value']:,.2f}){flag}.</li>\n"
+            if top2:
+                rows += f"<li><strong>2nd Holding ({top2['Scrip Name']}):</strong> <strong>{top2_wt:.2f}%</strong> of AUM (₹{top2['Current Value']:,.2f}).</li>\n"
+            rows += f"<li><strong>Top-5 Combined ({top5_names}):</strong> <strong>{top5_wt:.2f}%</strong> of total portfolio.</li>\n"
+            gap_note = (f"<strong>Sector Gaps:</strong> Little-to-no exposure in <em>{', '.join(missing_sectors)}</em>. Consider diversifying.<br><br>"
+                        if missing_sectors else "")
             response = f"""
-            <span style="font-weight: 700; color: var(--danger); font-size: 1rem; display: block; margin-bottom: 0.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Portfolio Concentration Risk Audit</span>
-            Our diagnostic scan has identified a **Highly Concentrated Barbell Allocation Profile** in your capital distribution:
-            <ul>
-              <li><strong>Top 1 Holding (HYUNDAI):</strong> Accounts for <strong>{hyundai_wt:.2f}%</strong> of your entire AUM (₹{hyundai_cv:,.2f}). This exceeds safe institutional risk ceilings of 10.0% by a massive margin.</li>
-              <li><strong>Top 2 Holding (IDEA):</strong> Accounts for <strong>{idea_wt:.2f}%</strong> of AUM (₹{idea_cv:,.2f}). Vodafone Idea's high debt and regulatory overhead make this allocation highly speculative.</li>
-              <li><strong>Top 5 Concentration:</strong> Together, your top 5 assets (Hyundai, Vodafone Idea, Coal India, Titan, and Vedanta) control <strong>{top5_wt:.2f}%</strong> of your net worth!</li>
-            </ul>
-            <strong>Structural MOAT Deficiency:</strong> Your portfolio has **0.00% direct allocation** to key structural growth drivers in Indian Equity: 
-            <br>&bull; <em>Information Technology Services</em> (TCS, Infosys, HCL Tech) 
-            <br>&bull; <em>Defensive Consumer Goods</em> (FMCG leaders like ITC, HUL)
-            <br>&bull; <em>Healthcare & Pharmaceuticals</em>.
-            <br><br>
-            <span style="color: var(--accent); font-weight: 600;">Advisory Opinion:</span> We highly recommend systematic capital recycling. Sell down Hyundai to a max of 10% and Vodafone Idea to 5%. Reallocate the surplus cash into high-quality defensive banks (HDFC Bank, ICICI Bank) and blue-chip IT stalwarts to stabilize your NAV.
-            """
+<span style="font-weight:700;color:var(--danger);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Portfolio Concentration Risk Audit</span>
+Our diagnostic scan reviewed your <strong>{active_stocks} holdings</strong> (₹{total_val:,.2f} AUM):
+<ul>{rows}</ul>
+{gap_note}<span style="color:var(--accent);font-weight:600;">Advisory Opinion:</span>
+If any single position exceeds 15% of your portfolio, consider trimming and redistributing into under-represented sectors.
+A portfolio beta of ~1.0 (yours: {portfolio_beta}) with diversified sector coverage reduces drawdown risk significantly.
+"""
+
         elif "stress" in prompt or "scenario" in prompt or "crisis" in prompt or "correction" in prompt:
             response = f"""
-            <span style="font-weight: 700; color: var(--warning); font-size: 1rem; display: block; margin-bottom: 0.5rem;"><i class="fa-solid fa-bolt"></i> Macro Scenario Stress Test (12-Month Outlook)</span>
-            We have stress-tested your current 23-holding allocation (₹{total_val:,.2f} baseline) across four financial market scenarios:
-            <ol>
-              <li><strong>Bull Run (+20% Nifty 50):</strong> 
-                  <br>Portfolio expected outcome: <span style="color: var(--success); font-weight: 600;">+24.8% (₹{total_val * 1.248:,.2f})</span>. High-beta elements like SAIL and Servotech will provide an upward boost.
-              </li>
-              <li><strong>Normal Market Correction (-10%):</strong> 
-                  <br>Portfolio expected outcome: <span style="color: var(--danger); font-weight: 600;">-13.2% (-₹{total_val * 0.132:,.2f})</span>. Lack of defensive hedges will lead to underperformance.
-              </li>
-              <li><strong>Severe Cyclical Bear Market (-25%):</strong> 
-                  <br>Portfolio expected outcome: <span style="color: var(--danger); font-weight: 600;">-31.5% (-₹{total_val * 0.315:,.2f})</span>. Commodities (VEDL, SAIL) and telecom (IDEA) will drag heavily.
-              </li>
-              <li><strong>Systemic Liquidity Crisis (-40%):</strong> 
-                  <br>Portfolio expected outcome: <span style="color: var(--danger); font-weight: 700;">-48.2% (-₹{total_val * 0.482:,.2f})</span>. Vulnerable speculative holdings (Vividha, Arc Finance, Rama Steel) will see massive capital erosion.
-              </li>
-            </ol>
-            <span style="color: var(--text-secondary); font-size: 0.85rem;">*Calculations are run using live historical betas and weighted sector variables.*</span>
-            """
+<span style="font-weight:700;color:var(--warning);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-bolt"></i> Macro Scenario Stress Test (12-Month Outlook)</span>
+Stress-testing your <strong>{active_stocks}-stock + {active_mfs}-MF</strong> portfolio (₹{total_val:,.2f}, beta ≈ {portfolio_beta}):
+<ol>
+  <li><strong>Bull Run (+20% Nifty 50):</strong><br>Expected: <span style="color:var(--success);font-weight:600;">+{20*portfolio_beta:.1f}% → ₹{total_val*(1+0.20*portfolio_beta):,.2f}</span>. High-beta holdings amplify gains.</li>
+  <li><strong>Normal Correction (-10%):</strong><br>Expected: <span style="color:var(--danger);font-weight:600;">{-10*portfolio_beta:.1f}% → -₹{total_val*0.10*portfolio_beta:,.2f}</span>. Defensive gaps will hurt relative performance.</li>
+  <li><strong>Severe Bear Market (-25%):</strong><br>Expected: <span style="color:var(--danger);font-weight:600;">{-25*portfolio_beta:.1f}% → -₹{total_val*0.25*portfolio_beta:,.2f}</span>. Cyclical names will drag heavily.</li>
+  <li><strong>Systemic Crisis (-40%):</strong><br>Expected: <span style="color:var(--danger);font-weight:700;">{-40*portfolio_beta:.1f}% → -₹{total_val*0.40*portfolio_beta:,.2f}</span>. Speculative small-caps face severe erosion.</li>
+</ol>
+<span style="color:var(--text-secondary);font-size:0.85rem;">*Returns scaled by estimated portfolio beta ({portfolio_beta}). Actual outcomes depend on individual stock fundamentals.*</span>
+"""
+
         elif "rebalance" in prompt or "plan" in prompt or "recommendation" in prompt:
+            overweight  = [s for s in stocks if total_val > 0 and (s["Current Value"] / total_val * 100) > 15]
+            deep_losers = [s for s in stocks if s["Return %"] < -20]
+            ow_lines = "".join(
+                f"&bull; Trim <strong>{s['Scrip Name']}</strong> ({s['Current Value']/total_val*100:.1f}% → ~10%)"
+                f" — frees ≈ ₹{(s['Current Value'] - total_val*0.10):,.0f}.<br>"
+                for s in overweight
+            ) or "&bull; No single position exceeds 15% — allocation looks balanced.<br>"
+            loser_lines = "".join(
+                f"&bull; Consider exiting <strong>{s['Scrip Name']}</strong> ({s['Return %']:.1f}%) — tax-loss harvest &amp; recycle capital.<br>"
+                for s in deep_losers
+            ) or "&bull; No deep losers (&gt;-20%) detected — good job managing downside.<br>"
             response = f"""
-            <span style="font-weight: 700; color: var(--accent); font-size: 1rem; display: block; margin-bottom: 0.5rem;"><i class="fa-solid fa-arrows-spin"></i> Actionable Rebalancing & Capital Recycling Plan</span>
-            To transition your portfolio into a resilient wealth compounding engine, we recommend a disciplined **capital recycling program**:
-            <br><br>
-            <strong>Step 1: Reduce Extreme Exposures (Raises ~₹15,625)</strong>
-            <br>&bull; Sell down <strong>HYUNDAI</strong> from 26.4% weight to <strong>10.0%</strong> (raises ₹8,380 cash).
-            <br>&bull; Sell down <strong>Vodafone IDEA</strong> from 19.2% weight to <strong>5.0%</strong> (raises ₹7,245 cash - take profits on your +{idea_ret:.1f}% gain!).
-            <br><br>
-            <strong>Step 2: Prune Speculative Tail (Raises ₹1,735)</strong>
-            <br>&bull; Exit underperforming, low-quality penny assets fully: **ARCFIN, VIVIDHA, and RAMASTEEL** to stop value erosion.
-            <br><br>
-            <strong>Step 3: Deploy Capital Pool (~₹17,360)</strong>
-            <br>&bull; <strong>Private Banks (₹6,000):</strong> Add to HDFC Bank and ICICI Bank at highly attractive multiples.
-            <br>&bull; <strong>Information Technology (₹4,000):</strong> Buy TCS or Infosys to establish a structural growth moat.
-            <br>&bull; <strong>Defensives & FMCG (₹4,500):</strong> Establish anchor weights in ITC, Sun Pharma, or HUL.
-            <br>&bull; <strong>Broad Index (₹2,860):</strong> Invest into MON100 and NiftyBees to boost asset allocation stability.
-            """
+<span style="font-weight:700;color:var(--accent);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-arrows-spin"></i> Actionable Rebalancing &amp; Capital Recycling Plan</span>
+Based on your <strong>{active_stocks} stocks + {active_mfs} MFs</strong> (₹{total_val:,.2f} total):
+<br><br>
+<strong>Step 1 — Trim Overweight Positions:</strong><br>{ow_lines}
+<br><strong>Step 2 — Exit Deep Underperformers:</strong><br>{loser_lines}
+<br><strong>Step 3 — Deploy Freed Capital:</strong><br>
+&bull; <strong>Quality Financials:</strong> HDFC Bank, ICICI Bank for stable compounding.<br>
+&bull; <strong>IT / Technology:</strong> TCS or Infosys for a structural growth moat.<br>
+&bull; <strong>Defensives / FMCG:</strong> ITC, Sun Pharma, or HUL to reduce portfolio beta.<br>
+&bull; <strong>Index ETFs:</strong> NiftyBees / MON100 to anchor broad market exposure.
+"""
+
         elif "worst" in prompt or "perform" in prompt or "loss" in prompt or "poor" in prompt:
-            worst_stocks = sorted(stocks, key=lambda x: x["Return %"])[:3]
+            rows = ""
+            for ws in worst3:
+                label = f"Loss ₹{abs(ws['P&L']):,.2f}" if ws["P&L"] < 0 else f"Gain ₹{ws['P&L']:,.2f}"
+                rows += f"<li><strong>{ws['Scrip Name']}:</strong> <span style='color:var(--danger);font-weight:600;'>{ws['Return %']:.1f}%</span> ({label} on ₹{ws['Invested Value']:,.2f})</li>"
             response = f"""
-            <span style="font-weight: 700; color: var(--danger); font-size: 1rem; display: block; margin-bottom: 0.5rem;"><i class="fa-solid fa-circle-down"></i> Underperforming Assets Diagnostic</span>
-            Our scan has flagged the following worst-performing assets in your spreadsheet tracker:
-            <ol>
-            """
-            for ws in worst_stocks:
-                response += f"<li><strong>{ws['Scrip Name']}:</strong> Return is <span style='color: var(--danger); font-weight: 600;'>{ws['Return %']:.1f}%</span> (Loss of ₹{abs(ws['P&L']):,.2f} on invested principal ₹{ws['Invested Value']:,.2f})</li>"
-            response += f"""
-            </ol>
-            <strong>Advisory Verdict:</strong>
-            <br>&bull; <strong>VIVIDHA (-62.8%):</strong> Classic speculative penny stock value-erosion trap. Liquidate immediately.
-            <br>&bull; <strong>ARCFIN (-40.9%):</strong> Financial shell/micro-cap bet carrying zero fundamental turnaround catalysts. Exit to preserve remaining capital.
-            <br>&bull; <strong>RAMASTEEL (-55.6%):</strong> Steel cycle decline. Tax-loss harvest this position and recycle into high-margin infrastructure leaders.
-            """
+<span style="font-weight:700;color:var(--danger);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-circle-down"></i> Underperforming Assets Diagnostic</span>
+Your 3 worst-performing holdings:
+<ol>{rows}</ol>
+<strong>Advisory Verdict:</strong><br>
+For holdings down &gt;30%, evaluate if the fundamental thesis has broken. If yes, tax-loss harvest and recycle into quality compounders.
+For 10–30% drawdowns, hold if conviction remains — average-down only for high-quality names with strong balance sheets.
+"""
+
+        elif "best" in prompt or "top" in prompt or "winner" in prompt or "gain" in prompt:
+            rows = ""
+            for bs in best3:
+                rows += f"<li><strong>{bs['Scrip Name']}:</strong> <span style='color:var(--success);font-weight:600;'>+{bs['Return %']:.1f}%</span> (Gain ₹{bs['P&L']:,.2f} on ₹{bs['Invested Value']:,.2f})</li>"
+            response = f"""
+<span style="font-weight:700;color:var(--success);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-circle-up"></i> Top Performing Holdings</span>
+Your 3 best-performing holdings:
+<ol>{rows}</ol>
+<strong>Advisory Verdict:</strong><br>
+For holdings up &gt;50%, consider booking partial profits (25–30% of position) to lock in gains and reduce concentration risk.
+Let the remaining position run with a trailing stop-loss strategy.
+"""
+
         else:
             response = f"""
-            <span style="font-weight: 700; color: var(--accent); font-size: 1rem; display: block; margin-bottom: 0.5rem;"><i class="fa-solid fa-user-doctor"></i> CFA Custom Wealth Consultation</span>
-            I have analyzed your investment query: "<em>{data.get('prompt')}</em>".
-            <br><br>
-            Looking at your current portfolio consisting of **{active_stocks} active holdings** with a total baseline of **₹{total_val:,.2f}** and an absolute net gain of **₹{total_pnl:,.2f} (+{total_ret:.2f}%)**:
-            <br><br>
-            Your stock basket has high potential, driven by excellent investments like **COALINDIA (+49.9%)**, **VEDL (+53.1%)**, and **TITAN (+48.7%)**. However, the sheer size of your **HYUNDAI** and **Vodafone Idea** assets means your net worth is structurally vulnerable to their individual corporate performance.
-            <br><br>
-            <strong>Advisor's Recommendation:</strong>
-            To make this advice highly custom, I suggest checking one of our pre-built institutional diagnostic stress tests:
-            <br>&bull; To audit concentration levels, type <strong>"Concentration Audit"</strong>.
-            <br>&bull; To simulate credit market shocks, type <strong>"Stress Test"</strong>.
-            <br>&bull; To review exact capital allocation buy/sell steps, type <strong>"Rebalancing Plan"</strong>.
-            """
-            
+<span style="font-weight:700;color:var(--accent);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-user-doctor"></i> CFA Custom Wealth Consultation</span>
+I have analysed your query: "<em>{data.get('prompt')}</em>"
+<br><br>
+<strong>Portfolio Snapshot:</strong> {active_stocks} stocks + {active_mfs} MFs &nbsp;|&nbsp; ₹{total_val:,.2f} total value &nbsp;|&nbsp; P&amp;L: ₹{total_pnl:,.2f} ({'+' if total_ret >= 0 else ''}{total_ret:.2f}%)
+<br><br>
+Top performers: {best_str}<br>
+Underperformers: {worst_str}
+<br><br>
+<strong>Advisor's Recommendation:</strong><br>
+&bull; Type <strong>"Concentration Audit"</strong> — review position sizing &amp; sector risk.<br>
+&bull; Type <strong>"Stress Test"</strong> — simulate portfolio under market crashes.<br>
+&bull; Type <strong>"Rebalancing Plan"</strong> — get concrete buy/sell/trim steps.<br>
+&bull; Type <strong>"Worst Performers"</strong> — triage your biggest losers.<br>
+&bull; Type <strong>"Best Performers"</strong> — review top gainers &amp; profit-booking strategy.
+"""
+
         return jsonify({"response": response})
     except Exception as e:
         return jsonify({"response": f"Wealth Advisor API error: {str(e)}"}), 500
