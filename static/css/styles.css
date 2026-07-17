@@ -1517,3 +1517,307 @@ select option {
   font-size: 10px;
 }
 
+/* ─── Account Settings Page ─────────────────────────────────────── */
+.account-container {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.account-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 1.75rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--card-shadow);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.account-card:hover {
+  border-color: rgba(var(--accent-rgb), 0.3);
+}
+
+.account-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  color: var(--text-primary);
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.danger-zone {
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+.danger-zone:hover {
+  border-color: rgba(239, 68, 68, 0.55) !important;
+}
+
+.danger-zone .account-card-title {
+  color: var(--danger);
+}
+
+.plan-feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.plan-feature-list li {
+  padding: 5px 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.plan-feature-list li::before {
+  content: '✓';
+  color: var(--success);
+  font-weight: 700;
+  font-size: 0.8rem;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.plan-feature-list li.locked::before {
+  content: '✗';
+  color: var(--danger);
+}
+
+.account-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+  transition: color 0.2s ease;
+}
+
+.account-back-link:hover {
+  color: var(--accent);
+}
+
+.account-page-title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.25rem;
+  font-family: 'Outfit', sans-serif;
+}
+
+.account-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 2rem;
+}
+
+.account-field-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.account-field-row .form-control {
+  flex: 1;
+}
+
+.account-field-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+.account-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 20px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.account-readonly-field {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.plan-card-inner {
+  background: rgba(var(--accent-rgb), 0.05);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.plan-card-inner.plan-pro-card {
+  background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.08) 100%);
+  border-color: rgba(102,126,234,0.3);
+}
+
+.plan-badge-large {
+  display: inline-block;
+  padding: 0.3rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.plan-badge-large.free {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.plan-badge-large.pro {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.account-alert {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  animation: accountAlertIn 0.3s ease;
+}
+
+.account-alert.success {
+  background: rgba(16,185,129,0.12);
+  border: 1px solid rgba(16,185,129,0.3);
+  color: #34d399;
+}
+
+.account-alert.error {
+  background: rgba(239,68,68,0.12);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: #f87171;
+}
+
+@keyframes accountAlertIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* User dropdown in header */
+.account-user-dropdown {
+  position: relative;
+}
+
+.account-user-dropdown-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  background: var(--bg-secondary);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  min-width: 170px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.account-user-dropdown.open .account-user-dropdown-menu {
+  display: block;
+  animation: accountAlertIn 0.2s ease;
+}
+
+.account-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+
+.account-dropdown-item:hover {
+  background: rgba(var(--accent-rgb), 0.08);
+  color: var(--text-primary);
+}
+
+.account-dropdown-item.danger:hover {
+  background: rgba(239,68,68,0.1);
+  color: var(--danger);
+}
+
+.account-user-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: border-color 0.2s, background 0.2s;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.account-user-trigger:hover {
+  border-color: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.04);
+}
+
+/* Member since info row */
+.account-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 0.875rem;
+}
+
+.account-info-row:last-child {
+  border-bottom: none;
+}
+
+.account-info-key {
+  color: var(--text-secondary);
+}
+
+.account-info-val {
+  color: var(--text-primary);
+  font-weight: 500;
+}

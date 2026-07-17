@@ -1276,6 +1276,74 @@ def reset_password_page():
 def dashboard_page():
     return render_template('index.html', **_auth_context())
 
+@app.route('/account')
+def account_page():
+    return render_template('account.html', **_auth_context())
+
+@app.route('/api/account/profile', methods=['GET'])
+def get_account_profile():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    try:
+        supabase = get_supabase_admin()
+        result = supabase.table('profiles')\
+            .select('*')\
+            .eq('id', user_id)\
+            .single()\
+            .execute()
+        profile = result.data
+        return jsonify({
+            "status": "success",
+            "profile": {
+                "id": profile.get('id'),
+                "email": profile.get('email'),
+                "full_name": profile.get('full_name', ''),
+                "plan": profile.get('plan', 'free'),
+                "created_at": profile.get('created_at', '')
+            }
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/account/update-name', methods=['POST'])
+def update_account_name():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    data = request.json
+    new_name = data.get('full_name', '').strip()
+    if not new_name:
+        return jsonify({"status": "error", "message": "Name cannot be empty"}), 400
+    try:
+        supabase = get_supabase_admin()
+        supabase.table('profiles')\
+            .update({'full_name': new_name})\
+            .eq('id', user_id)\
+            .execute()
+        return jsonify({"status": "success", "message": "Name updated successfully!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/account/delete', methods=['POST'])
+def delete_account():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    data = request.json
+    confirmation = data.get('confirmation', '')
+    if confirmation != 'DELETE':
+        return jsonify({"status": "error", "message": "Please type DELETE to confirm"}), 400
+    try:
+        supabase = get_supabase_admin()
+        supabase.table('stock_holdings').delete().eq('user_id', user_id).execute()
+        supabase.table('mf_holdings').delete().eq('user_id', user_id).execute()
+        supabase.table('subscriptions').delete().eq('user_id', user_id).execute()
+        supabase.table('profiles').delete().eq('id', user_id).execute()
+        return jsonify({"status": "success", "message": "Account deleted"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/test-db', methods=['GET'])
 def test_db():
     try:

@@ -54,6 +54,20 @@
     }
   }
 
+  function toggleUserDropdown() {
+    const wrapper = document.getElementById('user-dropdown-wrapper');
+    if (wrapper) wrapper.classList.toggle('open');
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    const wrapper = document.getElementById('user-dropdown-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      wrapper.classList.remove('open');
+    }
+  });
+
+
   async function getAuthHeaders() {
     if (window._authClient) {
       try {
@@ -194,28 +208,29 @@
           <button id="btn-update-prices" style="display:none; background:transparent; border:1px solid rgba(255,255,255,0.15); color:var(--text-secondary); padding:2px 10px; border-radius:6px; cursor:pointer; font-size:11px; margin-left:4px;"
             title="Update live prices"><i class="fa-solid fa-rotate-right"></i> Update Prices</button>
         </div>
-        <span id="current-user-name">
-          Loading...
-        </span>
-        <span id="plan-badge" class="plan-badge plan-free" style="margin-left: 6px; vertical-align: middle;">
-          FREE
-        </span>
-        <button onclick="signOut()" 
-          style="background:transparent;
-          border:1px solid rgba(255,255,255,0.2);
-          color:inherit;
-          padding:4px 12px;
-          border-radius:6px;
-          cursor:pointer;
-          font-size:13px;
-          margin-left:8px;">
-          Sign Out
-        </button>
+        <!-- User dropdown -->
+        <div class="account-user-dropdown" id="user-dropdown-wrapper">
+          <button class="account-user-trigger" id="user-dropdown-trigger" onclick="toggleUserDropdown()" aria-haspopup="true">
+            <span id="current-user-name">Loading...</span>
+            <span id="plan-badge" class="plan-badge plan-free" style="margin-left:4px;">FREE</span>
+            <i class="fa-solid fa-chevron-down" style="font-size:10px; color:var(--text-secondary); margin-left:2px;"></i>
+          </button>
+          <div class="account-user-dropdown-menu" id="user-dropdown-menu">
+            <a href="/account" class="account-dropdown-item">
+              <i class="fa-solid fa-user"></i> My Account
+            </a>
+            <div style="height:1px; background:rgba(255,255,255,0.05); margin:0 0.5rem;"></div>
+            <button class="account-dropdown-item danger" onclick="signOut()">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+            </button>
+          </div>
+        </div>
         <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Quick Theme Toggle">
           <i class="fa-solid fa-palette"></i> Theme
         </button>
       </div>
     </header>
+
 
     <!-- Real-Time Progress Bar for Scraper -->
     <div class="updater-widget card" id="price-updater-container" style="display: none;">
