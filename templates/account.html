@@ -221,6 +221,7 @@
         <button class="btn btn-secondary" id="btn-change-password" onclick="changePassword()">
           <i class="fa-solid fa-key"></i> Change Password
         </button>
+        <div id="password-alert-container" style="margin-top:12px;"></div>
       </div>
 
       <!-- ── SECTION 4: DANGER ZONE ──────────────────────── -->
@@ -394,9 +395,8 @@
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
 
-    // Remove any existing inline alert
-    const existingAlert = document.getElementById('password-alert');
-    if (existingAlert) existingAlert.remove();
+    const container = document.getElementById('password-alert-container');
+    container.innerHTML = '';
 
     try {
       const { error } = await window.supabaseClient.auth.resetPasswordForEmail(
@@ -406,49 +406,20 @@
 
       if (error) throw error;
 
-      // Show inline success alert directly below the button
-      const alert = document.createElement('div');
-      alert.id = 'password-alert';
-      alert.style.cssText = `
-        margin-top: 12px;
-        padding: 10px 16px;
-        background: rgba(16, 185, 129, 0.1);
-        border: 1px solid rgba(16, 185, 129, 0.3);
-        border-radius: 8px;
-        color: #10b981;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        animation: accountAlertIn 0.3s ease;
-      `;
-      alert.innerHTML = '<i class="fa-solid fa-circle-check"></i> Password reset email sent! Check your inbox.';
-      btn.parentNode.insertBefore(alert, btn.nextSibling);
-
-      // Auto-hide after 5 seconds
-      setTimeout(() => { if (alert.parentNode) alert.remove(); }, 5000);
+      container.innerHTML = `
+        <div style="padding:10px 16px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);
+                    border-radius:8px; color:#10b981; font-size:13px; display:flex; align-items:center; gap:8px;">
+          <i class="fa-solid fa-circle-check"></i> Password reset email sent! Check your inbox.
+        </div>`;
+      setTimeout(() => { container.innerHTML = ''; }, 5000);
 
     } catch(err) {
-      // Show inline error alert directly below the button
-      const alert = document.createElement('div');
-      alert.id = 'password-alert';
-      alert.style.cssText = `
-        margin-top: 12px;
-        padding: 10px 16px;
-        background: rgba(239, 68, 68, 0.1);
-        border: 1px solid rgba(239, 68, 68, 0.3);
-        border-radius: 8px;
-        color: #f87171;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        animation: accountAlertIn 0.3s ease;
-      `;
-      alert.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Failed to send reset email. Please try again.';
-      btn.parentNode.insertBefore(alert, btn.nextSibling);
-
-      setTimeout(() => { if (alert.parentNode) alert.remove(); }, 5000);
+      container.innerHTML = `
+        <div style="padding:10px 16px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);
+                    border-radius:8px; color:#f87171; font-size:13px; display:flex; align-items:center; gap:8px;">
+          <i class="fa-solid fa-circle-exclamation"></i> Failed to send reset email. Please try again.
+        </div>`;
+      setTimeout(() => { container.innerHTML = ''; }, 5000);
     } finally {
       btn.disabled = false;
       btn.innerHTML = '<i class="fa-solid fa-key"></i> Change Password';
