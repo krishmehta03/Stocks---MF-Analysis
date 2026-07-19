@@ -848,7 +848,23 @@ def get_portfolio_data(user_id=None):
         qty = s.get('quantity') or 0
         buy_price = float(s.get('buy_price') or 0)
         buy_date_raw = s.get('buy_date')
-        current_price = float(s.get('current_price') or 0) if s.get('current_price') is not None else buy_price
+        raw_cp = s.get('current_price')
+        if raw_cp is not None:
+            current_price = float(raw_cp) if float(raw_cp) > 0 else buy_price
+        else:
+            # current_price is NULL — fetch live and persist it so next load is instant
+            live_price = None
+            if sym:
+                try:
+                    live_price = _yf_info(sym, bypass_cache=True).get('price')
+                except Exception:
+                    pass
+            if live_price and live_price > 0:
+                current_price = live_price
+                from lib.supabase_data import update_stock_prices
+                update_stock_prices(user_id, [{'id': s.get('id'), 'current_price': live_price}])
+            else:
+                current_price = buy_price  # genuine fallback: no price available
         
         cagr_5y = None
         nifty_cagr_5y = None
