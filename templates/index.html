@@ -172,7 +172,17 @@
     'DOMContentLoaded', function() {
       const el = document.getElementById('current-user-name');
       if (el && window.currentUserName) {
-        el.textContent = window.currentUserName;
+        const isMobile = window.innerWidth <= 480;
+        if (isMobile) {
+          const name = window.currentUserName;
+          // If it looks like an email, show first 8 chars; otherwise show first word
+          const shortName = name.includes('@')
+            ? name.substring(0, 8)
+            : name.split(' ')[0];
+          el.textContent = shortName;
+        } else {
+          el.textContent = window.currentUserName;
+        }
       }
       loadUserPlan();
     }
@@ -199,7 +209,7 @@
     <!-- Top Premium Navigation -->
     <header>
       <div class="logo-section">
-        <h1><i class="fa-solid fa-chart-line"></i> Portfolio Analysis</h1>
+        <h1><i class="fa-solid fa-chart-line"></i><span class="logo-text"> Portfolio Analysis</span></h1>
       </div>
       <div class="header-actions">
         <div id="price-status-container" style="display: flex; align-items: center; gap: 0.5rem; margin-right: 0.5rem; background: rgba(255,255,255,0.02); padding: 0.4rem 0.75rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">

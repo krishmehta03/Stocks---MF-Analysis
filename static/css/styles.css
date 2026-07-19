@@ -1821,3 +1821,352 @@ select option {
   color: var(--text-primary);
   font-weight: 500;
 }
+
+/* ════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS  ≤ 768px  →  ≤ 480px
+   ════════════════════════════════════════════════════ */
+
+/* ── 768px: tablet-level tweaks ─────────────────── */
+@media (max-width: 768px) {
+  .app-container {
+    padding: 1.25rem 1rem;
+  }
+
+  header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+  }
+
+  .logo-section h1 {
+    font-size: 1.3rem;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .nav-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin-bottom: 1.5rem;
+  }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+
+  .tab-btn {
+    flex-shrink: 0;
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+  }
+
+  .card {
+    padding: 1.25rem;
+  }
+}
+
+/* ── 480px: phone-level fixes ────────────────────── */
+@media (max-width: 480px) {
+
+  /* 1 ── APP WRAPPER */
+  .app-container {
+    padding: 1rem 0.75rem;
+  }
+
+  /* 2 ── HEADER
+     Layout: [Logo] ... [Name+Badge] [Chevron]
+     Hide price-status pill and Theme button       */
+  header {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    align-items: center;
+  }
+
+  .logo-section h1 {
+    font-size: 1.1rem;
+    gap: 0.3rem;
+  }
+  /* Hide "Portfolio Analysis" text, keep icon */
+  .logo-section h1 .logo-text { display: none; }
+
+  .header-actions {
+    gap: 0.4rem;
+  }
+
+  /* Hide price-status pill on mobile */
+  #price-status-container {
+    display: none !important;
+  }
+
+  /* Hide Theme button from header on mobile */
+  #btn-theme-toggle {
+    display: none !important;
+  }
+
+  /* Compact user trigger */
+  .account-user-trigger {
+    padding: 3px 8px;
+    font-size: 0.78rem;
+    gap: 0.25rem;
+  }
+
+  /* 3 ── TAB NAVIGATION */
+  .nav-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0.25rem;
+    gap: 0.15rem;
+    border-radius: 10px;
+    margin-bottom: 1.25rem;
+    /* Fade indicator on right edge */
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+
+  .tab-btn {
+    flex-shrink: 0;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    gap: 0.3rem;
+  }
+
+  /* 4 ── CARDS */
+  .card {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+
+  /* 5 ── SUMMARY CARDS */
+  .summary-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .summary-card {
+    padding: 0.9rem 0.9rem 0.9rem 1.25rem;
+  }
+
+  .summary-card h3 {
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+  }
+
+  .summary-card .value {
+    font-size: 1.3rem;
+  }
+
+  .summary-card .sub-value {
+    font-size: 0.72rem;
+  }
+
+  /* 6 ── PERFORMANCE CHART
+     Stack benchmark dropdown above period toggles  */
+  #widget-performance-chart > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Period toggle row: full width */
+  #widget-performance-chart div[style*="display:flex"][style*="gap:0.3rem"],
+  #widget-performance-chart div[style*="display: flex"][style*="gap: 0.3rem"] {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .perf-period-btn {
+    flex: 1;
+    text-align: center;
+    padding: 0.35rem 0.3rem;
+    font-size: 0.75rem;
+  }
+
+  /* Chart height reduced on mobile */
+  #chart-performance {
+    height: 200px !important;
+  }
+
+  /* Sector contribution chart */
+  #contrib-chart-container {
+    height: 90px !important;
+  }
+
+  /* Contribution legend: single column */
+  #contrib-legend {
+    gap: 0.6rem !important;
+    font-size: 11px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  /* Contribution summary row: stack */
+  #contrib-summary-row {
+    grid-template-columns: 1fr !important;
+    gap: 0.6rem !important;
+    text-align: left !important;
+  }
+
+  /* 7 ── ALERT BANNERS */
+  .alert-banner-critical,
+  .alert-banner-warning,
+  .alert-banner-low,
+  .alert-banner-info,
+  .alert-banner-red,
+  .alert-banner-orange,
+  .alert-banner-yellow {
+    font-size: 0.78rem;
+    padding: 0.6rem 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .alert-review-btn {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+  }
+
+  /* Plan limit banner */
+  #plan-limit-banner {
+    font-size: 0.78rem;
+    padding: 0.6rem 0.75rem;
+  }
+
+  /* 8 ── SECTOR ALLOCATION CHART
+     Donut above legend, legend in 2-col grid       */
+  #widget-sector-chart-box .card,
+  #widget-sector-chart-box {
+    overflow: visible;
+  }
+
+  /* The canvas container + legend stack vertically */
+  #widget-sector-chart-box > div[style*="position: relative"],
+  #widget-sector-chart-box > div[style*="position:relative"] {
+    height: 200px !important;
+  }
+
+  /* 9 ── PORTFOLIO CONTEXT STRIP */
+  #portfolio-context-strip {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.4rem !important;
+    padding: 0.6rem 0.875rem !important;
+  }
+
+  #portfolio-context-strip > div[style*="width: 1px"],
+  #portfolio-context-strip > div[style*="width:1px"] {
+    display: none !important;
+  }
+
+  /* 10 ── STOCKS / MF TABLE toolbar */
+  #tab-stocks .card > div:first-child,
+  #tab-mfs .card > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+
+  #tab-stocks .card > div > div[style*="display: flex"],
+  #tab-mfs .card > div > div[style*="display: flex"] {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* 11 ── MF FILTER BAR */
+  .mf-filter-bar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .mf-filter-select,
+  #mf-search,
+  #stock-search {
+    width: 100%;
+    max-width: 100% !important;
+  }
+
+  /* 12 ── MF SUMMARY FOOTER */
+  .mf-summary-footer {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .footer-divider { display: none; }
+
+  /* 13 ── ACCOUNT PAGE */
+  .account-container {
+    padding: 0;
+  }
+
+  .account-card {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+
+  .account-field-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .account-field-row .btn,
+  .account-field-row button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .account-card .btn,
+  .account-card .btn-secondary,
+  .account-card .btn-danger {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Plan feature list more compact */
+  .plan-feature-list li {
+    font-size: 0.8rem;
+    padding: 4px 0;
+  }
+
+  /* Delete modal */
+  .modal-content {
+    padding: 1.25rem;
+    margin: 0 0.5rem;
+    width: calc(100% - 1rem);
+  }
+
+  /* 14 ── SIGNALS TABLE */
+  #tab-signals .card > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+
+  #signal-search {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* 15 ── VISUAL SETTINGS FORM */
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-picker-group {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* 16 ── DASHBOARD DETAILS: single col already from 968px rule,
+     but reduce gap on mobile */
+  .dashboard-details {
+    gap: 1rem;
+  }
+}
+
