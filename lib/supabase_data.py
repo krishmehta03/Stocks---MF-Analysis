@@ -40,7 +40,7 @@ def add_stock_holding(user_id: str, data: dict):
             'quantity': int(data.get('Qty', 0)),
             'buy_price': float(data.get('Buy Price', 0)),
             'buy_date': data.get('Buy Date') or None,
-            'current_price': float(data.get('Current Price', 0)) if data.get('Current Price') is not None else None
+            'current_price': float(data.get('Current Price')) if data.get('Current Price') else None
         }
         result = supabase.table('stock_holdings').insert(payload).execute()
         return result.data[0] if result.data else None

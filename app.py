@@ -849,10 +849,10 @@ def get_portfolio_data(user_id=None):
         buy_price = float(s.get('buy_price') or 0)
         buy_date_raw = s.get('buy_date')
         raw_cp = s.get('current_price')
-        if raw_cp is not None:
-            current_price = float(raw_cp) if float(raw_cp) > 0 else buy_price
+        if raw_cp is not None and float(raw_cp) > 0:
+            current_price = float(raw_cp)
         else:
-            # current_price is NULL — fetch live and persist it so next load is instant
+            # current_price is NULL or 0 — fetch live and persist it
             live_price = None
             if sym:
                 try:
