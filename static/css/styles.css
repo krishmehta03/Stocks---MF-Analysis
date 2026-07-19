@@ -1890,8 +1890,11 @@ select option {
     font-size: 1.1rem;
     gap: 0.3rem;
   }
-  /* Hide "Portfolio Analysis" text, keep icon */
-  .logo-section h1 .logo-text { display: none; }
+  /* Keep logo text visible but compact on mobile */
+  .logo-section h1 .logo-text {
+    display: inline;
+    font-size: 0.9rem;
+  }
 
   .header-actions {
     gap: 0.4rem;
@@ -1914,25 +1917,26 @@ select option {
     gap: 0.25rem;
   }
 
-  /* 3 ── TAB NAVIGATION */
+  /* 3 ── TAB NAVIGATION: force horizontal scroll, no wrap */
   .nav-tabs {
-    overflow-x: auto;
+    overflow-x: scroll !important;
+    overflow-y: hidden !important;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    -ms-overflow-style: none;
+    flex-wrap: nowrap !important;
     padding: 0.25rem;
     gap: 0.15rem;
     border-radius: 10px;
     margin-bottom: 1.25rem;
-    /* Fade indicator on right edge */
-    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
-    mask-image: linear-gradient(to right, black 85%, transparent 100%);
   }
   .nav-tabs::-webkit-scrollbar { display: none; }
 
   .tab-btn {
-    flex-shrink: 0;
-    padding: 0.45rem 0.75rem;
-    font-size: 0.78rem;
+    flex-shrink: 0 !important;
+    min-width: fit-content;
+    padding: 0.45rem 0.75rem !important;
+    font-size: 11px !important;
     white-space: nowrap;
     gap: 0.3rem;
   }
@@ -1989,9 +1993,13 @@ select option {
     font-size: 0.75rem;
   }
 
-  /* Chart height reduced on mobile */
-  #chart-performance {
-    height: 200px !important;
+  /* Chart: constrain the parent wrapper, not the canvas.
+     Chart.js ignores CSS height on <canvas> — control the container div instead. */
+  #widget-performance-chart div[style*="position:relative"],
+  #widget-performance-chart div[style*="position: relative"] {
+    height: 220px !important;
+    max-height: 220px !important;
+    min-height: 160px;
   }
 
   /* Sector contribution chart */
