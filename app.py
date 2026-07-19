@@ -1157,7 +1157,7 @@ def run_price_and_nav_update(user_id, is_background=False):
                 sector = info["sector"]
                 
                 if price is not None:
-                    update_stock_prices(user_id, [{'scrip_name': name, 'current_price': price}])
+                    update_stock_prices(user_id, [{'id': row_id, 'current_price': price}])
                     log_line = f"  -> ✅ ₹{price}  [{sym}]"
                     
                     # Auto-fill sector if missing
@@ -1215,6 +1215,37 @@ def live_price_updater_thread(user_id):
         run_price_and_nav_update(user_id, is_background=False)
     except Exception:
         pass
+
+# Lightweight helper: fetch+write prices for one user (used by /api/update-prices)
+def run_price_update_for_user(user_id: str):
+    """Fetch live prices for every stock holding of a user and write to Supabase."""
+    from lib.supabase_data import get_user_stock_holdings, update_stock_prices as _usp
+    try:
+        holdings = get_user_stock_holdings(user_id)
+        updates = []
+        for h in holdings:
+            scrip = h.get('scrip_name', '')
+            exchange = h.get('exchange', 'NSE') or 'NSE'
+            if not scrip:
+                continue
+            sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
+            if not sym:
+                print(f"[PriceUpdate] Could not resolve ticker for: {scrip}")
+                continue
+            info = _yf_info(sym, bypass_cache=True)
+            price = info.get('price')
+            if price is not None:
+                updates.append({'id': h['id'], 'current_price': price})
+                print(f"[PriceUpdate] {scrip} ({sym}) -> ₹{price}")
+            else:
+                print(f"[PriceUpdate] No price for {scrip} ({sym})")
+        if updates:
+            _usp(user_id, updates)
+            print(f"[PriceUpdate] Updated {len(updates)} stock prices for user {user_id}")
+        else:
+            print(f"[PriceUpdate] No prices fetched for user {user_id}")
+    except Exception as e:
+        print(f"[PriceUpdate] ERROR for user {user_id}: {e}")
 
 # Background daemon loop for automatic updates
 def automatic_price_updater_loop():
@@ -1343,6 +1374,19 @@ def delete_account():
         return jsonify({"status": "success", "message": "Account deleted"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/update-prices', methods=['POST'])
+def trigger_price_update():
+    """Manual trigger: fetch live prices and write them to Supabase for this user."""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    threading.Thread(
+        target=run_price_update_for_user,
+        args=(user_id,),
+        daemon=True
+    ).start()
+    return jsonify({"status": "success", "message": "Price update started in background"})
 
 @app.route('/api/test-db', methods=['GET'])
 def test_db():

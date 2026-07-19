@@ -156,22 +156,41 @@ def delete_mf_holding(user_id: str, holding_id: str):
         return False
 
 def update_stock_prices(user_id: str, price_updates: list):
-    """Bulk update stock prices in Supabase"""
+    """Bulk update stock prices in Supabase.
+    Accepts list of dicts with either:
+      - {'id': holding_id, 'current_price': price}   ← preferred (matches by row id)
+      - {'scrip_name': name, 'current_price': price}  ← legacy fallback
+    """
     try:
         supabase = get_supabase_admin()
+        now_ts = datetime.now(timezone.utc).isoformat()
         for update in price_updates:
-            scrip = update.get('scrip_name')
             price = update.get('current_price')
-            if scrip and price is not None:
+            if price is None:
+                continue
+            payload = {
+                'current_price': float(price),
+                'last_price_update': now_ts
+            }
+            holding_id = update.get('id')
+            if holding_id:
+                # Preferred: match by unique row id
                 supabase.table('stock_holdings')\
-                    .update({
-                        'current_price': float(price), 
-                        'last_price_update': datetime.now(timezone.utc).isoformat()
-                    }) \
+                    .update(payload)\
+                    .eq('id', holding_id)\
                     .eq('user_id', user_id)\
-                    .eq('scrip_name', scrip)\
                     .execute()
+            else:
+                # Legacy fallback: match by scrip_name
+                scrip = update.get('scrip_name')
+                if scrip:
+                    supabase.table('stock_holdings')\
+                        .update(payload)\
+                        .eq('user_id', user_id)\
+                        .eq('scrip_name', scrip)\
+                        .execute()
         return True
     except Exception as e:
         print(f"Error bulk updating prices: {e}")
         return False
+
