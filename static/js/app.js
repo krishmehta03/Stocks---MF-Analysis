@@ -67,7 +67,44 @@ async function initializeApp() {
   checkScraperRunningOnStartup();
 }
 
+function setupTableDragToScroll() {
+  const containers = document.querySelectorAll('.table-container');
+  containers.forEach(container => {
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+
+    container.addEventListener('mousedown', (e) => {
+      if (['BUTTON', 'INPUT', 'SELECT', 'A', 'I', 'OPTION'].includes(e.target.tagName)) return;
+      e.preventDefault();
+      isDown = true;
+      container.style.cursor = 'grabbing';
+      startX = e.pageX - container.offsetLeft;
+      scrollLeft = container.scrollLeft;
+    });
+
+    container.addEventListener('mouseleave', () => {
+      isDown = false;
+      container.style.cursor = 'grab';
+    });
+
+    container.addEventListener('mouseup', () => {
+      isDown = false;
+      container.style.cursor = 'grab';
+    });
+
+    container.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - container.offsetLeft;
+      const walk = (x - startX) * 1.8;
+      container.scrollLeft = scrollLeft - walk;
+    });
+  });
+}
+
 function setupEventListeners() {
+  setupTableDragToScroll();
   // Quick Theme Toggle
   document.getElementById("btn-theme-toggle").addEventListener("click", () => {
     const themes = ["emerald", "ocean", "cyberpunk", "rose-gold"];
@@ -3921,5 +3958,17 @@ function closeCustomConfirm(result) {
     customConfirmPromiseResolver = null;
   }
 }
+
+// Hide scroll hint once user first swipes/scrolls table
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".table-container").forEach((container) => {
+    container.addEventListener("scroll", function () {
+      const hint = this.parentNode ? this.parentNode.querySelector(".scroll-hint") : null;
+      if (hint) {
+        hint.style.display = "none";
+      }
+    }, { once: true });
+  });
+});
 
 

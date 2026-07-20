@@ -1,0 +1,48 @@
+{
+  "auto_update_prices": true,
+  "custom_alerts": {
+    "high_concentration_pct": 20,
+    "high_loss_pct": 10
+  },
+  "display_columns": {
+    "mf": [
+      "Fund Name",
+      "Category",
+      "Units Held",
+      "Invested Value",
+      "Current Value",
+      "P&L",
+      "Return %",
+      "XIRR %",
+      "Holding Period",
+      "Tax Flag"
+    ],
+    "stocks": [
+      "Scrip Name",
+      "Exchange",
+      "Sector",
+      "Qty",
+      "Buy Price",
+      "Buy Date",
+      "Current Price",
+      "Invested Value",
+      "Current Value",
+      "P&L",
+      "Return %",
+      "Tax Flag"
+    ]
+  },
+  "tax_rules": {
+    "mf_ltcg_days": 365,
+    "stocks_ltcg_days": 365
+  },
+  "theme": "cyberpunk",
+  "widgets": {
+    "asset_allocation": true,
+    "dividend_yield": true,
+    "portfolio_signals": true,
+    "risk_alerts": true,
+    "sector_allocation": true,
+    "top_performers": true
+  }
+}

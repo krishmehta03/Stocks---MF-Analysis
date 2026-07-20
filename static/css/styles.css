@@ -307,10 +307,37 @@ header {
 .table-container {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: 12px;
   border: 1px solid var(--card-border);
   background-color: var(--bg-secondary);
   max-height: 550px; /* Enable vertical scroll if needed */
+  position: relative;
+  cursor: grab;
+}
+
+.table-container:active {
+  cursor: grabbing;
+}
+
+/* Table horizontal scrollbar styling */
+.table-container::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-hover, #059669);
 }
 
 table {
@@ -320,14 +347,21 @@ table {
   font-size: 0.9rem;
 }
 
-/* Sticky table header and freeze-scroll columns */
-#stocks-table {
+/* Sticky table header and freeze-scroll 1st column */
+#stocks-table,
+#mfs-table,
+#signals-table {
   position: relative;
   border-collapse: separate;
   border-spacing: 0;
+  min-width: 1000px;
+  width: 100%;
 }
 
-#stocks-table th {
+/* Sticky top headers for all columns */
+#stocks-table th,
+#mfs-table th,
+#signals-table th {
   position: sticky;
   top: 0;
   z-index: 10;
@@ -335,42 +369,47 @@ table {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-#stocks-table th:first-child,
-#stocks-table td:first-child {
+/* Sticky 1st Column (Scrip / Fund Name) - Body Cells */
+#stocks-table td:first-child,
+#mfs-table td:first-child,
+#signals-table td:first-child {
   position: sticky;
   left: 0;
-  z-index: 12;
+  z-index: 15;
   background-color: var(--bg-secondary) !important;
-  min-width: 240px;
-  max-width: 240px;
-  width: 240px;
-  box-shadow: 2px 0 5px -1px rgba(0, 0, 0, 0.4);
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Sticky 1st Column (Scrip / Fund Name) - Header Cell (Sticks to Top 0 & Left 0) */
+#stocks-table th:first-child,
+#mfs-table th:first-child,
+#signals-table th:first-child {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 25;
+  background-color: var(--bg-secondary) !important;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.3);
+}
+
+/* 1st column sizing */
+#stocks-table th:first-child,
+#stocks-table td:first-child,
+#mfs-table th:first-child,
+#mfs-table td:first-child,
+#signals-table th:first-child,
+#signals-table td:first-child {
+  min-width: 160px;
+  max-width: 220px;
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
 }
-#stocks-table th:first-child {
-  z-index: 14;
-}
-
-#stocks-table th:nth-child(2),
-#stocks-table td:nth-child(2) {
-  position: sticky;
-  left: 240px;
-  z-index: 11;
-  background-color: var(--bg-secondary) !important;
-  min-width: 90px;
-  max-width: 90px;
-  width: 90px;
-  box-shadow: 2px 0 5px -1px rgba(0, 0, 0, 0.4);
-}
-#stocks-table th:nth-child(2) {
-  z-index: 13;
-}
 
 #stocks-table tr:hover td:first-child,
-#stocks-table tr:hover td:nth-child(2) {
-  background-color: rgba(var(--accent-rgb), 0.05) !important;
+#mfs-table tr:hover td:first-child,
+#signals-table tr:hover td:first-child {
+  background-color: #1e1b2e !important;
 }
 
 th {
@@ -1405,6 +1444,112 @@ select option {
     grid-template-columns: 1fr !important;
     gap: 0.75rem !important;
   }
+
+/* Mobile Scroll Hint Indicator */
+.scroll-hint {
+  display: none;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 6px;
+  opacity: 0.6;
+}
+
+@media (max-width: 768px) {
+  .scroll-hint {
+    display: block;
+  }
+
+  /* Make table container scrollable */
+  .table-container,
+  .stocks-table-wrapper,
+  [class*="table-wrap"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    position: relative !important;
+    width: 100% !important;
+  }
+
+  #stocks-table,
+  #mfs-table,
+  #signals-table {
+    min-width: 900px !important;
+  }
+
+  /* Freeze header row */
+  #stocks-table thead,
+  #mfs-table thead,
+  #signals-table thead,
+  .table-container table thead,
+  table thead {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    background-color: var(--bg-secondary) !important;
+  }
+
+  #stocks-table thead th,
+  #mfs-table thead th,
+  #signals-table thead th,
+  .table-container table thead th,
+  table thead th,
+  table th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    background-color: var(--bg-secondary) !important;
+    min-width: 90px;
+    font-size: 12px !important;
+    padding: 8px 6px !important;
+    white-space: nowrap !important;
+  }
+
+  table td {
+    min-width: 90px;
+    font-size: 12px !important;
+    padding: 8px 6px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Freeze first column (Scrip Name) */
+  #stocks-table thead th:first-child,
+  #stocks-table tbody td:first-child,
+  #mfs-table thead th:first-child,
+  #mfs-table tbody td:first-child,
+  #signals-table thead th:first-child,
+  #signals-table tbody td:first-child,
+  .table-container table thead th:first-child,
+  .table-container table tbody td:first-child,
+  table thead th:first-child,
+  table tbody td:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 11 !important;
+    background-color: var(--bg-secondary) !important;
+    min-width: 120px !important;
+    max-width: 130px !important;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* Header frozen first column needs higher z-index */
+  #stocks-table thead th:first-child,
+  #mfs-table thead th:first-child,
+  #signals-table thead th:first-child,
+  .table-container table thead th:first-child,
+  table thead th:first-child {
+    z-index: 12 !important;
+    top: 0 !important;
+    left: 0 !important;
+  }
+
+  /* Numeric columns can be narrower */
+  table th:nth-child(4),
+  table td:nth-child(4),
+  table th:nth-child(5),
+  table td:nth-child(5) {
+    min-width: 80px;
+  }
+}
 }
 
 /* Real-time Status Dot Styles */
@@ -1898,16 +2043,19 @@ select option {
 
   .header-actions {
     gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
-  /* Hide price-status pill on mobile */
+  /* Keep price-status pill visible & responsive on mobile */
   #price-status-container {
-    display: none !important;
+    display: flex !important;
+    padding: 0.25rem 0.5rem !important;
   }
 
-  /* Hide Theme button from header on mobile */
+  /* Keep Theme button visible & responsive on mobile */
   #btn-theme-toggle {
-    display: none !important;
+    display: inline-flex !important;
   }
 
   /* Compact user trigger */
@@ -2063,15 +2211,27 @@ select option {
 
   /* 9 ── PORTFOLIO CONTEXT STRIP */
   #portfolio-context-strip {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 0.4rem !important;
-    padding: 0.6rem 0.875rem !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    flex-wrap: nowrap !important;
+    gap: 0.75rem !important;
+    padding: 0.65rem 0.875rem !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  #portfolio-context-strip::-webkit-scrollbar { display: none; }
 
   #portfolio-context-strip > div[style*="width: 1px"],
   #portfolio-context-strip > div[style*="width:1px"] {
-    display: none !important;
+    display: block !important;
+    flex-shrink: 0;
+  }
+
+  #portfolio-context-strip > div {
+    flex-shrink: 0;
   }
 
   /* 10 ── STOCKS / MF TABLE toolbar */
