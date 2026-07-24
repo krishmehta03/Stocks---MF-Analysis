@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Portfolio Analysis</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .legal-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      flex-grow: 1;
+      width: 100%;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      margin-bottom: 2rem;
+    }
+    header .logo {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: var(--accent-gradient, linear-gradient(135deg, #10b981 0%, #059669 100%));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+    header .logo i {
+      background: var(--accent-gradient, linear-gradient(135deg, #10b981 0%, #059669 100%));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    header .back-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+    header .back-link:hover {
+      color: var(--accent);
+    }
+    .legal-content {
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+    .legal-content h1 {
+      font-size: 28px;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+      font-family: 'Outfit', sans-serif;
+    }
+    .legal-content h2 {
+      font-size: 18px;
+      color: var(--text-primary);
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      font-family: 'Outfit', sans-serif;
+    }
+    .legal-content p {
+      margin-bottom: 1rem;
+      font-size: 14px;
+    }
+    .legal-content ul {
+      padding-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .legal-content ul li {
+      margin-bottom: 0.5rem;
+      font-size: 14px;
+    }
+    .warning-box {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      color: #ef4444;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    footer {
+      text-align: center;
+      padding: 2rem 0;
+      border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      margin-top: 3rem;
+    }
+    footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      margin: 0 0.75rem;
+      font-size: 0.85rem;
+      transition: color 0.2s ease;
+    }
+    footer a:hover {
+      color: var(--accent);
+    }
+    footer p {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      opacity: 0.6;
+    }
+    .list-header {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 14px;
+      margin-top: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+  </style>
+  <script>
+    (function() {
+      const theme = localStorage.getItem('portfolio_theme') || 'emerald';
+      document.documentElement.className = '';
+      document.body.className = '';
+      document.body.classList.add('theme-' + theme);
+    })();
+  </script>
+</head>
+<body>
+  <div class="legal-container">
+    <header>
+      <a href="/" class="logo">
+        <i class="fa-solid fa-chart-line"></i>
+        Portfolio Analysis
+      </a>
+      <a href="/dashboard" class="back-link">
+        ← Back to Dashboard
+      </a>
+    </header>
+
+    <main class="legal-content">
+      <h1>Privacy Policy</h1>
+      <p style="opacity: 0.7; margin-bottom: 2rem;">Last updated: July 2026</p>
+
+      <h2>1. INFORMATION WE COLLECT</h2>
+      
+      <div class="list-header">Account Information:</div>
+      <ul>
+        <li>Full name</li>
+        <li>Email address</li>
+        <li>Password (encrypted, never stored in plain text)</li>
+      </ul>
+      
+      <div class="list-header">Portfolio Data:</div>
+      <ul>
+        <li>Stock holdings you add manually</li>
+        <li>Mutual fund holdings</li>
+        <li>Buy prices and quantities</li>
+        <li>Buy dates</li>
+      </ul>
+      
+      <div class="list-header">Usage Data:</div>
+      <ul>
+        <li>Pages visited</li>
+        <li>Features used</li>
+        <li>Login timestamps</li>
+      </ul>
+
+      <h2>2. HOW WE USE YOUR INFORMATION</h2>
+      <ul>
+        <li>To provide portfolio tracking and analytics services</li>
+        <li>To send account-related emails (verification, password reset)</li>
+        <li>To calculate portfolio performance</li>
+        <li>To generate AI-powered insights</li>
+        <li>We do NOT use your data for advertising</li>
+        <li>We do NOT sell your data to any third party</li>
+      </ul>
+
+      <h2>3. DATA STORAGE AND SECURITY</h2>
+      <ul>
+        <li>All data is stored securely on Supabase (PostgreSQL database)</li>
+        <li>Data is encrypted in transit using SSL/TLS</li>
+        <li>Passwords are hashed using industry-standard encryption</li>
+        <li>We use Row Level Security (RLS) to ensure each user can only access their own data</li>
+      </ul>
+
+      <h2>4. DATA SHARING</h2>
+      <p>We share your data with:</p>
+      <ul>
+        <li>Supabase (database hosting)</li>
+        <li>Razorpay (payment processing)</li>
+      </ul>
+      <p>We do NOT share your data with:</p>
+      <ul>
+        <li>Advertisers</li>
+        <li>Data brokers</li>
+        <li>Any other third parties</li>
+      </ul>
+
+      <h2>5. YOUR RIGHTS</h2>
+      <p>You have the right to:</p>
+      <ul>
+        <li>Access your personal data</li>
+        <li>Correct inaccurate data</li>
+        <li>Delete your account and all data</li>
+        <li>Export your portfolio data</li>
+        <li>Withdraw consent at any time</li>
+      </ul>
+
+      <h2>6. COOKIES</h2>
+      <p>We use minimal cookies for:</p>
+      <ul>
+        <li>Authentication (keeping you logged in)</li>
+        <li>Session management</li>
+      </ul>
+      <p>We do not use advertising cookies.</p>
+
+      <h2>7. DATA RETENTION</h2>
+      <ul>
+        <li>Active account data is retained while your account exists</li>
+        <li>Deleted accounts: data is permanently deleted within 30 days of account deletion</li>
+      </ul>
+
+      <h2>8. CHILDREN'S PRIVACY</h2>
+      <p>This service is not intended for users under 18 years of age.</p>
+
+      <h2>9. CHANGES TO PRIVACY POLICY</h2>
+      <p>We will notify users of significant changes via email.</p>
+
+      <h2>10. CONTACT</h2>
+      <p>For privacy concerns: privacy@portfolioanalysis.in</p>
+    </main>
+
+    <footer>
+      <a href="/terms">Terms of Service</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/disclaimer">Disclaimer</a>
+      <p>© 2026 Portfolio Analysis. All rights reserved.</p>
+    </footer>
+  </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const theme = localStorage.getItem('portfolio_theme') || 'emerald';
+      document.body.className = '';
+      document.body.classList.add('theme-' + theme);
+    });
+  </script>
+</body>
+</html>

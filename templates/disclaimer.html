@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investment Disclaimer — Portfolio Analysis</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .legal-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      flex-grow: 1;
+      width: 100%;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      margin-bottom: 2rem;
+    }
+    header .logo {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: var(--accent-gradient, linear-gradient(135deg, #10b981 0%, #059669 100%));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+    header .logo i {
+      background: var(--accent-gradient, linear-gradient(135deg, #10b981 0%, #059669 100%));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    header .back-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+    header .back-link:hover {
+      color: var(--accent);
+    }
+    .legal-content {
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+    .legal-content h1 {
+      font-size: 28px;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+      font-family: 'Outfit', sans-serif;
+    }
+    .legal-content h2 {
+      font-size: 18px;
+      color: var(--text-primary);
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      font-family: 'Outfit', sans-serif;
+    }
+    .legal-content p {
+      margin-bottom: 1rem;
+      font-size: 14px;
+    }
+    .legal-content ul {
+      padding-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .legal-content ul li {
+      margin-bottom: 0.5rem;
+      font-size: 14px;
+    }
+    .warning-box {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      color: #ef4444;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    footer {
+      text-align: center;
+      padding: 2rem 0;
+      border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      margin-top: 3rem;
+    }
+    footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      margin: 0 0.75rem;
+      font-size: 0.85rem;
+      transition: color 0.2s ease;
+    }
+    footer a:hover {
+      color: var(--accent);
+    }
+    footer p {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      opacity: 0.6;
+    }
+  </style>
+  <script>
+    (function() {
+      const theme = localStorage.getItem('portfolio_theme') || 'emerald';
+      document.documentElement.className = '';
+      document.body.className = '';
+      document.body.classList.add('theme-' + theme);
+    })();
+  </script>
+</head>
+<body>
+  <div class="legal-container">
+    <header>
+      <a href="/" class="logo">
+        <i class="fa-solid fa-chart-line"></i>
+        Portfolio Analysis
+      </a>
+      <a href="/dashboard" class="back-link">
+        ← Back to Dashboard
+      </a>
+    </header>
+
+    <main class="legal-content">
+      <h1>Investment Disclaimer</h1>
+      <p style="opacity: 0.7; margin-bottom: 2rem;">Last updated: July 2026</p>
+
+      <div class="warning-box">
+        <div style="font-size: 16px; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fa-solid fa-triangle-exclamation"></i> IMPORTANT NOTICE
+        </div>
+        Portfolio Analysis is NOT registered with the Securities and Exchange Board of India (SEBI) as an Investment Advisor, Portfolio Manager, or Stock Broker.
+      </div>
+
+      <h2>1. NOT INVESTMENT ADVICE</h2>
+      <p>All content on this platform including but not limited to:</p>
+      <ul>
+        <li>Portfolio performance metrics</li>
+        <li>Sector allocation analysis</li>
+        <li>Risk signals and alerts</li>
+        <li>AI Advisor recommendations</li>
+        <li>Benchmark comparisons</li>
+      </ul>
+      <p>is provided for INFORMATIONAL AND EDUCATIONAL PURPOSES ONLY and does not constitute investment advice, financial advice, trading advice, or any other type of advice.</p>
+
+      <h2>2. NO SEBI REGISTRATION</h2>
+      <p>This platform is not:</p>
+      <ul>
+        <li>A SEBI registered Investment Advisor</li>
+        <li>A SEBI registered Portfolio Manager</li>
+        <li>A SEBI registered Stock Broker</li>
+        <li>A SEBI registered Research Analyst</li>
+      </ul>
+      <p>Users should consult a SEBI registered Investment Advisor before making any investment decisions.</p>
+
+      <h2>3. PAST PERFORMANCE</h2>
+      <p>Past performance shown on this platform does not guarantee future results. All investments involve risk including possible loss of principal.</p>
+
+      <h2>4. DATA ACCURACY</h2>
+      <p>While we strive for accuracy:</p>
+      <ul>
+        <li>Stock prices are sourced from Yahoo Finance and may be delayed</li>
+        <li>Historical data may not be complete or accurate</li>
+        <li>We are not responsible for any errors in data</li>
+      </ul>
+
+      <h2>5. AI ADVISOR DISCLAIMER</h2>
+      <p>The AI Advisor feature provides automated analysis based on your portfolio data. This is NOT personalized financial advice and should not be treated as such.</p>
+
+      <h2>6. USER RESPONSIBILITY</h2>
+      <p>Users are solely responsible for:</p>
+      <ul>
+        <li>Their investment decisions</li>
+        <li>Verifying information before acting on it</li>
+        <li>Consulting qualified professionals</li>
+        <li>Understanding tax implications</li>
+      </ul>
+
+      <h2>7. LIMITATION OF LIABILITY</h2>
+      <p>Portfolio Analysis, its founders, and employees shall not be held liable for any financial losses arising from the use of this platform.</p>
+    </main>
+
+    <footer>
+      <a href="/terms">Terms of Service</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/disclaimer">Disclaimer</a>
+      <p>© 2026 Portfolio Analysis. All rights reserved.</p>
+    </footer>
+  </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const theme = localStorage.getItem('portfolio_theme') || 'emerald';
+      document.body.className = '';
+      document.body.classList.add('theme-' + theme);
+    });
+  </script>
+</body>
+</html>

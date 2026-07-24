@@ -1327,6 +1327,18 @@ def dashboard_page():
 def account_page():
     return render_template('account.html', **_auth_context())
 
+@app.route('/terms')
+def terms_page():
+    return render_template('terms.html')
+
+@app.route('/privacy')
+def privacy_page():
+    return render_template('privacy.html')
+
+@app.route('/disclaimer')
+def disclaimer_page():
+    return render_template('disclaimer.html')
+
 @app.route('/api/account/profile', methods=['GET'])
 def get_account_profile():
     user_id = get_current_user_id()

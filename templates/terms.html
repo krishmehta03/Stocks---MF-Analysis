@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service — Portfolio Analysis</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .legal-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      flex-grow: 1;
+      width: 100%;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      margin-bottom: 2rem;
+    }
+    header .logo {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: var(--accent-gradient, linear-gradient(135deg, #10b981 0%, #059669 100%));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+    header .logo i {
+      background: var(--accent-gradient, linear-gradient(135deg, #10b981 0%, #059669 100%));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    header .back-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+    header .back-link:hover {
+      color: var(--accent);
+    }
+    .legal-content {
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+    .legal-content h1 {
+      font-size: 28px;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+      font-family: 'Outfit', sans-serif;
+    }
+    .legal-content h2 {
+      font-size: 18px;
+      color: var(--text-primary);
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      font-family: 'Outfit', sans-serif;
+    }
+    .legal-content p {
+      margin-bottom: 1rem;
+      font-size: 14px;
+    }
+    .legal-content ul {
+      padding-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .legal-content ul li {
+      margin-bottom: 0.5rem;
+      font-size: 14px;
+    }
+    .warning-box {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      color: #ef4444;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    footer {
+      text-align: center;
+      padding: 2rem 0;
+      border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      margin-top: 3rem;
+    }
+    footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      margin: 0 0.75rem;
+      font-size: 0.85rem;
+      transition: color 0.2s ease;
+    }
+    footer a:hover {
+      color: var(--accent);
+    }
+    footer p {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      opacity: 0.6;
+    }
+  </style>
+  <script>
+    (function() {
+      const theme = localStorage.getItem('portfolio_theme') || 'emerald';
+      document.documentElement.className = '';
+      document.body.className = '';
+      document.body.classList.add('theme-' + theme);
+    })();
+  </script>
+</head>
+<body>
+  <div class="legal-container">
+    <header>
+      <a href="/" class="logo">
+        <i class="fa-solid fa-chart-line"></i>
+        Portfolio Analysis
+      </a>
+      <a href="/dashboard" class="back-link">
+        ← Back to Dashboard
+      </a>
+    </header>
+
+    <main class="legal-content">
+      <h1>Terms of Service</h1>
+      <p style="opacity: 0.7; margin-bottom: 2rem;">Last updated: July 2026</p>
+
+      <h2>1. ACCEPTANCE OF TERMS</h2>
+      <p>By accessing and using Portfolio Analysis ("the Service"), you accept and agree to be bound by these Terms of Service.</p>
+
+      <h2>2. DESCRIPTION OF SERVICE</h2>
+      <p>Portfolio Analysis is a portfolio tracking and analytics platform that allows users to:</p>
+      <ul>
+        <li>Track stock and mutual fund holdings</li>
+        <li>View portfolio performance analytics</li>
+        <li>Receive AI-powered investment insights</li>
+        <li>Monitor risk and sector allocation</li>
+      </ul>
+
+      <h2>3. NOT FINANCIAL ADVICE</h2>
+      <div class="warning-box">
+        IMPORTANT: Portfolio Analysis is NOT a SEBI registered Investment Advisor. All information, analysis, and AI recommendations provided by this platform are for EDUCATIONAL AND INFORMATIONAL PURPOSES ONLY.
+      </div>
+      <p>Nothing on this platform constitutes:</p>
+      <ul>
+        <li>Investment advice</li>
+        <li>Financial planning advice</li>
+        <li>Tax advice</li>
+        <li>Legal advice</li>
+      </ul>
+      <p>Always consult a SEBI registered Investment Advisor before making any investment decisions.</p>
+
+      <h2>4. USER ACCOUNTS</h2>
+      <ul>
+        <li>You must provide accurate information when creating an account</li>
+        <li>You are responsible for maintaining the security of your account</li>
+        <li>You must be at least 18 years old to use this service</li>
+        <li>One person may not maintain more than one account</li>
+      </ul>
+
+      <h2>5. SUBSCRIPTION AND PAYMENTS</h2>
+      <ul>
+        <li>Free plan is available with limited features</li>
+        <li>Pro plan is available at ₹199/month or ₹1,799/year</li>
+        <li>Payments are processed securely through Razorpay</li>
+        <li>Subscriptions auto-renew unless cancelled</li>
+        <li>Refund policy: 7-day refund for annual plans, no refund for monthly plans after 48 hours</li>
+      </ul>
+
+      <h2>6. DATA AND PRIVACY</h2>
+      <ul>
+        <li>We collect and store portfolio data you provide</li>
+        <li>We do not sell your data to third parties</li>
+        <li>We do not execute trades on your behalf</li>
+        <li>See our Privacy Policy for full details</li>
+      </ul>
+
+      <h2>7. PROHIBITED USES</h2>
+      <p>You may not use this service to:</p>
+      <ul>
+        <li>Violate any applicable laws</li>
+        <li>Impersonate any person or entity</li>
+        <li>Attempt to gain unauthorized access to the platform</li>
+        <li>Use automated tools to scrape or extract data</li>
+      </ul>
+
+      <h2>8. TERMINATION</h2>
+      <p>We reserve the right to terminate or suspend your account at any time for violation of these terms.</p>
+
+      <h2>9. LIMITATION OF LIABILITY</h2>
+      <p>Portfolio Analysis shall not be liable for any investment losses incurred based on information provided by this platform.</p>
+
+      <h2>10. CHANGES TO TERMS</h2>
+      <p>We reserve the right to modify these terms at any time. Continued use of the service constitutes acceptance of updated terms.</p>
+
+      <h2>11. CONTACT</h2>
+      <p>For questions about these terms: support@portfolioanalysis.in</p>
+    </main>
+
+    <footer>
+      <a href="/terms">Terms of Service</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/disclaimer">Disclaimer</a>
+      <p>© 2026 Portfolio Analysis. All rights reserved.</p>
+    </footer>
+  </div>
+  <script>
+    // Double check theme after page load to align classes
+    document.addEventListener("DOMContentLoaded", function() {
+      const theme = localStorage.getItem('portfolio_theme') || 'emerald';
+      document.body.className = '';
+      document.body.classList.add('theme-' + theme);
+    });
+  </script>
+</body>
+</html>

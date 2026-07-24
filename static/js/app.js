@@ -246,6 +246,7 @@ function applyTheme(themeName) {
   activeTheme = themeName;
   document.body.className = '';
   document.body.classList.add(`theme-${themeName}`);
+  localStorage.setItem('portfolio_theme', themeName);
   
   // Highlight active option in Settings Form
   document.querySelectorAll(".theme-option").forEach(opt => {
