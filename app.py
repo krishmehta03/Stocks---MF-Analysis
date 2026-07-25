@@ -24,6 +24,17 @@ from lib.supabase import get_supabase, get_supabase_admin
 
 load_dotenv()
 
+import razorpay
+
+razorpay_client = None
+try:
+    key_id = os.environ.get('RAZORPAY_KEY_ID')
+    key_secret = os.environ.get('RAZORPAY_KEY_SECRET')
+    if key_id and key_secret:
+        razorpay_client = razorpay.Client(auth=(key_id, key_secret))
+except Exception as e:
+    print(f"[Razorpay] Initialization error: {e}")
+
 def get_current_user_id():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
@@ -86,18 +97,35 @@ PLAN_LIMITS = {
 }
 
 def get_user_plan(user_id: str) -> str:
-    """Get user's current plan from Supabase (uses admin client to bypass RLS)"""
+    """Get user's current plan from Supabase, checking for expiry and auto downgrading if expired (uses admin client to bypass RLS)"""
     try:
-        # Must use admin client — anon client is blocked by RLS on the profiles table
-        # when called server-side without a user session context.
         supabase = get_supabase_admin()
         result = supabase.table('profiles')\
-            .select('plan')\
+            .select('plan, plan_expires_at')\
             .eq('id', user_id)\
             .single()\
             .execute()
-        plan = result.data.get('plan', 'free') if result.data else 'free'
-        print(f"[get_user_plan] user_id={user_id} -> plan={plan}")
+        
+        if not result.data:
+            return 'free'
+            
+        plan = result.data.get('plan', 'free')
+        expires_at = result.data.get('plan_expires_at')
+        
+        # Check expiry
+        if expires_at and plan == 'pro':
+            from datetime import timezone
+            expiry = datetime.fromisoformat(
+                expires_at.replace('Z', '+00:00'))
+            if datetime.now(timezone.utc) > expiry:
+                # Auto downgrade to free
+                supabase.table('profiles')\
+                    .update({'plan': 'free'})\
+                    .eq('id', user_id)\
+                    .execute()
+                print(f"[get_user_plan] Plan for user {user_id} expired at {expires_at}. Downgraded to free.")
+                return 'free'
+        
         return plan
     except Exception as e:
         print(f"[get_user_plan] ERROR for user_id={user_id}: {e}")
@@ -1359,6 +1387,7 @@ def get_account_profile():
                 "email": profile.get('email'),
                 "full_name": profile.get('full_name', ''),
                 "plan": profile.get('plan', 'free'),
+                "plan_expires_at": profile.get('plan_expires_at', ''),
                 "created_at": profile.get('created_at', '')
             }
         })
@@ -1476,6 +1505,187 @@ def get_user_plan_api():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     return response
+
+@app.route('/api/payment/create-order', methods=['POST'])
+def create_payment_order():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({
+            "status": "error",
+            "message": "Unauthorized"
+        }), 401
+    
+    key_id = os.environ.get('RAZORPAY_KEY_ID')
+    key_secret = os.environ.get('RAZORPAY_KEY_SECRET')
+    
+    if not razorpay_client or not key_id or not key_secret:
+        # Mock mode
+        return jsonify({
+            "status": "success",
+            "order_id": f"order_mock_{user_id[:8]}",
+            "amount": 19900,
+            "currency": "INR",
+            "key_id": "rzp_test_mock_key",
+            "is_mock": True
+        })
+    
+    try:
+        # Create Razorpay order
+        # Amount in paise (₹199 = 19900)
+        order_data = {
+            "amount": 19900,
+            "currency": "INR",
+            "receipt": f"order_{user_id[:8]}",
+            "notes": {
+                "user_id": user_id,
+                "plan": "pro",
+                "duration": "monthly"
+            }
+        }
+        
+        order = razorpay_client.order.create(data=order_data)
+        
+        return jsonify({
+            "status": "success",
+            "order_id": order['id'],
+            "amount": order['amount'],
+            "currency": order['currency'],
+            "key_id": key_id,
+            "is_mock": False
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/api/payment/verify', methods=['POST'])
+def verify_payment():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({
+            "status": "error",
+            "message": "Unauthorized"
+        }), 401
+    
+    data = request.json
+    is_mock = data.get('is_mock', False)
+    
+    try:
+        if is_mock:
+            payment_id = data.get('razorpay_payment_id', 'pay_mock_default')
+        else:
+            # Verify payment signature
+            params_dict = {
+                'razorpay_order_id': data.get('razorpay_order_id'),
+                'razorpay_payment_id': data.get('razorpay_payment_id'),
+                'razorpay_signature': data.get('razorpay_signature')
+            }
+            
+            razorpay_client.utility.verify_payment_signature(params_dict)
+            payment_id = data.get('razorpay_payment_id')
+        
+        # Payment verified — upgrade user using admin client (to bypass RLS)
+        supabase = get_supabase_admin()
+        
+        # Calculate expiry (30 days)
+        from datetime import timedelta
+        expiry = datetime.now() + timedelta(days=30)
+        
+        # Update user plan to pro
+        supabase.table('profiles')\
+            .update({
+                'plan': 'pro',
+                'plan_expires_at': expiry.isoformat()
+            })\
+            .eq('id', user_id)\
+            .execute()
+        
+        # Save subscription record
+        supabase.table('subscriptions')\
+            .insert({
+                'user_id': user_id,
+                'razorpay_payment_id': payment_id,
+                'plan': 'pro',
+                'status': 'active',
+                'started_at': datetime.now().isoformat(),
+                'expires_at': expiry.isoformat()
+            })\
+            .execute()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Payment verified! Welcome to Pro plan.",
+            "plan": "pro",
+            "expires_at": expiry.isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "Payment verification failed: " + str(e)
+        }), 400
+
+@app.route('/api/payment/status', methods=['GET'])
+def payment_status():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({
+            "status": "error",
+            "message": "Unauthorized"
+        }), 401
+    
+    try:
+        # Query plan status using admin client
+        supabase = get_supabase_admin()
+        result = supabase.table('profiles')\
+            .select('plan, plan_expires_at')\
+            .eq('id', user_id)\
+            .single()\
+            .execute()
+        
+        if not result.data:
+            return jsonify({
+                "plan": "free",
+                "expires_at": None,
+                "is_active": False
+            })
+            
+        profile = result.data
+        plan = profile.get('plan', 'free')
+        expires_at = profile.get('plan_expires_at')
+        
+        # Check if plan has expired
+        if expires_at and plan == 'pro':
+            from datetime import timezone
+            expiry = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+            if datetime.now(timezone.utc) > expiry:
+                # Downgrade to free
+                supabase.table('profiles')\
+                    .update({'plan': 'free'})\
+                    .eq('id', user_id)\
+                    .execute()
+                plan = 'free'
+        
+        return jsonify({
+            "plan": plan,
+            "expires_at": expires_at,
+            "is_active": plan == 'pro'
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/upgrade')
+def upgrade_page():
+    return render_template(
+        'upgrade.html',
+        razorpay_key_id=os.environ.get('RAZORPAY_KEY_ID'),
+        **_auth_context()
+    )
+
 
 @app.route('/api/admin/update-plan', methods=['POST'])
 def admin_update_plan():

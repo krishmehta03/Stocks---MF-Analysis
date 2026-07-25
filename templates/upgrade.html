@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
+  <script>
+  (async function() {
+    try {
+      window.SUPABASE_URL = '{{ supabase_url }}';
+      window.SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
+
+      if (!window.SUPABASE_URL || window.SUPABASE_URL === '') {
+        console.error('Supabase URL missing');
+        window.location.replace('/login');
+        return;
+      }
+
+      window.supabaseClient = window.supabase.createClient(
+        window.SUPABASE_URL,
+        window.SUPABASE_ANON_KEY
+      );
+
+      const { data: { session }, error } = await window.supabaseClient.auth.getSession();
+
+      if (!session) {
+        window.location.replace('/login?redirectTo=/upgrade');
+        return;
+      }
+
+      window.currentUser = session.user;
+      window.currentUserEmail = session.user.email;
+      window.currentUserName =
+        session.user.user_metadata?.full_name || session.user.email;
+      window._authClient = window.supabaseClient;
+
+    } catch(err) {
+      console.error('Auth check failed:', err);
+      window.location.replace('/login');
+    }
+  })();
+
+  async function getAuthHeaders() {
+    if (window.supabaseClient) {
+      try {
+        const { data: { session } } = await window.supabaseClient.auth.getSession();
+        if (session && session.access_token) {
+          return {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          };
+        }
+      } catch(e) { console.error(e); }
+    }
+    return { 'Content-Type': 'application/json' };
+  }
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upgrade to Pro — Portfolio Analysis</title>
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+    .upgrade-layout {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 2rem;
+      margin-top: 1.5rem;
+    }
+    @media (max-width: 968px) {
+      .upgrade-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+    .pricing-card {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.8) 100%);
+      border: 1px solid var(--accent);
+      box-shadow: 0 10px 30px var(--accent-glow);
+      text-align: center;
+      padding: 2.5rem 2rem;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      height: fit-content;
+      position: sticky;
+      top: 2rem;
+    }
+    .price-value {
+      font-size: 3rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin: 1rem 0;
+      font-family: 'Outfit', sans-serif;
+    }
+    .price-period {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .pricing-features {
+      margin: 1.5rem 0 2rem;
+      width: 100%;
+      text-align: left;
+    }
+    .pricing-features li {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.95rem;
+      color: var(--text-primary);
+    }
+    .pricing-features i {
+      color: var(--accent);
+    }
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      background: var(--card-bg);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .comparison-table th, .comparison-table td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .comparison-table th {
+      background-color: rgba(0, 0, 0, 0.2);
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .comparison-table td {
+      font-size: 0.95rem;
+    }
+    .comparison-table tr:hover {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+    .comparison-table .feature-name {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .comparison-table .center-align {
+      text-align: center;
+      width: 80px;
+    }
+    .comparison-table .check-icon {
+      color: var(--accent);
+      font-size: 1.1rem;
+    }
+    .comparison-table .cross-icon {
+      color: var(--danger);
+      font-size: 1rem;
+    }
+    .testimonial-card {
+      margin-top: 2rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+    }
+    .testimonial-text {
+      font-style: italic;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+    .testimonial-author {
+      margin-top: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .testimonial-author::before {
+      content: '';
+      display: inline-block;
+      width: 12px;
+      height: 2px;
+      background-color: var(--accent);
+    }
+    .hero-section {
+      margin-bottom: 2rem;
+    }
+    .hero-section h2 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+    .hero-section p {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body class="theme-emerald">
+
+  <!-- Mock Payment Modal -->
+  <div id="mock-payment-modal" class="modal-overlay">
+    <div class="modal-content" style="text-align: center;">
+      <div class="modal-header">
+        <h3 style="color: var(--accent);"><i class="fa-solid fa-flask"></i> Mock Payment Mode</h3>
+      </div>
+      <p style="color: var(--text-secondary); margin: 1.5rem 0; line-height: 1.6;">
+        You are in mock payment mode since Razorpay API keys are not configured. Choose how to simulate this payment:
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <button id="btn-mock-success" onclick="handleMockPayment(true)" class="btn" style="justify-content: center; width: 100%; padding: 0.8rem;">
+          <i class="fa-solid fa-circle-check"></i> Simulate Successful Payment
+        </button>
+        <button id="btn-mock-fail" onclick="handleMockPayment(false)" class="btn btn-danger" style="justify-content: center; width: 100%; padding: 0.8rem;">
+          <i class="fa-solid fa-circle-xmark"></i> Simulate Failed Payment
+        </button>
+        <button id="btn-mock-cancel" onclick="closeMockModal()" class="btn btn-secondary" style="justify-content: center; width: 100%; padding: 0.8rem;">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header>
+      <div class="logo-section">
+        <h1><i class="fa-solid fa-chart-line"></i> Portfolio Analysis</h1>
+      </div>
+      <div class="header-actions">
+        <a href="/dashboard" class="btn btn-secondary btn-sm">
+          <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+        </a>
+      </div>
+    </header>
+
+    <!-- Hero Section -->
+    <div class="hero-section">
+      <h2>Upgrade to Pro</h2>
+      <p>Unlock the full power of your portfolio analytics</p>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="upgrade-layout">
+      <!-- Left side: Comparison -->
+      <div>
+        <h3 style="font-family:'Outfit', sans-serif; font-size: 1.3rem; margin-bottom: 1rem; color: var(--text-primary);">
+          Compare Plans
+        </h3>
+        
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th class="center-align">Free</th>
+              <th class="center-align" style="color: var(--accent);">Pro</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="feature-name">Stocks Limit</td>
+              <td class="center-align">10</td>
+              <td class="center-align" style="font-weight: 700; color: var(--accent);">Unlimited</td>
+            </tr>
+            <tr>
+              <td class="feature-name">Mutual Funds</td>
+              <td class="center-align"><i class="fa-solid fa-xmark cross-icon"></i></td>
+              <td class="center-align" style="font-weight: 700; color: var(--accent);">Unlimited</td>
+            </tr>
+            <tr>
+              <td class="feature-name">Live Alerts</td>
+              <td class="center-align"><i class="fa-solid fa-xmark cross-icon"></i></td>
+              <td class="center-align"><i class="fa-solid fa-check check-icon"></i></td>
+            </tr>
+            <tr>
+              <td class="feature-name">AI Advisor</td>
+              <td class="center-align"><i class="fa-solid fa-xmark cross-icon"></i></td>
+              <td class="center-align"><i class="fa-solid fa-check check-icon"></i></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Benchmark Chart</td>
+              <td class="center-align"><i class="fa-solid fa-xmark cross-icon"></i></td>
+              <td class="center-align"><i class="fa-solid fa-check check-icon"></i></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Sector Analysis</td>
+              <td class="center-align"><i class="fa-solid fa-xmark cross-icon"></i></td>
+              <td class="center-align"><i class="fa-solid fa-check check-icon"></i></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Tax Flags</td>
+              <td class="center-align"><i class="fa-solid fa-xmark cross-icon"></i></td>
+              <td class="center-align"><i class="fa-solid fa-check check-icon"></i></td>
+            </tr>
+            <tr>
+              <td class="feature-name">CSV Import</td>
+              <td class="center-align"><i class="fa-solid fa-xmark cross-icon"></i></td>
+              <td class="center-align"><i class="fa-solid fa-check check-icon"></i></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Portfolio Beta</td>
+              <td class="center-align"><i class="fa-solid fa-xmark cross-icon"></i></td>
+              <td class="center-align"><i class="fa-solid fa-check check-icon"></i></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Priority Support</td>
+              <td class="center-align"><i class="fa-solid fa-xmark cross-icon"></i></td>
+              <td class="center-align"><i class="fa-solid fa-check check-icon"></i></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Testimonial -->
+        <div class="testimonial-card">
+          <p class="testimonial-text">
+            "Finally a portfolio tracker that shows real analytics!"
+          </p>
+          <div class="testimonial-author">Beta User</div>
+        </div>
+      </div>
+
+      <!-- Right side: Pricing and Action -->
+      <div>
+        <div class="pricing-card">
+          <div style="width: 100%;">
+            <span class="plan-badge plan-pro" style="padding: 0.4rem 1rem; font-size: 0.85rem; border-radius: 20px;">PRO</span>
+            <div class="price-value">
+              ₹199<span class="price-period">/month</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
+              Billed monthly • Cancel anytime
+            </p>
+          </div>
+
+          <div style="width: 100%;" id="payment-result">
+            <!-- Payment failure or success messages will render here -->
+          </div>
+
+          <button id="btn-upgrade" onclick="initiatePayment()" class="btn" style="width: 100%; padding: 1rem; font-size: 1.05rem; justify-content: center; border-radius: 12px; margin-top: 1rem;">
+            <i class="fa-solid fa-rocket"></i> Upgrade Now
+          </button>
+          
+          <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 1rem; width: 100%;">
+            Secured by Razorpay. Safe & encrypted transactions.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Razorpay integration script -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+  let activeMockOrder = null;
+  async function initiatePayment() {
+    const btn = document.getElementById('btn-upgrade');
+    btn.disabled = true;
+    btn.textContent = 'Processing...';
+    
+    try {
+      // Create order
+      const headers = await getAuthHeaders();
+      const orderRes = await fetch('/api/payment/create-order', {
+        method: 'POST',
+        headers: headers
+      });
+      const orderData = await orderRes.json();
+      
+      if (orderData.status !== 'success') {
+        throw new Error(orderData.message);
+      }
+      
+      if (orderData.is_mock) {
+        activeMockOrder = orderData;
+        document.getElementById('mock-payment-modal').classList.add('active');
+        return;
+      }
+      
+      // Open Razorpay checkout
+      const options = {
+        key: orderData.key_id,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: 'Portfolio Analysis',
+        description: 'Pro Plan — Monthly',
+        order_id: orderData.order_id,
+        handler: async function(response) {
+          btn.textContent = 'Verifying...';
+          try {
+            // Verify payment
+            const verifyRes = await fetch('/api/payment/verify', {
+              method: 'POST',
+              headers: await getAuthHeaders(),
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+            
+            const verifyData = await verifyRes.json();
+            
+            if (verifyData.status === 'success'){
+              // Show success
+              showSuccess();
+              // Redirect to dashboard
+              setTimeout(() => {
+                window.location.href = '/dashboard';
+              }, 2000);
+            } else {
+              showError('Payment verification failed. Contact support.');
+              btn.disabled = false;
+              btn.textContent = 'Upgrade Now';
+            }
+          } catch (vErr) {
+            showError('Payment verification call failed. Contact support.');
+            btn.disabled = false;
+            btn.textContent = 'Upgrade Now';
+          }
+        },
+        prefill: {
+          email: window.currentUserEmail || ''
+        },
+        theme: {
+          color: '#10b981'
+        },
+        modal: {
+          ondismiss: function() {
+            btn.disabled = false;
+            btn.textContent = 'Upgrade Now';
+          }
+        }
+      };
+      
+      const rzp = new Razorpay(options);
+      rzp.open();
+      
+    } catch(err) {
+      showError(err.message || 'Something went wrong');
+      btn.disabled = false;
+      btn.textContent = 'Upgrade Now';
+    }
+  }
+
+  function closeMockModal() {
+    document.getElementById('mock-payment-modal').classList.remove('active');
+    const btn = document.getElementById('btn-upgrade');
+    btn.disabled = false;
+    btn.textContent = 'Upgrade Now';
+  }
+
+  async function handleMockPayment(success) {
+    document.getElementById('mock-payment-modal').classList.remove('active');
+    const btn = document.getElementById('btn-upgrade');
+    
+    if (!success) {
+      showError('Mock payment failed.');
+      btn.disabled = false;
+      btn.textContent = 'Upgrade Now';
+      return;
+    }
+    
+    btn.textContent = 'Verifying...';
+    try {
+      const verifyRes = await fetch('/api/payment/verify', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({
+          razorpay_order_id: activeMockOrder.order_id,
+          razorpay_payment_id: "pay_mock_" + Math.random().toString(36).substring(7),
+          razorpay_signature: "sig_mock_" + Math.random().toString(36).substring(7),
+          is_mock: true
+        })
+      });
+      
+      const verifyData = await verifyRes.json();
+      if (verifyData.status === 'success') {
+        showSuccess();
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 2000);
+      } else {
+        showError('Mock verification failed: ' + verifyData.message);
+        btn.disabled = false;
+        btn.textContent = 'Upgrade Now';
+      }
+    } catch (vErr) {
+      showError('Mock verification call failed.');
+      btn.disabled = false;
+      btn.textContent = 'Upgrade Now';
+    }
+  }
+
+  function showSuccess() {
+    document.getElementById('payment-result').innerHTML = `
+      <div style="
+        background:rgba(16,185,129,0.1);
+        border:1px solid rgba(16,185,129,0.3);
+        border-radius:8px;
+        padding:16px;
+        text-align:center;
+        color:#10b981;
+        margin-bottom:1rem;">
+        <i class="fa-solid fa-circle-check"
+           style="font-size:2rem;
+           display:block;
+           margin-bottom:8px;"></i>
+        <strong>Payment Successful!</strong>
+        <p>Welcome to Pro plan. Redirecting to dashboard...</p>
+      </div>
+    `;
+  }
+
+  function showError(msg) {
+    document.getElementById('payment-result').innerHTML = `
+      <div style="
+        background:rgba(239,68,68,0.1);
+        border:1px solid rgba(239,68,68,0.3);
+        border-radius:8px;
+        padding:16px;
+        text-align:center;
+        color:#ef4444;
+        margin-bottom:1rem;">
+        <i class="fa-solid fa-circle-xmark"
+           style="font-size:2rem;
+           display:block;
+           margin-bottom:8px;"></i>
+        <strong>Payment Failed</strong>
+        <p>${msg}</p>
+      </div>
+    `;
+  }
+  </script>
+</body>
+</html>

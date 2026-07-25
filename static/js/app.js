@@ -2691,7 +2691,7 @@ function showUpgradeModal(feature) {
         </p>
         <div style="display:flex;gap:12px;
           justify-content:center;">
-          <button onclick="window.location.href='/account'"
+          <button onclick="window.location.href='/upgrade'"
             style="background:var(--accent);
             color:white;border:none;
             padding:10px 24px;

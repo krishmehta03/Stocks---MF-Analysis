@@ -180,7 +180,7 @@
             <li class="locked">AI Advisor access</li>
             <li class="locked">Tax reports &amp; export</li>
           </ul>
-          <a href="/upgrade" class="btn" style="margin-top:0.5rem; display:inline-flex; text-decoration:none;">
+          <a href="/upgrade" class="btn btn-primary" style="margin-top:0.5rem; display:inline-flex; text-decoration:none;">
             <i class="fa-solid fa-rocket"></i> Upgrade to Pro — ₹199/month
           </a>
         </div>
@@ -198,6 +198,7 @@
             <li>Tax reports &amp; CSV export</li>
             <li>Priority support</li>
           </ul>
+          <div id="pro-plan-expiry-info" style="display:none; margin-bottom: 0.75rem;"></div>
           <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="showAlert('Contact support to manage your subscription.', 'success')">
             <i class="fa-solid fa-gear"></i> Manage Subscription
           </button>
@@ -341,6 +342,35 @@
 
       if (plan === 'pro' || plan === 'wealth') {
         document.getElementById('plan-card-pro').style.display = 'block';
+        
+        // Show expiry details
+        const expiresAt = p.plan_expires_at;
+        const expiryContainer = document.getElementById('pro-plan-expiry-info');
+        if (expiryContainer && expiresAt) {
+          const expiryDate = new Date(expiresAt);
+          const formattedDate = expiryDate.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+          
+          const now = new Date();
+          const timeDiff = expiryDate.getTime() - now.getTime();
+          const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+          
+          let warningHtml = '';
+          if (daysDiff >= 0 && daysDiff <= 7) {
+            warningHtml = `
+              <div style="margin-top:8px; padding:8px 12px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; color:#f59e0b; font-size:0.8rem; display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Your subscription expires in ${daysDiff} day(s). Please renew to maintain access.</span>
+              </div>`;
+          }
+          
+          expiryContainer.innerHTML = `
+            <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.75rem;">
+              Expires on: <strong style="color:var(--text-primary);">${formattedDate}</strong>
+            </div>
+            ${warningHtml}
+          `;
+          expiryContainer.style.display = 'block';
+        }
       } else {
         document.getElementById('plan-card-free').style.display = 'block';
       }
