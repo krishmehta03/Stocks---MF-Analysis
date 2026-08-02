@@ -55,7 +55,7 @@
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upgrade to Pro — Portfolio Analysis</title>
+  <title>Upgrade to Pro — WealthLenz</title>
   
   <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -236,7 +236,7 @@
     <!-- Header -->
     <header>
       <div class="logo-section">
-        <h1><i class="fa-solid fa-chart-line"></i> Portfolio Analysis</h1>
+        <h1><i class="fa-solid fa-chart-line"></i> WealthLenz</h1>
       </div>
       <div class="header-actions">
         <a href="/dashboard" class="btn btn-secondary btn-sm">
@@ -392,7 +392,7 @@
         key: orderData.key_id,
         amount: orderData.amount,
         currency: orderData.currency,
-        name: 'Portfolio Analysis',
+        name: 'WealthLenz',
         description: 'Pro Plan — Monthly',
         order_id: orderData.order_id,
         handler: async function(response) {
@@ -419,12 +419,12 @@
                 window.location.href = '/dashboard';
               }, 2000);
             } else {
-              showError('Payment verification failed. Contact support.');
+              showError(verifyData.message || 'Payment verification failed. Contact support.');
               btn.disabled = false;
               btn.textContent = 'Upgrade Now';
             }
           } catch (vErr) {
-            showError('Payment verification call failed. Contact support.');
+            showError(vErr.message || 'Payment verification call failed. Contact support.');
             btn.disabled = false;
             btn.textContent = 'Upgrade Now';
           }

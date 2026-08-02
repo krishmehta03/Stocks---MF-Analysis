@@ -27,13 +27,31 @@ load_dotenv()
 import razorpay
 
 razorpay_client = None
-try:
+
+def get_razorpay_client():
+    global razorpay_client
     key_id = os.environ.get('RAZORPAY_KEY_ID')
     key_secret = os.environ.get('RAZORPAY_KEY_SECRET')
+    if key_id:
+        key_id = key_id.strip().strip("'").strip('"')
+    if key_secret:
+        key_secret = key_secret.strip().strip("'").strip('"')
+    
     if key_id and key_secret:
-        razorpay_client = razorpay.Client(auth=(key_id, key_secret))
+        if not razorpay_client:
+            try:
+                razorpay_client = razorpay.Client(auth=(key_id, key_secret))
+            except Exception as e:
+                print(f"[Razorpay] Initialization error: {e}")
+        return razorpay_client, key_id, key_secret
+    return None, None, None
+
+# Try to initialize at startup
+try:
+    get_razorpay_client()
 except Exception as e:
-    print(f"[Razorpay] Initialization error: {e}")
+    print(f"[Razorpay] Startup init error: {e}")
+
 
 def get_current_user_id():
     auth_header = request.headers.get("Authorization")
@@ -1515,10 +1533,9 @@ def create_payment_order():
             "message": "Unauthorized"
         }), 401
     
-    key_id = os.environ.get('RAZORPAY_KEY_ID')
-    key_secret = os.environ.get('RAZORPAY_KEY_SECRET')
+    client, key_id, key_secret = get_razorpay_client()
     
-    if not razorpay_client or not key_id or not key_secret:
+    if not client or not key_id or not key_secret:
         # Mock mode
         return jsonify({
             "status": "success",
@@ -1543,7 +1560,7 @@ def create_payment_order():
             }
         }
         
-        order = razorpay_client.order.create(data=order_data)
+        order = client.order.create(data=order_data)
         
         return jsonify({
             "status": "success",
@@ -1575,6 +1592,10 @@ def verify_payment():
         if is_mock:
             payment_id = data.get('razorpay_payment_id', 'pay_mock_default')
         else:
+            client, key_id, key_secret = get_razorpay_client()
+            if not client:
+                raise ValueError("Razorpay client is not configured, but a real signature verification was requested.")
+            
             # Verify payment signature
             params_dict = {
                 'razorpay_order_id': data.get('razorpay_order_id'),
@@ -1582,7 +1603,7 @@ def verify_payment():
                 'razorpay_signature': data.get('razorpay_signature')
             }
             
-            razorpay_client.utility.verify_payment_signature(params_dict)
+            client.utility.verify_payment_signature(params_dict)
             payment_id = data.get('razorpay_payment_id')
         
         # Payment verified — upgrade user using admin client (to bypass RLS)
@@ -1680,9 +1701,10 @@ def payment_status():
 
 @app.route('/upgrade')
 def upgrade_page():
+    _, key_id, _ = get_razorpay_client()
     return render_template(
         'upgrade.html',
-        razorpay_key_id=os.environ.get('RAZORPAY_KEY_ID'),
+        razorpay_key_id=key_id,
         **_auth_context()
     )
 
