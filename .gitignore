@@ -6,3 +6,4 @@ yfinance_cache.json
 .env
 .env.*
 !.env.example
+profiles/config_*.json
