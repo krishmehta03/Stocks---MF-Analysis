@@ -1326,7 +1326,7 @@ def automatic_price_updater_loop():
                 if user_config.get("auto_update_prices", True):
                     last_updated = price_update_state["last_updated_by_profile"].get(user_id, 0)
                     now = time.time()
-                    if now - last_updated >= 900: # 15 minutes
+                    if now - last_updated >= 300: # 5 minutes
                         print(f"[Auto Price Updater] Running scheduled automatic price/NAV update for user: {user_id}")
                         try:
                             run_price_and_nav_update(user_id, is_background=True)
