@@ -199,47 +199,72 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- Custom Premium Style -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=1.0.1">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
 </head>
 <body class="theme-emerald">
 
   <div class="app-container">
     
-    <!-- Top Premium Navigation -->
-    <header>
-      <div class="logo-section">
-        <h1><i class="fa-solid fa-chart-line"></i><span class="logo-text"> WealthLenz</span></h1>
-      </div>
-      <div class="header-actions">
-        <div id="price-status-container" style="display: flex; align-items: center; gap: 0.5rem; margin-right: 0.5rem; background: rgba(255,255,255,0.02); padding: 0.4rem 0.75rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
-          <span id="price-status-dot" class="status-dot idle"></span>
-          <span id="price-status-text" style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 500;">Checking...</span>
-          <button id="btn-update-prices" style="display:none; background:transparent; border:1px solid rgba(255,255,255,0.15); color:var(--text-secondary); padding:2px 10px; border-radius:6px; cursor:pointer; font-size:11px; margin-left:4px;"
-            title="Update live prices"><i class="fa-solid fa-rotate-right"></i> Update Prices</button>
+    <!-- Sticky Top Section -->
+    <div class="sticky-header-wrapper">
+      <!-- Top Premium Navigation -->
+      <header>
+        <div class="logo-section">
+          <h1><i class="fa-solid fa-chart-line"></i><span class="logo-text"> WealthLenz</span></h1>
         </div>
-        <!-- User dropdown -->
-        <div class="account-user-dropdown" id="user-dropdown-wrapper">
-          <button class="account-user-trigger" id="user-dropdown-trigger" onclick="toggleUserDropdown()" aria-haspopup="true">
-            <span id="current-user-name">Loading...</span>
-            <span id="plan-badge" class="plan-badge plan-free" style="margin-left:4px;">FREE</span>
-            <i class="fa-solid fa-chevron-down" style="font-size:10px; color:var(--text-secondary); margin-left:2px;"></i>
-          </button>
-          <div class="account-user-dropdown-menu" id="user-dropdown-menu">
-            <a href="/account" class="account-dropdown-item">
-              <i class="fa-solid fa-user"></i> My Account
-            </a>
-            <div style="height:1px; background:rgba(255,255,255,0.05); margin:0 0.5rem;"></div>
-            <button class="account-dropdown-item danger" onclick="signOut()">
-              <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
-            </button>
+        <div class="header-actions">
+          <div id="price-status-container" style="display: flex; align-items: center; gap: 0.5rem; margin-right: 0.5rem; background: rgba(255,255,255,0.02); padding: 0.4rem 0.75rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <span id="price-status-dot" class="status-dot idle"></span>
+            <span id="price-status-text" style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 500;">Checking...</span>
+            <button id="btn-update-prices" style="display:none; background:transparent; border:1px solid rgba(255,255,255,0.15); color:var(--text-secondary); padding:2px 10px; border-radius:6px; cursor:pointer; font-size:11px; margin-left:4px;"
+              title="Update live prices"><i class="fa-solid fa-rotate-right"></i> Update Prices</button>
           </div>
+          <!-- User dropdown -->
+          <div class="account-user-dropdown" id="user-dropdown-wrapper">
+            <button class="account-user-trigger" id="user-dropdown-trigger" onclick="toggleUserDropdown()" aria-haspopup="true">
+              <span id="current-user-name">Loading...</span>
+              <span id="plan-badge" class="plan-badge plan-free" style="margin-left:4px;">FREE</span>
+              <i class="fa-solid fa-chevron-down" style="font-size:10px; color:var(--text-secondary); margin-left:2px;"></i>
+            </button>
+            <div class="account-user-dropdown-menu" id="user-dropdown-menu">
+              <a href="/account" class="account-dropdown-item">
+                <i class="fa-solid fa-user"></i> My Account
+              </a>
+              <div style="height:1px; background:rgba(255,255,255,0.05); margin:0 0.5rem;"></div>
+              <button class="account-dropdown-item danger" onclick="signOut()">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+              </button>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Quick Theme Toggle">
+            <i class="fa-solid fa-palette"></i> Theme
+          </button>
         </div>
-        <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Quick Theme Toggle">
-          <i class="fa-solid fa-palette"></i> Theme
+      </header>
+
+      <!-- Nav Tabs Navigation -->
+      <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('dashboard')">
+          <i class="fa-solid fa-grip"></i> Dashboard
+        </button>
+        <button class="tab-btn" onclick="switchTab('stocks')">
+          <i class="fa-solid fa-chart-simple"></i> Stocks Holdings
+        </button>
+        <button class="tab-btn" onclick="switchTab('mfs')">
+          <i class="fa-solid fa-wallet"></i> Mutual Funds
+        </button>
+        <button class="tab-btn" onclick="switchTab('signals')">
+          <i class="fa-solid fa-triangle-exclamation"></i> Risk & Signals
+        </button>
+        <button class="tab-btn" data-tab="ai-advisor" onclick="switchTab('advisor')">
+          <i class="fa-solid fa-user-tie"></i> AI Advisor
+        </button>
+        <button class="tab-btn" onclick="switchTab('settings')">
+          <i class="fa-solid fa-sliders"></i> Visual Settings
         </button>
       </div>
-    </header>
+    </div>
 
 
     <!-- Real-Time Progress Bar for Scraper -->
@@ -274,28 +299,6 @@
       margin-bottom:12px;
       font-size:13px;
       color:var(--text-secondary);">
-    </div>
-
-    <!-- Nav Tabs Navigation -->
-    <div class="nav-tabs">
-      <button class="tab-btn active" onclick="switchTab('dashboard')">
-        <i class="fa-solid fa-grip"></i> Dashboard
-      </button>
-      <button class="tab-btn" onclick="switchTab('stocks')">
-        <i class="fa-solid fa-chart-simple"></i> Stocks Holdings
-      </button>
-      <button class="tab-btn" onclick="switchTab('mfs')">
-        <i class="fa-solid fa-wallet"></i> Mutual Funds
-      </button>
-      <button class="tab-btn" onclick="switchTab('signals')">
-        <i class="fa-solid fa-triangle-exclamation"></i> Risk & Signals
-      </button>
-      <button class="tab-btn" data-tab="ai-advisor" onclick="switchTab('advisor')">
-        <i class="fa-solid fa-user-tie"></i> AI Advisor
-      </button>
-      <button class="tab-btn" onclick="switchTab('settings')">
-        <i class="fa-solid fa-sliders"></i> Visual Settings
-      </button>
     </div>
 
     <!-- TAB 1: EXECUTIVE DASHBOARD -->

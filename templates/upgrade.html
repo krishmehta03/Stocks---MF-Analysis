@@ -60,7 +60,7 @@
   <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Styles -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=1.0.1">
   <style>
     .upgrade-layout {
       display: grid;
@@ -233,17 +233,20 @@
   </div>
 
   <div class="app-container">
-    <!-- Header -->
-    <header>
-      <div class="logo-section">
-        <h1><i class="fa-solid fa-chart-line"></i> WealthLenz</h1>
-      </div>
-      <div class="header-actions">
-        <a href="/dashboard" class="btn btn-secondary btn-sm">
-          <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
-        </a>
-      </div>
-    </header>
+    <!-- Sticky Top Section -->
+    <div class="sticky-header-wrapper">
+      <!-- Header -->
+      <header>
+        <div class="logo-section">
+          <h1><i class="fa-solid fa-chart-line"></i> WealthLenz</h1>
+        </div>
+        <div class="header-actions">
+          <a href="/dashboard" class="btn btn-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+          </a>
+        </div>
+      </header>
+    </div>
 
     <!-- Hero Section -->
     <div class="hero-section">
