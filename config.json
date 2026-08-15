@@ -37,6 +37,7 @@
     "stocks_ltcg_days": 365
   },
   "theme": "rose-gold",
+  "theme_mode": "dark",
   "widgets": {
     "asset_allocation": true,
     "dividend_yield": true,

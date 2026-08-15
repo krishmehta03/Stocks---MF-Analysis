@@ -2066,8 +2066,9 @@ select option {
     padding: 0.25rem 0.5rem !important;
   }
 
-  /* Keep Theme button visible & responsive on mobile */
-  #btn-theme-toggle {
+  /* Keep Theme & Mode buttons visible & responsive on mobile */
+  #btn-theme-toggle,
+  #btn-mode-toggle {
     display: inline-flex !important;
   }
 
@@ -2351,3 +2352,312 @@ select option {
   }
 }
 
+
+
+/* ==========================================
+   LIGHT MODE / WHITE MODE OVERRIDES
+   ========================================== */
+body.light-mode {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --card-bg: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+}
+
+/* Specific theme card border overrides in light mode to keep them elegant */
+body.light-mode.theme-emerald {
+  --card-border: rgba(16, 185, 129, 0.22);
+}
+body.light-mode.theme-ocean {
+  --card-border: rgba(59, 130, 246, 0.22);
+}
+body.light-mode.theme-cyberpunk {
+  --card-border: rgba(236, 72, 153, 0.22);
+}
+body.light-mode.theme-rose-gold {
+  --card-border: rgba(199, 125, 142, 0.28);
+}
+
+/* Light mode component specific styles */
+body.light-mode header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode #price-status-container {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode #price-status-container button {
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-mode .nav-tabs {
+  background-color: #f1f5f9 !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-mode .tab-btn {
+  color: var(--text-secondary);
+}
+
+body.light-mode .tab-btn:hover {
+  color: var(--text-primary);
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+body.light-mode .tab-btn.active {
+  color: #ffffff;
+}
+
+body.light-mode .leader-item {
+  background-color: rgba(0, 0, 0, 0.015) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-mode .card:hover {
+  box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.1), 0 0 15px rgba(var(--accent-rgb), 0.05) !important;
+}
+
+/* Tables in light mode */
+body.light-mode .table-container {
+  border: 1px solid var(--card-border) !important;
+  background-color: #ffffff !important;
+}
+
+body.light-mode .table-container::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+}
+
+body.light-mode #stocks-table th,
+body.light-mode #mfs-table th,
+body.light-mode #signals-table th {
+  background-color: #f8fafc !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode #stocks-table td:first-child,
+body.light-mode #mfs-table td:first-child,
+body.light-mode #signals-table td:first-child {
+  background-color: #ffffff !important;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.light-mode #stocks-table th:first-child,
+body.light-mode #mfs-table th:first-child,
+body.light-mode #signals-table th:first-child {
+  background-color: #f8fafc !important;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.light-mode #stocks-table tr:hover td:first-child,
+body.light-mode #mfs-table tr:hover td:first-child,
+body.light-mode #signals-table tr:hover td:first-child {
+  background-color: rgba(var(--accent-rgb), 0.04) !important;
+}
+
+body.light-mode th {
+  background-color: rgba(0, 0, 0, 0.01) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-mode td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Buttons in light mode */
+body.light-mode .btn-secondary {
+  background: #f1f5f9 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #0f172a !important;
+}
+
+body.light-mode .btn-secondary:hover {
+  background: #e2e8f0 !important;
+}
+
+/* Form Controls in light mode */
+body.light-mode .form-control {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  color: #0f172a !important;
+}
+
+body.light-mode .form-control:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 8px var(--accent-glow) !important;
+}
+
+/* Modals in light mode */
+body.light-mode .modal-content {
+  background: #ffffff !important;
+  border: 1px solid var(--card-border) !important;
+}
+
+body.light-mode .modal-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Context Strip */
+body.light-mode #portfolio-context-strip {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-mode #portfolio-context-strip div[style*="background: rgba(255,255,255,0.1)"] {
+  background: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Sector contribution attribution adjustments */
+body.light-mode #contrib-summary-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode #contrib-sort-btn {
+  background: #f1f5f9 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #0f172a !important;
+}
+
+body.light-mode #contrib-legend {
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Column Selection & Settings Customisations */
+body.light-mode .column-selection-grid {
+  background-color: rgba(0, 0, 0, 0.01) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-mode .theme-option {
+  border: 2px solid rgba(0, 0, 0, 0.06) !important;
+  background-color: rgba(0, 0, 0, 0.01) !important;
+}
+
+body.light-mode .theme-option.active {
+  border-color: var(--accent) !important;
+  background-color: rgba(var(--accent-rgb), 0.05) !important;
+}
+
+body.light-mode .widget-toggle-item {
+  background-color: rgba(0, 0, 0, 0.015) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+/* User Dropdown */
+body.light-mode .account-user-trigger {
+  background: #f1f5f9 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #0f172a !important;
+}
+
+body.light-mode .account-user-dropdown-menu {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-mode .account-dropdown-item {
+  color: #334155 !important;
+}
+
+body.light-mode .account-dropdown-item:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+body.light-mode .account-user-dropdown-menu div[style*="background:rgba(255,255,255,0.05)"] {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Scraper widget updates */
+body.light-mode .updater-widget {
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.05) 0%, rgba(255, 255, 255, 1) 100%) !important;
+  border: 1px dashed rgba(var(--accent-rgb), 0.25) !important;
+}
+
+body.light-mode .updater-progress-bg {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-mode .updater-logs {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  color: #0284c7 !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Tooltip */
+body.light-mode .breakdown-tooltip {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-mode .breakdown-tooltip .tooltip-title {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Account.html Specific Card overrides in light mode */
+body.light-mode .account-card {
+  background: #ffffff !important;
+  border: 1px solid var(--card-border) !important;
+}
+
+body.light-mode .account-card.danger-zone {
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+body.light-mode .account-readonly-field {
+  background: #f1f5f9 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #334155 !important;
+}
+
+body.light-mode .account-info-row {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-mode .plan-card-inner {
+  background: #f8fafc !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-mode .plan-card-inner.plan-pro-card {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%) !important;
+  border-color: rgba(102, 126, 234, 0.25) !important;
+}
+
+body.light-mode .plan-card-inner.plan-pro-card span[style*="color:var(--text-secondary)"] {
+  color: #475569 !important;
+}
+
+body.light-mode .plan-feature-list li {
+  color: #334155 !important;
+}
+
+body.light-mode .plan-feature-list li::before {
+  color: var(--success) !important;
+}
+
+body.light-mode .plan-feature-list li.locked {
+  color: #94a3b8 !important;
+}
+
+body.light-mode .plan-feature-list li.locked::before {
+  color: #94a3b8 !important;
+}
+
+body.light-mode .account-header-badge {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #64748b !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-mode .account-header-badge.plan-pro {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: #ffffff !important;
+}

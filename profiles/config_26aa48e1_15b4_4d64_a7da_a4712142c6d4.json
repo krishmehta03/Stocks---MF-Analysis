@@ -36,7 +36,7 @@
     "mf_ltcg_days": 365,
     "stocks_ltcg_days": 365
   },
-  "theme": "cyberpunk",
+  "theme": "emerald",
   "widgets": {
     "asset_allocation": true,
     "dividend_yield": true,
@@ -44,5 +44,6 @@
     "risk_alerts": true,
     "sector_allocation": true,
     "top_performers": true
-  }
+  },
+  "theme_mode": "dark"
 }

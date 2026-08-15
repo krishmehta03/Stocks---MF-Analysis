@@ -170,6 +170,23 @@
 
   document.addEventListener(
     'DOMContentLoaded', function() {
+      const savedTheme = localStorage.getItem('portfolio_theme') || 'emerald';
+      const savedMode = localStorage.getItem('portfolio_theme_mode') || 'dark';
+      document.body.className = `theme-${savedTheme}`;
+      if (savedMode === 'light') {
+        document.body.classList.add('light-mode');
+      }
+      const modeBtn = document.getElementById('btn-mode-toggle');
+      if (modeBtn) {
+        if (savedMode === 'light') {
+          modeBtn.innerHTML = '<i class="fa-solid fa-moon"></i> Dark';
+          modeBtn.title = 'Switch to Dark Mode';
+        } else {
+          modeBtn.innerHTML = '<i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Light';
+          modeBtn.title = 'Switch to Light Mode';
+        }
+      }
+
       const el = document.getElementById('current-user-name');
       if (el && window.currentUserName) {
         const isMobile = window.innerWidth <= 480;
@@ -237,6 +254,9 @@
               </button>
             </div>
           </div>
+          <button class="btn btn-secondary btn-sm" id="btn-mode-toggle" title="Toggle Light/Dark Mode" onclick="toggleThemeMode()" style="margin-right: 0.25rem;">
+            <i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Light
+          </button>
           <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Quick Theme Toggle">
             <i class="fa-solid fa-palette"></i> Theme
           </button>
@@ -743,6 +763,23 @@
               <div class="theme-option" id="theme-opt-rose-gold" onclick="selectThemeOption('rose-gold')">
                 <div class="theme-swatch" style="background: linear-gradient(135deg, #e0b1cb 0%, #9f86c0 100%);"></div>
                 <strong>Rose Gold Premium</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Theme Mode Selection -->
+          <div class="form-group" style="margin-bottom: 2rem;">
+            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">Theme Mode</label>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Switch between Dark Mode and Light (White) Mode.</p>
+            
+            <div class="theme-picker-group">
+              <div class="theme-option" id="mode-opt-dark" onclick="selectThemeMode('dark')">
+                <i class="fa-solid fa-moon" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block; color: var(--accent);"></i>
+                <strong>Dark Mode</strong>
+              </div>
+              <div class="theme-option" id="mode-opt-light" onclick="selectThemeMode('light')">
+                <i class="fa-solid fa-sun" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block; color: var(--accent);"></i>
+                <strong>Light Mode</strong>
               </div>
             </div>
           </div>

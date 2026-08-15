@@ -89,6 +89,9 @@
         <div class="header-actions">
           <span id="account-header-name" style="font-size:0.9rem; color:var(--text-secondary);"></span>
           <span id="account-header-badge" class="plan-badge plan-free">FREE</span>
+          <button class="btn btn-secondary btn-sm" id="btn-mode-toggle" title="Toggle Light/Dark Mode" onclick="toggleThemeMode()" style="margin-right: 0.25rem;">
+            <i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Light
+          </button>
           <a href="/dashboard" class="btn btn-secondary btn-sm">
             <i class="fa-solid fa-grip"></i> Dashboard
           </a>
@@ -293,11 +296,38 @@
     setTimeout(() => div.remove(), 6000);
   }
 
+  function toggleThemeMode() {
+    const currentMode = localStorage.getItem('portfolio_theme_mode') || 'dark';
+    const nextMode = currentMode === 'light' ? 'dark' : 'light';
+    localStorage.setItem('portfolio_theme_mode', nextMode);
+    applyHeaderThemeMode(nextMode);
+  }
+
+  function applyHeaderThemeMode(modeName) {
+    if (modeName === 'light') {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
+    const modeBtn = document.getElementById("btn-mode-toggle");
+    if (modeBtn) {
+      if (modeName === 'light') {
+        modeBtn.innerHTML = `<i class="fa-solid fa-moon"></i> Dark`;
+        modeBtn.title = "Switch to Dark Mode";
+      } else {
+        modeBtn.innerHTML = `<i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Light`;
+        modeBtn.title = "Switch to Light Mode";
+      }
+    }
+  }
+
   // ─── Load profile on page ready ──────────────────────────
   document.addEventListener('DOMContentLoaded', async function() {
-    // Apply saved theme
-    const savedTheme = localStorage.getItem('portfolioTheme') || 'emerald';
+    // Apply saved theme and mode
+    const savedTheme = localStorage.getItem('portfolio_theme') || 'emerald';
+    const savedMode = localStorage.getItem('portfolio_theme_mode') || 'dark';
     document.body.className = `theme-${savedTheme}`;
+    applyHeaderThemeMode(savedMode);
 
     // Wait a tick for auth to complete
     await new Promise(r => setTimeout(r, 300));

@@ -117,6 +117,7 @@ function setupEventListeners() {
       appConfig.theme = nextTheme;
       saveConfigOnServer(appConfig);
     }
+    renderCharts();
     
     const themeLabels = {
       'emerald': 'Emerald Forest',
@@ -208,6 +209,7 @@ async function fetchConfig() {
     const res = await authorizedFetch('/api/config');
     appConfig = await res.json();
     applyTheme(appConfig.theme || 'emerald');
+    applyThemeMode(appConfig.theme_mode || 'dark');
     loadSettingsIntoForm();
   } catch (err) {
     console.error("Error loading config:", err);
@@ -244,12 +246,17 @@ async function fetchPortfolio() {
 // APPLY VISUAL THEME
 function applyTheme(themeName) {
   activeTheme = themeName;
+  // Keep the light-mode class if it is present
+  const isLight = document.body.classList.contains('light-mode');
   document.body.className = '';
   document.body.classList.add(`theme-${themeName}`);
+  if (isLight) {
+    document.body.classList.add('light-mode');
+  }
   localStorage.setItem('portfolio_theme', themeName);
   
   // Highlight active option in Settings Form
-  document.querySelectorAll(".theme-option").forEach(opt => {
+  document.querySelectorAll(".theme-option[id^='theme-opt-']").forEach(opt => {
     opt.classList.remove("active");
   });
   const activeOpt = document.getElementById(`theme-opt-${themeName}`);
@@ -269,7 +276,56 @@ async function selectThemeOption(themeName) {
     'rose-gold': 'Rose Gold Premium'
   };
   const displayName = themeLabels[themeName] || themeName;
+  renderCharts();
   showToast(`Theme updated to ${displayName}`);
+}
+
+// APPLY THEME MODE (DARK / LIGHT)
+let activeThemeMode = 'dark';
+
+function applyThemeMode(modeName) {
+  activeThemeMode = modeName;
+  if (modeName === 'light') {
+    document.body.classList.add('light-mode');
+  } else {
+    document.body.classList.remove('light-mode');
+  }
+  localStorage.setItem('portfolio_theme_mode', modeName);
+  
+  // Highlight active option in Settings Form
+  document.querySelectorAll(".theme-option[id^='mode-opt-']").forEach(opt => {
+    opt.classList.remove("active");
+  });
+  const activeOpt = document.getElementById(`mode-opt-${modeName}`);
+  if (activeOpt) activeOpt.classList.add("active");
+  
+  // Update the Quick Toggle button icon in header
+  const modeBtn = document.getElementById("btn-mode-toggle");
+  if (modeBtn) {
+    if (modeName === 'light') {
+      modeBtn.innerHTML = `<i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Light`;
+      modeBtn.title = "Switch to Dark Mode";
+    } else {
+      modeBtn.innerHTML = `<i class="fa-solid fa-moon"></i> Dark`;
+      modeBtn.title = "Switch to Light Mode";
+    }
+  }
+}
+
+async function selectThemeMode(modeName) {
+  applyThemeMode(modeName);
+  if (appConfig) {
+    appConfig.theme_mode = modeName;
+    await saveConfigOnServer(appConfig);
+  }
+  // Redraw charts to update text and gridline colors
+  renderCharts();
+  showToast(`Mode updated to ${modeName === 'light' ? 'Light' : 'Dark'} Mode`);
+}
+
+async function toggleThemeMode() {
+  const nextMode = activeThemeMode === 'light' ? 'dark' : 'light';
+  await selectThemeMode(nextMode);
 }
 
 // TOAST NOTIFICATIONS & PREFERENCES AUTO-SAVE
@@ -3076,6 +3132,7 @@ function loadSettingsIntoForm() {
   
   // Theme highlights
   applyTheme(appConfig.theme);
+  applyThemeMode(appConfig.theme_mode || 'dark');
   
   // Columns Checkboxes inside Settings
   const stChecksContainer = document.getElementById("settings-stock-columns-checks");
@@ -3139,6 +3196,7 @@ async function saveCustomSettings(e) {
   // Map payload
   const payload = {
     theme: activeTheme,
+    theme_mode: activeThemeMode,
     auto_update_prices: document.getElementById("settings-auto-update").checked,
     tax_rules: {
       stocks_ltcg_days: parseInt(document.getElementById("settings-stock-ltcg").value),

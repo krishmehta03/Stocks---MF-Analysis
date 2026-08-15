@@ -124,12 +124,14 @@
     }
   </style>
   <script>
-    (function() {
+    document.addEventListener("DOMContentLoaded", function() {
       const theme = localStorage.getItem('portfolio_theme') || 'emerald';
-      document.documentElement.className = '';
-      document.body.className = '';
-      document.body.classList.add('theme-' + theme);
-    })();
+      const mode = localStorage.getItem('portfolio_theme_mode') || 'dark';
+      document.body.className = `theme-${theme}`;
+      if (mode === 'light') {
+        document.body.classList.add('light-mode');
+      }
+    });
   </script>
 </head>
 <body>
@@ -227,13 +229,5 @@
       <p>© 2026 WealthLenz. All rights reserved.</p>
     </footer>
   </div>
-  <script>
-    // Double check theme after page load to align classes
-    document.addEventListener("DOMContentLoaded", function() {
-      const theme = localStorage.getItem('portfolio_theme') || 'emerald';
-      document.body.className = '';
-      document.body.classList.add('theme-' + theme);
-    });
-  </script>
 </body>
 </html>
