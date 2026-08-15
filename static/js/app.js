@@ -864,9 +864,9 @@ function renderCharts() {
               data: [stVal, mfVal],
               backgroundColor: [
                 '#ec4899',
-                '#ffffff'
+                '#3b82f6'
               ],
-              borderColor: 'rgba(255, 255, 255, 0.05)',
+              borderColor: activeThemeMode === 'light' ? '#ffffff' : 'rgba(15, 23, 42, 0.6)',
               borderWidth: 2
             }]
           },
