@@ -257,6 +257,47 @@ price_update_state = {
     "last_updated_by_profile": {}  # active profile -> timestamp
 }
 
+def get_user_last_updated(user_id):
+    if not user_id:
+        return None
+    global price_update_state
+    if "last_updated_by_profile" not in price_update_state:
+        price_update_state["last_updated_by_profile"] = {}
+        
+    ts = price_update_state["last_updated_by_profile"].get(user_id)
+    if ts:
+        return ts
+        
+    # Fallback to database timestamps from stock/MF holdings
+    try:
+        from lib.supabase_data import get_user_stock_holdings, get_user_mf_holdings
+        stocks = get_user_stock_holdings(user_id)
+        mfs = get_user_mf_holdings(user_id)
+        latest_ts = 0
+        
+        for item in (stocks + mfs):
+            lpu = item.get('last_price_update') or item.get('created_at') or item.get('updated_at')
+            if lpu:
+                try:
+                    if isinstance(lpu, str):
+                        dt = datetime.fromisoformat(lpu.replace('Z', '+00:00'))
+                        unix_t = dt.timestamp()
+                    elif isinstance(lpu, (int, float)):
+                        unix_t = float(lpu)
+                    else:
+                        unix_t = 0
+                    if unix_t > latest_ts:
+                        latest_ts = unix_t
+                except Exception:
+                    pass
+        if latest_ts > 0:
+            price_update_state["last_updated_by_profile"][user_id] = latest_ts
+            return latest_ts
+    except Exception as e:
+        print(f"Error fetching last_updated fallback for {user_id}: {e}")
+        
+    return None
+
 def get_user_config_path(user_id):
     if not user_id:
         return CONFIG_FILE
@@ -1487,7 +1528,7 @@ def api_portfolio():
     data = get_portfolio_data(user_id)
     # Inject last_updated timestamp
     if isinstance(data, dict):
-        data["last_updated"] = price_update_state["last_updated_by_profile"].get(user_id)
+        data["last_updated"] = get_user_last_updated(user_id)
     return jsonify(data)
 
 @app.route('/api/user/plan', methods=['GET'])
@@ -2793,7 +2834,7 @@ def update_status():
     if user_state["start_time"] and user_state["status"] in ("running", "background_running"):
         elapsed = round(time.time() - user_state["start_time"], 1)
         
-    last_updated = price_update_state["last_updated_by_profile"].get(user_id)
+    last_updated = get_user_last_updated(user_id)
     
     return jsonify({
         "status": user_state["status"],
