@@ -2683,6 +2683,20 @@ def delete_all_stocks():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route('/api/mf/delete-all', methods=['POST'])
+def delete_all_mfs():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    try:
+        supabase = get_supabase_admin()
+        supabase.table('mf_holdings').delete().eq('user_id', user_id).execute()
+        clear_user_caches(user_id)
+        return jsonify({"status": "success", "message": "All mutual fund holdings deleted successfully!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/api/mf/add', methods=['POST'])
 def add_mf():
     user_id = get_current_user_id()

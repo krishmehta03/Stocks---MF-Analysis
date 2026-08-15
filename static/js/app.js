@@ -1,18 +1,31 @@
 // Secure fetch helper to inject Supabase access token in Authorization headers
-async function authorizedFetch(url, options = {}) {
-  options.headers = options.headers || {};
+async function getAuthHeaders() {
+  const headers = {};
   if (window._authClient) {
     try {
       const { data: { session } } = await window._authClient.auth.getSession();
       if (session && session.access_token) {
-        options.headers['Authorization'] = `Bearer ${session.access_token}`;
+        headers['Authorization'] = `Bearer ${session.access_token}`;
       }
     } catch (err) {
-      console.error('Error fetching Supabase session:', err);
+      console.error('Error fetching Supabase session for auth headers:', err);
     }
   }
+  return headers;
+}
+
+async function authorizedFetch(url, options = {}) {
+  options.headers = options.headers || {};
+  const authHeaders = await getAuthHeaders();
+  options.headers = { ...authHeaders, ...options.headers };
   return fetch(url, options);
 }
+
+async function debugAuth() {
+  const headers = await getAuthHeaders();
+  console.log('Auth headers:', headers);
+}
+debugAuth();
 
 // Global Application State
 let portfolioData = null;
@@ -3372,9 +3385,8 @@ function formatLastUpdated(timestamp) {
 }
 
 function showScraperProgressWidget() {
-  document.getElementById("price-updater-container").style.display = "flex";
-  document.getElementById("btn-updater-close").style.display = "none";
-  console.log("Initializing scraping connections...");
+  const container = document.getElementById("price-updater-container");
+  if (container) container.style.display = "none";
 }
 
 function startPollingProgress() {
@@ -3545,358 +3557,29 @@ async function submitAdvisorMessage() {
   }
 }
 
-// MULTI-PROFILE CONTROLLER OPERATIONS
-function openProfileModal() {
-  document.getElementById("modal-profile").classList.add("active");
-  fetchProfilesList();
-}
-
-function closeProfileModal() {
-  document.getElementById("modal-profile").classList.remove("active");
-}
-
-async function fetchProfilesList() {
-  try {
-    const res = await authorizedFetch('/api/profiles');
-    const data = await res.json();
-    
-    // Update header label with profile name
-    const activeProfileNameEl = document.getElementById("active-profile-name");
-    if (activeProfileNameEl) {
-      activeProfileNameEl.innerHTML = `<i class="fa-solid fa-user-circle"></i> Profile: ${data.active_profile}`;
-    }
-    
-    // Populate dynamic profiles list inside modal
-    const listContainer = document.getElementById("profiles-list-container");
-    if (listContainer) {
-      listContainer.innerHTML = "";
-      data.profiles.forEach(pObj => {
-        const p = pObj.name;
-        const hasPin = pObj.has_pin;
-        const isActive = p === data.active_profile;
-        const isDefault = p === "Default Portfolio";
-        
-        if (isActive) {
-          // Show current-pin input in Settings tab if active profile is protected by a PIN
-          const currentPinGroup = document.getElementById("pin-current-group");
-          if (currentPinGroup) {
-            currentPinGroup.style.display = hasPin ? "block" : "none";
-          }
-        }
-        
-        const item = document.createElement("div");
-        item.className = `profile-item ${isActive ? 'active' : ''}`;
-        
-        // Clicking on the profile item (except action buttons) switches to it
-        item.onclick = (e) => {
-          if (e.target.closest('.btn-profile-delete')) return;
-          if (e.target.closest('.btn-profile-rename')) return;
-          if (e.target.closest('.btn-profile-pin')) return;
-          if (!isActive) switchProfile(p, hasPin);
-        };
-        
-        item.innerHTML = `
-          <div class="profile-item-info">
-            <span class="profile-item-name">
-              ${p} ${hasPin ? '<i class="fa-solid fa-lock" style="font-size: 0.75rem; margin-left: 0.35rem; opacity: 0.6;" title="PIN Protected"></i>' : ''}
-            </span>
-            ${isActive ? '<span class="profile-item-status"><i class="fa-solid fa-circle-dot"></i> Active Portfolio</span>' : ''}
-          </div>
-          <div class="profile-item-actions">
-            ${!isDefault ? `
-              <button class="btn-profile-pin" title="Change/Set PIN">
-                <i class="fa-solid fa-key"></i>
-              </button>
-              <button class="btn-profile-rename" title="Rename Profile">
-                <i class="fa-solid fa-pencil"></i>
-              </button>
-              <button class="btn-profile-delete" title="Delete Profile">
-                <i class="fa-solid fa-trash-can"></i>
-              </button>
-            ` : ''}
-          </div>
-        `;
-        
-        // Bind click events for pin, rename and delete buttons
-        const pinBtn = item.querySelector(".btn-profile-pin");
-        if (pinBtn) {
-          pinBtn.onclick = (e) => {
-            e.stopPropagation();
-            configureProfilePin(p, hasPin);
-          };
-        }
-        const renameBtn = item.querySelector(".btn-profile-rename");
-        if (renameBtn) {
-          renameBtn.onclick = (e) => {
-            e.stopPropagation();
-            renameProfile(p, hasPin);
-          };
-        }
-        const delBtn = item.querySelector(".btn-profile-delete");
-        if (delBtn) {
-          delBtn.onclick = (e) => {
-            e.stopPropagation();
-            deleteProfile(p, hasPin);
-          };
-        }
-        
-        listContainer.appendChild(item);
-      });
-    }
-  } catch (err) {
-    console.error("Failed to fetch profiles list:", err);
-  }
-}
-
-async function renameProfile(oldName, hasPin) {
-  if (oldName === "Default Portfolio") {
-    alert("The Default Portfolio profile cannot be renamed.");
-    return;
-  }
-
-  let pin = "";
-  if (hasPin) {
-    pin = await showCustomPrompt(`Security Required`, `Enter security PIN to rename profile "${oldName}":`, true, "e.g. 1234");
-    if (pin === null) return;
-  }
-
-  const newName = await showCustomPrompt(`Rename Profile`, `Enter a new name for the profile "${oldName}":`, false, "Profile Name", oldName);
-  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+// DELETE ALL HOLDINGS (STOCKS & MUTUAL FUNDS) FROM SUPABASE
+async function deleteAllHoldings() {
+  const confirmed = await customConfirm(
+    "Are you sure you want to delete ALL stock and mutual fund holdings from your portfolio? This action cannot be undone.",
+    "Delete All Holdings"
+  );
+  if (!confirmed) return;
 
   try {
-    const res = await authorizedFetch('/api/profiles/rename', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ old_name: oldName, new_name: newName.trim(), pin: pin })
-    });
-    const data = await res.json();
-    if (data.status === 'success') {
-      // Refresh header label, profile list, and theme
-      await fetchConfig();
-      await fetchProfilesList();
-      if (appConfig && appConfig.theme) applyTheme(appConfig.theme);
-    } else {
-      alert("Error renaming profile: " + data.message);
-    }
-  } catch (err) {
-    console.error("Failed to rename profile:", err);
-    alert("API connection failed. Ensure Flask app is running!");
-  }
-}
+    const resStock = await authorizedFetch('/api/stock/delete-all', { method: 'POST' });
+    const resMf = await authorizedFetch('/api/mf/delete-all', { method: 'POST' });
+    const dataStock = await resStock.json();
 
-async function deleteProfile(profileName, hasPin) {
-  if (profileName === "Default Portfolio") {
-    alert("The Default Portfolio profile cannot be deleted.");
-    return;
-  }
-  
-  const confirmed = await showCustomConfirm(`Delete Profile`, `Are you sure you want to delete the profile "${profileName}"? This will permanently delete its associated Excel workbook, config file, and all recorded holdings. This action CANNOT be undone.`);
-  if (!confirmed) {
-    return;
-  }
-  
-  let pin = "";
-  if (hasPin) {
-    pin = await showCustomPrompt(`Security Required`, `Enter security PIN to delete profile "${profileName}":`, true, "e.g. 1234");
-    if (pin === null) return;
-  }
-
-  try {
-    const res = await authorizedFetch('/api/profiles/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile_name: profileName, pin: pin })
-    });
-    
-    const data = await res.json();
-    if (data.status === 'success') {
-      alert(data.message);
-      
-      // Reload entire visual layout & charts instantly
-      await fetchConfig();
+    if (resStock.ok && resMf.ok) {
+      customAlert("All holdings have been deleted successfully.", "Holdings Deleted");
       await fetchPortfolio();
-      await fetchProfilesList();
-      
-      // Reset visual theme to active profile's theme
-      if (appConfig && appConfig.theme) {
-        applyTheme(appConfig.theme);
-      }
-    } else {
-      alert("Error deleting profile: " + data.message);
-    }
-  } catch (err) {
-    console.error("Failed to delete profile:", err);
-    alert("API connection failed. Ensure Flask app is running!");
-  }
-}
-
-async function switchProfile(profileName, hasPin) {
-  let pin = "";
-  if (hasPin) {
-    pin = await showCustomPrompt(`PIN Protection`, `Enter security PIN to switch to profile "${profileName}":`, true, "e.g. 1234");
-    if (pin === null) return;
-  }
-
-  try {
-    const res = await authorizedFetch('/api/profiles/select', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile_name: profileName, pin: pin })
-    });
-    const data = await res.json();
-    if (data.status === 'success') {
-      alert(data.message);
-      closeProfileModal();
-      
-      // Reload entire visual layout & charts instantly from new Excel & config
-      await fetchConfig();
-      await fetchPortfolio();
-      await fetchProfilesList();
-      
-      // Reset visual theme to the profile's saved preference
-      if (appConfig && appConfig.theme) {
-        applyTheme(appConfig.theme);
-      }
-    } else {
-      alert("Error switching profile: " + data.message);
-    }
-  } catch (err) {
-    console.error("Failed to switch profile:", err);
-  }
-}
-
-async function submitCreateProfile(e) {
-  e.preventDefault();
-  const inputEl = document.getElementById("new-profile-input");
-  const pinEl = document.getElementById("new-profile-pin");
-  const profileName = inputEl.value.trim();
-  const pinVal = pinEl ? pinEl.value.trim() : "";
-  if (!profileName) return;
-  
-  try {
-    const res = await authorizedFetch('/api/profiles/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile_name: profileName, pin: pinVal })
-    });
-    const data = await res.json();
-    if (data.status === 'success') {
-      alert(data.message);
-      inputEl.value = "";
-      if (pinEl) pinEl.value = "";
-      closeProfileModal();
-      
-      // Reload entire visual layout & charts instantly from new Excel & config
-      await fetchConfig();
-      await fetchPortfolio();
-      await fetchProfilesList();
-      
-      // Set visual theme to standard default
-      if (appConfig && appConfig.theme) {
-        applyTheme(appConfig.theme);
-      }
-    } else {
-      alert("Error creating profile: " + data.message);
-    }
-  } catch (err) {
-    console.error("Failed to create profile:", err);
-  }
-}
-
-async function clearPortfolioHoldings() {
-  if (!confirm("⚠️ WARNING: Are you sure you want to delete and clear ALL stock and mutual fund holdings inside the currently active profile? This will completely empty your portfolio data and cannot be undone.")) {
-    return;
-  }
-  
-  try {
-    const res = await authorizedFetch('/api/portfolio/reset', {
-      method: 'POST'
-    });
-    
-    const data = await res.json();
-    if (data.status === 'success') {
-      alert(data.message);
-      
-      // Reload entire visual layout & charts instantly
-      await fetchPortfolio();
-      
-      // Navigate user back to executive dashboard to show clean slate
       switchTab('dashboard');
     } else {
-      alert("Error resetting portfolio: " + data.message);
+      customAlert(dataStock.message || "Error deleting holdings", "Error");
     }
   } catch (err) {
-    console.error("Failed to reset portfolio:", err);
-    alert("API connection failed. Ensure Flask app is running!");
-  }
-}
-
-async function updateProfilePin() {
-  const currentPinEl = document.getElementById("settings-current-pin");
-  const newPinEl = document.getElementById("settings-new-pin");
-  const newPinConfirmEl = document.getElementById("settings-new-pin-confirm");
-  
-  const currentPin = currentPinEl ? currentPinEl.value : "";
-  const newPin = newPinEl ? newPinEl.value.trim() : "";
-  const newPinConfirm = newPinConfirmEl ? newPinConfirmEl.value.trim() : "";
-  
-  if (newPin !== newPinConfirm) {
-    alert("New PIN and confirmation PIN do not match.");
-    return;
-  }
-  
-  try {
-    const res = await authorizedFetch('/api/profiles/set-pin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ current_pin: currentPin, new_pin: newPin })
-    });
-    
-    const data = await res.json();
-    if (data.status === 'success') {
-      alert(data.message);
-      // Clear fields
-      if (currentPinEl) currentPinEl.value = "";
-      if (newPinEl) newPinEl.value = "";
-      if (newPinConfirmEl) newPinConfirmEl.value = "";
-      
-      // Refresh profile list (which updates whether the active profile has a pin)
-      await fetchProfilesList();
-    } else {
-      alert("Error setting PIN: " + data.message);
-    }
-  } catch (err) {
-    console.error("Failed to set profile PIN:", err);
-    alert("API connection failed. Ensure Flask app is running!");
-  }
-}
-
-async function configureProfilePin(profileName, hasPin) {
-  let currentPin = "";
-  if (hasPin) {
-    currentPin = await showCustomPrompt(`PIN Authorization`, `Enter CURRENT security PIN to confirm authorization for "${profileName}":`, true, "Current PIN");
-    if (currentPin === null) return;
-  }
-  
-  const newPin = await showCustomPrompt(`Set Profile PIN`, `Enter NEW security PIN for "${profileName}" (leave blank and click OK to disable/remove PIN):`, true, "New PIN (or blank)");
-  if (newPin === null) return;
-  
-  try {
-    const res = await authorizedFetch('/api/profiles/set-pin-by-name', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile_name: profileName, current_pin: currentPin, new_pin: newPin })
-    });
-    const data = await res.json();
-    if (data.status === 'success') {
-      alert(data.message);
-      await fetchProfilesList();
-    } else {
-      alert("Error: " + data.message);
-    }
-  } catch (err) {
-    console.error("Failed to set profile PIN:", err);
-    alert("API connection failed. Ensure Flask app is running!");
+    console.error("Failed to delete holdings:", err);
+    customAlert("Failed to delete holdings. Please check connection.", "Error");
   }
 }
 

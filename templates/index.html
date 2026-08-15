@@ -187,20 +187,16 @@
         }
       }
 
-      const el = document.getElementById('current-user-name');
-      if (el && window.currentUserName) {
-        const isMobile = window.innerWidth <= 480;
-        if (isMobile) {
-          const name = window.currentUserName;
-          // If it looks like an email, show first 8 chars; otherwise show first word
-          const shortName = name.includes('@')
-            ? name.substring(0, 8)
-            : name.split(' ')[0];
-          el.textContent = shortName;
+      function updateHeaderName() {
+        const el = document.getElementById('current-user-name');
+        if (!el) return;
+        if (window.currentUserName) {
+          el.textContent = window.currentUserName.split(' ')[0];
         } else {
-          el.textContent = window.currentUserName;
+          setTimeout(updateHeaderName, 1000);
         }
       }
+      updateHeaderName();
       loadUserPlan();
     }
   );
@@ -288,7 +284,7 @@
 
 
     <!-- Real-Time Progress Bar for Scraper -->
-    <div class="updater-widget card" id="price-updater-container" style="display: none;">
+    <div class="updater-widget card" id="price-updater-container" style="display: none !important;">
       <div class="updater-info">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <strong id="updater-status-title"><i class="fa-solid fa-spinner fa-spin"></i> Updating Stock Prices...</strong>
@@ -881,39 +877,13 @@
             </div>
           </div>
 
-          <!-- 5. Profile Security Lock -->
+          <!-- Advanced Portfolio Actions -->
           <div class="form-group" style="margin-bottom: 2rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 2rem;">
-            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">5. Profile PIN Security</label>
-            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Protect your current portfolio with a security PIN. Leave the new PIN field blank to disable protection.</p>
-            
-            <div id="pin-current-group" class="form-group" style="display: none; margin-bottom: 1rem;">
-              <label style="font-size: 0.85rem; color: var(--text-secondary);">Current PIN *</label>
-              <input type="password" class="form-control" id="settings-current-pin" placeholder="Enter current PIN" style="max-width: 200px;" maxlength="6" pattern="\d*">
-            </div>
-            
-            <div class="form-row">
-              <div class="form-group" style="margin-bottom: 0;">
-                <label style="font-size: 0.85rem; color: var(--text-secondary);">New Security PIN</label>
-                <input type="password" class="form-control" id="settings-new-pin" placeholder="e.g. 1234" style="max-width: 200px;" maxlength="6" pattern="\d*">
-              </div>
-              <div class="form-group" style="margin-bottom: 0;">
-                <label style="font-size: 0.85rem; color: var(--text-secondary);">Confirm New PIN</label>
-                <input type="password" class="form-control" id="settings-new-pin-confirm" placeholder="e.g. 1234" style="max-width: 200px;" maxlength="6" pattern="\d*">
-              </div>
-            </div>
-            
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-save-pin" onclick="updateProfilePin()" style="margin-top: 1.25rem;">
-              <i class="fa-solid fa-key"></i> Update PIN Security
-            </button>
-          </div>
-
-          <!-- 6. Advanced Portfolio Actions -->
-          <div class="form-group" style="margin-bottom: 2rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 2rem;">
-            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">6. Advanced Portfolio Management</label>
+            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">Advanced Portfolio Management</label>
             <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Perform bulk operations on your active portfolio dataset:</p>
             <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-              <button type="button" class="btn btn-danger" onclick="clearPortfolioHoldings()">
-                <i class="fa-solid fa-eraser"></i> Reset & Clear All Holdings
+              <button type="button" class="btn btn-danger" onclick="deleteAllHoldings()">
+                <i class="fa-solid fa-trash-can"></i> Delete All Holdings
               </button>
             </div>
           </div>
@@ -1241,48 +1211,7 @@
     </div>
   </div>
 
-  <!-- MODAL: PROFILE MANAGER -->
-  <div class="modal-overlay" id="modal-profile">
-    <div class="modal-content" style="max-width: 450px;">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-user-circle" style="color: var(--accent);"></i> Portfolio Profiles</h3>
-        <button class="modal-close" onclick="closeProfileModal()">&times;</button>
-      </div>
-      <div style="padding: 1.25rem 0 0 0;">
-        
-        <!-- Available Profiles Picker -->
-        <div class="form-group" style="margin-bottom: 1.5rem;">
-          <label style="font-weight: 700; color: var(--text-primary);">Available Profiles</label>
-          <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Manage, switch, or delete your client & family account profiles:</p>
-          <div id="profiles-list-container" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 200px; overflow-y: auto; padding-right: 0.25rem;">
-            <!-- Dynamic profile items rendered by JS -->
-          </div>
-        </div>
-        
-        <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 1.5rem 0;">
-        
-        <!-- Create Profile Form -->
-        <form id="create-profile-form" onsubmit="submitCreateProfile(event)">
-          <div class="form-group" style="margin-bottom: 1.25rem;">
-            <label style="font-weight: 700; color: var(--text-primary);">Create New Profile</label>
-            <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Initializes a separate portfolio profile & customized settings dashboard:</p>
-            <input type="text" class="form-control" id="new-profile-input" placeholder="e.g. Krish Mehta, Mom Portfolio" required>
-          </div>
-          
-          <div class="form-group" style="margin-bottom: 1.5rem;">
-            <label style="font-weight: 700; color: var(--text-primary);">Security PIN (Optional)</label>
-            <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Set a numeric PIN to restrict access to this profile:</p>
-            <input type="password" class="form-control" id="new-profile-pin" placeholder="e.g. 1234" maxlength="6" pattern="\d*">
-          </div>
-          
-          <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-            <button type="button" class="btn btn-secondary" onclick="closeProfileModal()">Close</button>
-            <button type="submit" class="btn"><i class="fa-solid fa-plus-circle"></i> Create & Load</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
+
 
   <!-- FUND DETAIL DRAWER (slide-in from right) -->
   <div class="mf-drawer-overlay" id="mf-drawer-overlay" onclick="closeMfDetailDrawer()"></div>
@@ -1344,6 +1273,6 @@
   </div>
 
   <!-- Custom Visual Script App.js -->
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=1.0.3"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=1.0.4"></script>
 </body>
 </html>
