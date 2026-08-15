@@ -3306,8 +3306,11 @@ function checkScraperRunningOnStartup() {
     });
 }
 
-function startPriceStatusPolling() {
+let priceStatusIntervalMs = 10000;
+
+function startPriceStatusPolling(intervalMs = 10000) {
   if (priceStatusTimer) clearInterval(priceStatusTimer);
+  priceStatusIntervalMs = intervalMs;
   
   priceStatusTimer = setInterval(async () => {
     try {
@@ -3332,6 +3335,13 @@ function startPriceStatusPolling() {
             : "Last updated: Never";
         }
       }
+
+      // Fast 2.5s polling while background update is running
+      if ((data.status === "running" || data.status === "background_running") && priceStatusIntervalMs !== 2500) {
+        startPriceStatusPolling(2500);
+      } else if (data.status !== "running" && data.status !== "background_running" && priceStatusIntervalMs !== 10000) {
+        startPriceStatusPolling(10000);
+      }
       
       // Refresh portfolio if new updates came in
       if (data.last_updated) {
@@ -3346,12 +3356,12 @@ function startPriceStatusPolling() {
     } catch (err) {
       console.error("Error polling price status", err);
     }
-  }, 10000);
+  }, intervalMs);
 }
 
 function formatLastUpdated(timestamp) {
   if (!timestamp) return "Never";
-  const diffSec = Math.floor((Date.now() / 1000) - timestamp);
+  const diffSec = Math.max(0, Math.floor((Date.now() / 1000) - timestamp));
   if (diffSec < 10) return "Just now";
   if (diffSec < 60) return `${diffSec}s ago`;
   const diffMin = Math.floor(diffSec / 60);

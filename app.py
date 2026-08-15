@@ -2864,6 +2864,18 @@ def update_status():
         "current_ticker": ""
     })
     
+    last_updated = get_user_last_updated(user_id)
+    now = time.time()
+    
+    # Auto-trigger update if prices are missing or older than 5 minutes (300s)
+    if (not last_updated or (now - last_updated >= 300)) and user_state["status"] not in ("running", "background_running"):
+        user_config = load_config(user_id)
+        if user_config.get("auto_update_prices", True):
+            print(f"[Update Status] Auto-triggering 5-min update for user: {user_id}")
+            t = threading.Thread(target=run_price_and_nav_update, args=(user_id, True), daemon=True)
+            t.start()
+            user_state["status"] = "background_running"
+    
     pct = 0
     if user_state["total_tickers"] > 0:
         pct = int((user_state["current_index"] / user_state["total_tickers"]) * 100)
@@ -2872,6 +2884,7 @@ def update_status():
     if user_state["start_time"] and user_state["status"] in ("running", "background_running"):
         elapsed = round(time.time() - user_state["start_time"], 1)
         
+    # Re-fetch last_updated if in-memory was updated
     last_updated = get_user_last_updated(user_id)
     
     return jsonify({
