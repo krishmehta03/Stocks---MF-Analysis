@@ -1353,30 +1353,68 @@ def run_price_update_for_user(user_id: str):
 # Background daemon loop for automatic updates
 def automatic_price_updater_loop():
     print("[Auto Price Updater] Starting background automatic price updater loop...")
-    time.sleep(15)  # wait for Flask app to fully spin up
+    time.sleep(10)  # wait for Flask app to fully spin up
     
     while True:
         try:
             from lib.supabase import get_supabase_admin
             supabase = get_supabase_admin()
-            res = supabase.table('profiles').select('id').execute()
-            user_ids = [item['id'] for item in res.data] if res.data else []
+            user_ids_set = set()
+            
+            try:
+                res = supabase.table('profiles').select('id').execute()
+                if res.data:
+                    for item in res.data:
+                        if item.get('id'):
+                            user_ids_set.add(item['id'])
+            except Exception as e:
+                print(f"[Auto Price Updater] Could not fetch profiles: {e}")
+
+            try:
+                res_s = supabase.table('stock_holdings').select('user_id').execute()
+                if res_s.data:
+                    for item in res_s.data:
+                        if item.get('user_id'):
+                            user_ids_set.add(item['user_id'])
+            except Exception as e:
+                print(f"[Auto Price Updater] Could not fetch stock_holdings user_ids: {e}")
+
+            try:
+                res_m = supabase.table('mf_holdings').select('user_id').execute()
+                if res_m.data:
+                    for item in res_m.data:
+                        if item.get('user_id'):
+                            user_ids_set.add(item['user_id'])
+            except Exception as e:
+                print(f"[Auto Price Updater] Could not fetch mf_holdings user_ids: {e}")
+
+            user_ids = list(user_ids_set)
             
             for user_id in user_ids:
                 user_config = load_config(user_id)
                 if user_config.get("auto_update_prices", True):
-                    last_updated = price_update_state["last_updated_by_profile"].get(user_id, 0)
+                    last_updated = get_user_last_updated(user_id) or 0
                     now = time.time()
                     if now - last_updated >= 300: # 5 minutes
-                        print(f"[Auto Price Updater] Running scheduled automatic price/NAV update for user: {user_id}")
+                        print(f"[Auto Price Updater] Running 5-min auto price update for user: {user_id}")
                         try:
                             run_price_and_nav_update(user_id, is_background=True)
                         except Exception as e:
-                            print(f"[Auto Price Updater] Scheduled update failed for user {user_id}: {e}")
+                            print(f"[Auto Price Updater] Auto update failed for user {user_id}: {e}")
         except Exception as e:
             print(f"[Auto Price Updater] Exception in background loop: {e}")
             
-        time.sleep(60)  # Check every 60 seconds
+        time.sleep(30)  # Check every 30 seconds for pending 5-minute updates
+
+_auto_updater_started = False
+def init_background_updater():
+    global _auto_updater_started
+    if not _auto_updater_started:
+        _auto_updater_started = True
+        t = threading.Thread(target=automatic_price_updater_loop, daemon=True)
+        t.start()
+
+init_background_updater()
 
 @app.route('/')
 def home():
