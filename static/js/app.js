@@ -1038,6 +1038,7 @@ function renderPerformanceChart(data) {
   }
   
   // Update Legend Row
+  const combinedColor = activeThemeMode === 'light' ? '#3b82f6' : '#38bdf8';
   const legendRow = document.getElementById("perf-chart-legend-row");
   if (legendRow) {
     if (hasCombined) {
@@ -1047,7 +1048,7 @@ function renderPerformanceChart(data) {
           <span style="color:var(--text-secondary);">Stocks Portfolio</span>
         </div>
         <div style="display:flex;align-items:center;gap:0.4rem;">
-          <div style="width:24px;height:3px;background:#ffffff;border-radius:2px;"></div>
+          <div style="width:24px;height:3px;background:${combinedColor};border-radius:2px;"></div>
           <span style="color:var(--text-secondary);">Combined Portfolio</span>
         </div>
         <div style="display:flex;align-items:center;gap:0.4rem;">
@@ -1086,11 +1087,11 @@ function renderPerformanceChart(data) {
     datasets.push({
       label: 'Combined Portfolio',
       data: data.combined,
-      borderColor: '#ffffff',
+      borderColor: combinedColor,
       borderWidth: 3,
       pointRadius: 0,
       pointHoverRadius: 6,
-      pointBackgroundColor: '#ffffff',
+      pointBackgroundColor: combinedColor,
       fill: false,
       tension: 0.25
     });
