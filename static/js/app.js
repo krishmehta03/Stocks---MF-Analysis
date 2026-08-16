@@ -136,29 +136,6 @@ function setupTableDragToScroll() {
 
 function setupEventListeners() {
   setupTableDragToScroll();
-  // Quick Theme Toggle
-  document.getElementById("btn-theme-toggle").addEventListener("click", () => {
-    const themes = ["emerald", "ocean", "cyberpunk", "rose-gold"];
-    let nextIdx = (themes.indexOf(activeTheme) + 1) % themes.length;
-    const nextTheme = themes[nextIdx];
-    applyTheme(nextTheme);
-
-    // Save updated theme to config
-    if (appConfig) {
-      appConfig.theme = nextTheme;
-      saveConfigOnServer(appConfig);
-    }
-    renderCharts();
-
-    const themeLabels = {
-      'emerald': 'Emerald Forest',
-      'ocean': 'Deep Blue Ocean',
-      'cyberpunk': 'Cyberpunk Dark',
-      'rose-gold': 'Rose Gold Premium'
-    };
-    const displayName = themeLabels[nextTheme] || nextTheme;
-    showToast(`Theme updated to ${displayName}`);
-  });
 
   // Reset columns button
   const resetBtn = document.getElementById("settings-reset-columns-btn");
@@ -313,40 +290,15 @@ async function fetchProfilesList() {
 }
 
 // APPLY VISUAL THEME
-function applyTheme(themeName) {
-  activeTheme = themeName;
+function applyTheme() {
+  activeTheme = 'emerald';
   // Keep the light-mode class if it is present
   const isLight = document.body.classList.contains('light-mode');
   document.body.className = '';
-  document.body.classList.add(`theme-${themeName}`);
+  document.body.classList.add('theme-emerald');
   if (isLight) {
     document.body.classList.add('light-mode');
   }
-  localStorage.setItem('portfolio_theme', themeName);
-
-  // Highlight active option in Settings Form
-  document.querySelectorAll(".theme-option[id^='theme-opt-']").forEach(opt => {
-    opt.classList.remove("active");
-  });
-  const activeOpt = document.getElementById(`theme-opt-${themeName}`);
-  if (activeOpt) activeOpt.classList.add("active");
-}
-
-async function selectThemeOption(themeName) {
-  applyTheme(themeName);
-  if (appConfig) {
-    appConfig.theme = themeName;
-    await saveConfigOnServer(appConfig);
-  }
-  const themeLabels = {
-    'emerald': 'Emerald Forest',
-    'ocean': 'Deep Blue Ocean',
-    'cyberpunk': 'Cyberpunk Dark',
-    'rose-gold': 'Rose Gold Premium'
-  };
-  const displayName = themeLabels[themeName] || themeName;
-  renderCharts();
-  showToast(`Theme updated to ${displayName}`);
 }
 
 // APPLY THEME MODE (DARK / LIGHT)
@@ -832,54 +784,126 @@ function renderCharts() {
         dataForChart = displayData;
       }
 
-      sectorChart = new Chart(sectorCtx, {
-        type: 'doughnut',
-        data: {
-          labels: labels,
-          datasets: [{
-            data: dataForChart,
-            backgroundColor: labels.map(l => getSectorColor(l)),
-            borderColor: 'rgba(255, 255, 255, 0.05)',
-            borderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'right',
-              labels: {
-                color: textSecondary,
-                font: { family: 'Plus Jakarta Sans', size: 11 }
-              }
-            },
-            tooltip: {
-              callbacks: {
-                label: function (context) {
-                  const idx = context.dataIndex;
-                  const item = finalSectors[idx];
-                  if (!item) return '';
+      // Check for extreme concentration (>= 80% in a single sector)
+      const maxSectorPct = totalPortfolioVal > 0 && sectorsList.length > 0 ? (sectorsList[0].value / totalPortfolioVal) * 100 : 0;
+      let barListContainer = document.getElementById('sector-bar-list-container');
 
-                  const actualVal = item.value;
-                  const actualPct = totalPortfolioVal > 0 ? (actualVal / totalPortfolioVal) * 100 : 0;
+      if (maxSectorPct >= 80) {
+        // EXTREME CONCENTRATION (>= 80%): Switch to clean horizontal bar view
+        sectorCtx.style.display = 'none';
+        if (sectorChart) {
+          sectorChart.destroy();
+          sectorChart = null;
+        }
 
-                  if (item.isOthers) {
-                    const lines = [`Others (${actualPct.toFixed(1)}%):`];
-                    othersSectors.forEach(sub => {
-                      const subPct = totalPortfolioVal > 0 ? (sub.value / totalPortfolioVal) * 100 : 0;
-                      lines.push(`→ ${sub.sector}: ${subPct.toFixed(1)}%`);
-                    });
-                    return lines;
+        if (!barListContainer) {
+          barListContainer = document.createElement('div');
+          barListContainer.id = 'sector-bar-list-container';
+          sectorCtx.parentElement.appendChild(barListContainer);
+        }
+        barListContainer.style.display = 'flex';
+        barListContainer.style.flexDirection = 'column';
+        barListContainer.style.justifyContent = 'center';
+        barListContainer.style.gap = '0.75rem';
+        barListContainer.style.width = '100%';
+        barListContainer.style.height = '100%';
+        barListContainer.style.padding = '0.5rem 0';
+        barListContainer.style.overflowY = 'auto';
+
+        let barRowsHTML = '';
+        sectorsList.forEach(item => {
+          const itemPct = totalPortfolioVal > 0 ? (item.value / totalPortfolioVal) * 100 : 0;
+          const color = getSectorColor(item.sector);
+          barRowsHTML += `
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                <span style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.45rem;">
+                  <span style="width: 10px; height: 10px; border-radius: 50%; background: ${color}; display: inline-block; flex-shrink: 0;"></span>
+                  ${item.sector}
+                </span>
+                <span style="font-weight: 700; color: var(--text-primary); font-family: 'Outfit';">${formatINR(item.value)} <span style="color: var(--text-secondary); font-weight: 600; font-size: 0.8rem;">(${itemPct.toFixed(1)}%)</span></span>
+              </div>
+              <div style="width: 100%; height: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; overflow: hidden; border: 1px solid var(--border, rgba(255, 255, 255, 0.08));">
+                <div style="width: ${Math.max(itemPct, 1)}%; height: 100%; background: ${color}; border-radius: 6px; transition: width 0.4s ease;"></div>
+              </div>
+            </div>
+          `;
+        });
+        barListContainer.innerHTML = barRowsHTML;
+      } else {
+        // DIVERSIFIED (< 80%): Render classic Doughnut chart with percentages in legend
+        if (barListContainer) barListContainer.style.display = 'none';
+        sectorCtx.style.display = 'block';
+
+        sectorChart = new Chart(sectorCtx, {
+          type: 'doughnut',
+          data: {
+            labels: labels,
+            datasets: [{
+              data: dataForChart,
+              backgroundColor: labels.map(l => getSectorColor(l)),
+              borderColor: 'rgba(255, 255, 255, 0.05)',
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'right',
+                labels: {
+                  color: textSecondary,
+                  font: { family: 'Plus Jakarta Sans', size: 11 },
+                  generateLabels: function (chart) {
+                    const data = chart.data;
+                    if (data.labels.length && data.datasets.length) {
+                      return data.labels.map((label, i) => {
+                        const item = finalSectors[i];
+                        const actualVal = item ? item.value : 0;
+                        const actualPct = totalPortfolioVal > 0 ? (actualVal / totalPortfolioVal) * 100 : 0;
+                        const fill = data.datasets[0].backgroundColor[i];
+                        return {
+                          text: `${label} — ${actualPct.toFixed(1)}%`,
+                          fillStyle: fill,
+                          strokeStyle: 'rgba(255, 255, 255, 0.05)',
+                          lineWidth: 1,
+                          hidden: !chart.isDatasetVisible(0) || (chart.getDatasetMeta(0).data[i] && chart.getDatasetMeta(0).data[i].hidden),
+                          index: i
+                        };
+                      });
+                    }
+                    return [];
                   }
+                }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    const idx = context.dataIndex;
+                    const item = finalSectors[idx];
+                    if (!item) return '';
 
-                  return ` ${item.sector}: ${formatINR(actualVal)} (${actualPct.toFixed(1)}%)`;
+                    const actualVal = item.value;
+                    const actualPct = totalPortfolioVal > 0 ? (actualVal / totalPortfolioVal) * 100 : 0;
+
+                    if (item.isOthers) {
+                      const lines = [`Others (${actualPct.toFixed(1)}%):`];
+                      othersSectors.forEach(sub => {
+                        const subPct = totalPortfolioVal > 0 ? (sub.value / totalPortfolioVal) * 100 : 0;
+                        lines.push(`→ ${sub.sector}: ${subPct.toFixed(1)}%`);
+                      });
+                      return lines;
+                    }
+
+                    return ` ${item.sector}: ${formatINR(actualVal)} (${actualPct.toFixed(1)}%)`;
+                  }
                 }
               }
             }
           }
-        }
-      });
+        });
+      }
 
       // Update concentration warning label below chart
       const concentrationLabelEl = document.getElementById('sector-concentration-label');

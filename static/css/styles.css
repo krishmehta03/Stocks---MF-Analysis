@@ -20,62 +20,7 @@ body.theme-emerald {
   --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
 }
 
-body.theme-ocean {
-  --bg-primary: #020617;
-  --bg-secondary: #0f172a;
-  --bg-tertiary: #1e293b;
-  --card-bg: rgba(15, 23, 42, 0.7);
-  --card-border: rgba(59, 130, 246, 0.18);
-  --accent: #3b82f6;
-  --accent-rgb: 59, 130, 246;
-  --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-  --accent-hover: #60a5fa;
-  --accent-glow: rgba(59, 130, 246, 0.35);
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --success: #10b981;
-  --danger: #ef4444;
-  --warning: #f59e0b;
-  --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-}
 
-body.theme-cyberpunk {
-  --bg-primary: #05010d;
-  --bg-secondary: #120224;
-  --bg-tertiary: #240442;
-  --card-bg: rgba(18, 2, 36, 0.65);
-  --card-border: rgba(236, 72, 153, 0.22);
-  --accent: #ec4899;
-  --accent-rgb: 236, 72, 153;
-  --accent-gradient: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);
-  --accent-hover: #f472b6;
-  --accent-glow: rgba(236, 72, 153, 0.4);
-  --text-primary: #ffffff;
-  --text-secondary: #cbd5e1;
-  --success: #06b6d4;
-  --danger: #f43f5e;
-  --warning: #f59e0b;
-  --card-shadow: 0 10px 30px -10px rgba(236, 72, 153, 0.15);
-}
-
-body.theme-rose-gold {
-  --bg-primary: #0d0b0c;
-  --bg-secondary: #161214;
-  --bg-tertiary: #272023;
-  --card-bg: rgba(22, 18, 20, 0.7);
-  --card-border: rgba(199, 125, 142, 0.25);
-  --accent: #c77d8e;
-  --accent-rgb: 199, 125, 142;
-  --accent-gradient: linear-gradient(135deg, #e0b1cb 0%, #9f86c0 100%);
-  --accent-hover: #e0b1cb;
-  --accent-glow: rgba(199, 125, 142, 0.35);
-  --text-primary: #fcfafb;
-  --text-secondary: #9fa0a4;
-  --success: #a3b18a;
-  --danger: #e07a5f;
-  --warning: #f2cc8f;
-  --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-}
 
 /* Global Reset */
 * {
@@ -2377,15 +2322,7 @@ body.light-mode {
 body.light-mode.theme-emerald {
   --card-border: rgba(16, 185, 129, 0.22);
 }
-body.light-mode.theme-ocean {
-  --card-border: rgba(59, 130, 246, 0.22);
-}
-body.light-mode.theme-cyberpunk {
-  --card-border: rgba(236, 72, 153, 0.22);
-}
-body.light-mode.theme-rose-gold {
-  --card-border: rgba(199, 125, 142, 0.28);
-}
+
 
 /* Light mode component specific styles */
 body.light-mode header {

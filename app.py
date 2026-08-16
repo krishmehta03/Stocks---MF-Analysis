@@ -521,30 +521,38 @@ _BROAD_SECTOR_MAP = {
     "communication": "Communication",
     "technology": "Technology",
     "healthcare": "Healthcare",
-    "other": "ETF"
+    "other": "Other"
 }
+
+def is_etf_stock(scrip_name: str, sym: str | None = None) -> bool:
+    name_upper = str(scrip_name or "").upper()
+    sym_upper = str(sym or "").upper()
+    etf_keywords = ["ETF", "BEES", "FOF", "INDEX", "CPSEETF", "MON100"]
+    return any(kw in name_upper for kw in etf_keywords) or any(kw in sym_upper for kw in etf_keywords)
 
 def get_broad_sector(granular_sector: str) -> str:
     if not granular_sector:
-        return "ETF"
+        return "Other"
     norm = granular_sector.strip().lower()
+    if norm in ("etf", "etfs"):
+        return "ETF"
     return _BROAD_SECTOR_MAP.get(norm, granular_sector.strip())
 
 
-def resolve_stock_sector(raw_sector: str, sym: str | None) -> tuple:
+def resolve_stock_sector(raw_sector: str, sym: str | None, scrip_name: str = "") -> tuple:
     """
     Resolve the (sector, industry, is_sector_missing) tuple for a stock.
-    If the raw sector in Excel is missing, 'Other', or 'ETFs', try to look it up
+    If the raw sector is generic/missing ('Other', 'ETFs', 'ETF', ''), try to look it up
     from yfinance cache or yfinance info.
     """
     raw_clean = str(raw_sector or "").strip()
-    if raw_clean and raw_clean not in ("Other", "ETFs"):
+    if raw_clean and raw_clean.lower() not in ("other", "etfs", "etf", "none", "null", ""):
         return get_broad_sector(raw_clean), raw_clean, False
         
     # Try resolving from yfinance
+    fetched_sector = None
     if sym:
         cached_info = _info_cache.get(sym)
-        fetched_sector = None
         if cached_info and cached_info.get("sector"):
             fetched_sector = cached_info["sector"]
         else:
@@ -554,12 +562,16 @@ def resolve_stock_sector(raw_sector: str, sym: str | None) -> tuple:
             except Exception:
                 pass
                 
-        if fetched_sector:
-            industry = _SECTOR_MAP.get(fetched_sector, fetched_sector)
-            return get_broad_sector(industry), industry, False
+    if fetched_sector:
+        industry = _SECTOR_MAP.get(fetched_sector, fetched_sector)
+        broad = get_broad_sector(industry)
+        if broad and broad.lower() != "other":
+            return broad, industry, False
             
-    # Default to ETFs/ETF
-    return "ETF", "ETFs", True
+    # Check if stock is an actual ETF
+    if is_etf_stock(scrip_name, sym):
+        return "ETF", "ETFs", True
+    return "Other", "Other", True
 
 
 
@@ -959,7 +971,15 @@ def get_portfolio_data(user_id=None):
         sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
         
         raw_sector = s.get('sector')
-        sector, industry, is_sector_missing = resolve_stock_sector(raw_sector, sym)
+        sector, industry, is_sector_missing = resolve_stock_sector(raw_sector, sym, str(scrip).strip())
+        
+        # Auto-heal DB sector if stored incorrectly as ETF/Other
+        if raw_sector != sector and sector not in ("Other", ""):
+            from lib.supabase_data import update_stock_holding
+            try:
+                update_stock_holding(user_id, s.get('id'), {'Sector': sector, 'Industry': industry})
+            except Exception:
+                pass
         
         qty = s.get('quantity') or 0
         buy_price = float(s.get('buy_price') or 0)
@@ -2099,7 +2119,7 @@ def sector_contribution():
             qty = s.get('quantity') or 0
             raw_sector = s.get('sector')
             sym = _resolve_ticker(str(scrip).strip(), str(exchange).strip())
-            sector, industry, is_sector_missing = resolve_stock_sector(raw_sector, sym)
+            sector, industry, is_sector_missing = resolve_stock_sector(raw_sector, sym, str(scrip).strip())
             if float(qty) > 0:
                 holdings.append({
                     'name': str(scrip).strip(),
@@ -2357,7 +2377,7 @@ def add_stock():
         buy_date = parse_date(buy_date_raw) if buy_date_raw else None
         
         sym = _resolve_ticker(company_name, "NSE")
-        sector, industry, is_sector_missing = resolve_stock_sector(sector, sym)
+        sector, industry, is_sector_missing = resolve_stock_sector(sector, sym, company_name)
 
         holding_data = {
             'Scrip Name': company_name,
@@ -2529,7 +2549,7 @@ def import_stocks_csv():
                 continue
 
             sym = _resolve_ticker(company, "NSE")
-            sector, industry, is_sector_missing = resolve_stock_sector(sector, sym)
+            sector, industry, is_sector_missing = resolve_stock_sector(sector, sym, company)
 
             holding_data = {
                 'Scrip Name': company,
@@ -2600,7 +2620,7 @@ def edit_stock():
         buy_date = parse_date(buy_date_raw) if buy_date_raw else None
         
         sym = _resolve_ticker(company_name, "NSE")
-        sector, industry, is_sector_missing = resolve_stock_sector(sector, sym)
+        sector, industry, is_sector_missing = resolve_stock_sector(sector, sym, company_name)
 
         holding_data = {
             'Scrip Name': company_name,

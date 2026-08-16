@@ -250,11 +250,8 @@
               </button>
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btn-mode-toggle" title="Toggle Light/Dark Mode" onclick="toggleThemeMode()" style="margin-right: 0.25rem;">
+          <button class="btn btn-secondary btn-sm" id="btn-mode-toggle" title="Toggle Light/Dark Mode" onclick="toggleThemeMode()">
             <i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Light
-          </button>
-          <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Quick Theme Toggle">
-            <i class="fa-solid fa-palette"></i> Theme
           </button>
         </div>
       </header>
@@ -739,29 +736,7 @@
         
         <form id="settings-form" onsubmit="saveCustomSettings(event)">
           
-          <!-- 1. Select Active Theme -->
-          <div class="form-group" style="margin-bottom: 2rem;">
-            <label style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">1. Select Custom Colour Theme</label>
-            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Swaps the visual style immediately by modifying CSS custom root variables.</p>
-            <div class="theme-picker-group">
-              <div class="theme-option" id="theme-opt-emerald" onclick="selectThemeOption('emerald')">
-                <div class="theme-swatch" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"></div>
-                <strong>Emerald Forest</strong>
-              </div>
-              <div class="theme-option" id="theme-opt-ocean" onclick="selectThemeOption('ocean')">
-                <div class="theme-swatch" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);"></div>
-                <strong>Deep Blue Ocean</strong>
-              </div>
-              <div class="theme-option" id="theme-opt-cyberpunk" onclick="selectThemeOption('cyberpunk')">
-                <div class="theme-swatch" style="background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);"></div>
-                <strong>Cyberpunk Dark</strong>
-              </div>
-              <div class="theme-option" id="theme-opt-rose-gold" onclick="selectThemeOption('rose-gold')">
-                <div class="theme-swatch" style="background: linear-gradient(135deg, #e0b1cb 0%, #9f86c0 100%);"></div>
-                <strong>Rose Gold Premium</strong>
-              </div>
-            </div>
-          </div>
+
 
           <!-- Theme Mode Selection -->
           <div class="form-group" style="margin-bottom: 2rem;">
