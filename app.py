@@ -191,6 +191,35 @@ def check_stock_limit(user_id: str) -> dict:
         "plan": plan
     }
 
+def check_mf_limit(user_id: str) -> dict:
+    """
+    Check if user can add more mutual funds.
+    Returns {allowed: bool, current: int, 
+             max: int, plan: str}
+    """
+    plan = get_user_plan(user_id)
+    limits = PLAN_LIMITS.get(plan, 
+                             PLAN_LIMITS['free'])
+    max_mf = limits['max_mf']
+    
+    if max_mf == -1:
+        return {
+            "allowed": True,
+            "current": 0,
+            "max": -1,
+            "plan": plan
+        }
+    
+    from lib.supabase_data import get_user_mf_holdings
+    current = len(get_user_mf_holdings(user_id))
+    
+    return {
+        "allowed": current < max_mf,
+        "current": current,
+        "max": max_mf,
+        "plan": plan
+    }
+
 
 app = Flask(__name__)
 
@@ -2702,6 +2731,16 @@ def add_mf():
     user_id = get_current_user_id()
     if not user_id:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    limit_check = check_mf_limit(user_id)
+    if not limit_check["allowed"]:
+        return jsonify({
+            "status": "error",
+            "message": f"Free plan limit reached. You have {limit_check['current']}/{limit_check['max']} mutual funds. Upgrade to Pro for unlimited mutual funds.",
+            "upgrade_required": True,
+            "feature": "max_mf"
+        }), 403
+
     data = request.json
     try:
         from lib.supabase_data import add_mf_holding
