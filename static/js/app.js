@@ -41,12 +41,14 @@ let activePeriod = '1M';
 let activeBenchmark = 'nifty50';
 let activeContribPeriod = '1M';
 let contribSortMode = 'contribution';
+let profilesList = [];
+let activeProfileName = 'Default Portfolio';
 
 
 // Core Constants
 const ALL_STOCK_COLUMNS = [
   "Scrip Name", "Exchange", "Sector", "Industry", "Qty", "Buy Price", "Buy Date", "Holding Period",
-  "Current Price", "5Y CAGR", "Nifty 5Y CAGR", "Invested Value", 
+  "Current Price", "5Y CAGR", "Nifty 5Y CAGR", "Invested Value",
   "Current Value", "P&L", "Return %", "Dividends", "Tax Flag", "Return (₹)"
 ];
 
@@ -74,10 +76,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Initialize Config and Data
 async function initializeApp() {
-  await fetchConfig();
-  await fetchPortfolio();
-  await fetchProfilesList();
-  checkScraperRunningOnStartup();
+  try {
+    await fetchConfig();
+  } catch (err) {
+    console.error("initializeApp: fetchConfig failed:", err);
+  }
+  try {
+    await fetchPortfolio();
+  } catch (err) {
+    console.error("initializeApp: fetchPortfolio failed:", err);
+  }
+  try {
+    await fetchProfilesList();
+  } catch (err) {
+    console.error("initializeApp: fetchProfilesList failed:", err);
+  }
+  try {
+    checkScraperRunningOnStartup();
+  } catch (err) {
+    console.error("initializeApp: checkScraperRunningOnStartup failed:", err);
+  }
 }
 
 function setupTableDragToScroll() {
@@ -124,14 +142,14 @@ function setupEventListeners() {
     let nextIdx = (themes.indexOf(activeTheme) + 1) % themes.length;
     const nextTheme = themes[nextIdx];
     applyTheme(nextTheme);
-    
+
     // Save updated theme to config
     if (appConfig) {
       appConfig.theme = nextTheme;
       saveConfigOnServer(appConfig);
     }
     renderCharts();
-    
+
     const themeLabels = {
       'emerald': 'Emerald Forest',
       'ocean': 'Deep Blue Ocean',
@@ -153,7 +171,7 @@ function setupEventListeners() {
   if (updatePricesBtn) {
     updatePricesBtn.addEventListener("click", startLivePriceScraper);
   }
-  
+
   // Search Filters
   document.getElementById("stock-search").addEventListener("input", filterStocksTable);
   document.getElementById("mf-search").addEventListener("input", filterMfsTable);
@@ -187,7 +205,7 @@ function setupEventListeners() {
 // SWITCH TABS
 function switchTab(tabId) {
   activeTab = tabId;
-  
+
   // Update nav buttons
   const tabBtns = document.querySelectorAll(".tab-btn");
   tabBtns.forEach(btn => {
@@ -233,26 +251,59 @@ async function fetchPortfolio() {
   try {
     const res = await authorizedFetch('/api/portfolio');
     portfolioData = await res.json();
-    
+
     if (portfolioData.error) {
       alert("Error: " + portfolioData.error);
       return;
     }
-    
+
     updateDashboardMetrics();
     renderCharts();
     renderStocksTable();
     renderMfsTable();
     renderRiskSignals();
     evaluateRiskAlerts();
-    
+
     // Fetch performance historical trend data
     fetchPerformanceData();
-    
+
     // Fetch sector contribution breakdown data
     fetchSectorContributionData();
   } catch (err) {
     console.error("Error loading portfolio data:", err);
+  }
+}
+
+// Fetch the list of saved portfolio profiles and which one is active.
+// Populates an optional #profile-select dropdown if one exists in the DOM,
+// but is safe to run even if no such element is present.
+async function fetchProfilesList() {
+  try {
+    const res = await authorizedFetch('/api/profiles');
+    const data = await res.json();
+
+    if (data.status === 'error') {
+      console.error("Error loading profiles:", data.message);
+      return;
+    }
+
+    profilesList = data.profiles || [];
+    activeProfileName = data.active_profile || 'Default Portfolio';
+
+    // If a profile selector exists in the page, keep it in sync.
+    const selectEl = document.getElementById('profile-select');
+    if (selectEl) {
+      selectEl.innerHTML = '';
+      profilesList.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = p.name;
+        if (p.name === activeProfileName) opt.selected = true;
+        selectEl.appendChild(opt);
+      });
+    }
+  } catch (err) {
+    console.error("Error loading profiles list:", err);
   }
 }
 
@@ -267,7 +318,7 @@ function applyTheme(themeName) {
     document.body.classList.add('light-mode');
   }
   localStorage.setItem('portfolio_theme', themeName);
-  
+
   // Highlight active option in Settings Form
   document.querySelectorAll(".theme-option[id^='theme-opt-']").forEach(opt => {
     opt.classList.remove("active");
@@ -304,14 +355,14 @@ function applyThemeMode(modeName) {
     document.body.classList.remove('light-mode');
   }
   localStorage.setItem('portfolio_theme_mode', modeName);
-  
+
   // Highlight active option in Settings Form
   document.querySelectorAll(".theme-option[id^='mode-opt-']").forEach(opt => {
     opt.classList.remove("active");
   });
   const activeOpt = document.getElementById(`mode-opt-${modeName}`);
   if (activeOpt) activeOpt.classList.add("active");
-  
+
   // Update the Quick Toggle button icon in header
   const modeBtn = document.getElementById("btn-mode-toggle");
   if (modeBtn) {
@@ -367,22 +418,22 @@ function showToast(message) {
     toastEl.style.transition = "opacity 0.3s ease, transform 0.3s ease";
     document.body.appendChild(toastEl);
   }
-  
+
   toastEl.innerHTML = `<i class="fa-solid fa-circle-check" style="color: #10b981;"></i> <span>${message}</span>`;
   toastEl.style.opacity = "0";
   toastEl.style.transform = "translateY(10px)";
   toastEl.style.display = "flex";
-  
+
   // Trigger animation
   setTimeout(() => {
     toastEl.style.opacity = "1";
     toastEl.style.transform = "translateY(0)";
   }, 10);
-  
+
   if (toastTimeout) {
     clearTimeout(toastTimeout);
   }
-  
+
   toastTimeout = setTimeout(() => {
     toastEl.style.opacity = "0";
     toastEl.style.transform = "translateY(10px)";
@@ -404,22 +455,22 @@ function triggerCheckboxToast() {
 
 async function saveColumnPreferences() {
   if (!appConfig) return;
-  
+
   const stockCols = [];
   document.querySelectorAll("input[name='stock-col']:checked").forEach(cb => {
     stockCols.push(cb.value);
   });
-  
+
   const mfCols = [];
   document.querySelectorAll("input[name='mf-col']:checked").forEach(cb => {
     mfCols.push(cb.value);
   });
-  
+
   appConfig.display_columns.stocks = stockCols;
   appConfig.display_columns.mf = mfCols;
-  
+
   await saveConfigOnServer(appConfig);
-  
+
   // Update tables
   renderStocksTable();
   renderMfsTable();
@@ -427,27 +478,27 @@ async function saveColumnPreferences() {
 
 async function resetColumnsToDefault() {
   if (!appConfig) return;
-  
+
   document.querySelectorAll("input[name='stock-col']").forEach(cb => {
     cb.checked = DEFAULT_STOCK_COLUMNS.includes(cb.value);
   });
-  
+
   document.querySelectorAll("input[name='mf-col']").forEach(cb => {
     cb.checked = DEFAULT_MF_COLUMNS.includes(cb.value);
   });
-  
+
   // Save preferences immediately (no debounce needed for reset)
   if (checkboxToastTimeout) clearTimeout(checkboxToastTimeout);
-  
+
   appConfig.display_columns.stocks = [...DEFAULT_STOCK_COLUMNS];
   appConfig.display_columns.mf = [...DEFAULT_MF_COLUMNS];
-  
+
   await saveConfigOnServer(appConfig);
-  
+
   // Update tables
   renderStocksTable();
   renderMfsTable();
-  
+
   showToast("Columns reset to default");
 }
 
@@ -455,33 +506,33 @@ async function resetColumnsToDefault() {
 function updateDashboardMetrics() {
   if (!portfolioData || !portfolioData.summary) return;
   const s = portfolioData.summary;
-  
+
   // Combined Stats
   document.getElementById("val-total-portfolio").innerText = formatINR(s.total_portfolio_value);
   document.getElementById("sub-total-portfolio").innerText = `Invested: ${formatINR(s.total_portfolio_invested)}`;
-  
+
   const pnlVal = document.getElementById("val-total-pnl");
   pnlVal.innerText = formatINR(s.total_portfolio_pnl);
   pnlVal.className = 'value ' + (s.total_portfolio_pnl >= 0 ? 'positive' : 'negative');
-  
+
   const pnlSub = document.getElementById("sub-total-pnl");
   pnlSub.innerText = `Return: ${s.total_portfolio_return_pct.toFixed(2)}%`;
   pnlSub.className = 'sub-value ' + (s.total_portfolio_pnl >= 0 ? 'positive' : 'negative');
-  
+
   // Portfolio Beta
   document.getElementById("val-portfolio-beta").innerText = s.portfolio_beta.toFixed(2);
   const stSub = document.getElementById("sub-portfolio-beta");
   stSub.innerText = "Weighted sensitivity relative to Nifty 50";
   stSub.className = 'sub-value text-secondary';
-  
+
   // Update Combined Portfolio breakdown tooltip values
   document.getElementById("tooltip-stocks-val").innerText = formatINR(s.total_stock_value);
   document.getElementById("tooltip-mfs-val").innerText = formatINR(s.total_mf_value);
-  
+
   // MF Stats (Dynamic empty or populated state)
   const mfCardContent = document.getElementById("mf-card-content");
   const hasMfData = portfolioData.mfs && portfolioData.mfs.length > 0;
-  
+
   if (!hasMfData) {
     // Empty State
     mfCardContent.innerHTML = `
@@ -498,7 +549,7 @@ function updateDashboardMetrics() {
     const pnlSign = s.total_mf_pnl >= 0 ? '+' : '';
     const pnlClass = s.total_mf_pnl >= 0 ? 'positive' : 'negative';
     const fundCountStr = portfolioData.mfs.length === 1 ? '1 fund' : `${portfolioData.mfs.length} funds`;
-    
+
     mfCardContent.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <h3>Mutual Fund Allocation</h3>
@@ -509,10 +560,10 @@ function updateDashboardMetrics() {
       <div class="sub-value ${pnlClass}" id="sub-mf-value" style="margin-top: 0.25rem; font-weight: 600;">P&L: ${pnlSign}${formatINR(s.total_mf_pnl)} (${s.total_mf_return_pct.toFixed(2)}%)</div>
     `;
   }
-  
+
   // Toggles active widgets display
   toggleWidgetsVisibility();
-  
+
   // Render leaderboard Performers
   renderLeaders();
   renderUnderperformers();
@@ -521,12 +572,12 @@ function updateDashboardMetrics() {
 function toggleWidgetsVisibility() {
   if (!appConfig || !appConfig.widgets) return;
   const w = appConfig.widgets;
-  
+
   document.getElementById("widget-sector-chart-box").style.display = w.sector_allocation ? 'block' : 'none';
   document.getElementById("widget-asset-chart-box").style.display = w.asset_allocation ? 'block' : 'none';
   document.getElementById("widget-leaders-box").style.display = w.top_performers ? 'block' : 'none';
   document.getElementById("widget-underperformers-box").style.display = (w.top_underperformers !== false) ? 'block' : 'none';
-  
+
   // Recalculate Dashboard details grid layout based on what widgets are visible
   const detGrid = document.querySelector(".dashboard-details");
   const rightColHasContent = w.asset_allocation || w.top_performers || (w.top_underperformers !== false);
@@ -547,18 +598,18 @@ function renderLeaders() {
     container.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; padding: 1rem;">No holdings yet</p>`;
     return;
   }
-  
+
   const allInvested = portfolioData.stocks.filter(s => (s["Invested Value"] || 0) > 0);
   const qualifiers = allInvested.filter(s => (s["Return %"] || 0) > 10);
-  
+
   if (qualifiers.length === 0) {
     container.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; padding: 1rem;">No stocks qualify (Threshold: +10%)</p>`;
     return;
   }
-  
+
   // Sort descending
   const sorted = [...qualifiers].sort((a, b) => b["Return %"] - a["Return %"]);
-  
+
   // Header count note
   const countNote = document.createElement("div");
   countNote.style.fontSize = "0.75rem";
@@ -567,7 +618,7 @@ function renderLeaders() {
   countNote.style.textAlign = "right";
   countNote.innerText = `${Math.min(3, sorted.length)} of ${sorted.length} qualify`;
   container.appendChild(countNote);
-  
+
   // Render up to 3
   const toDisplay = sorted.slice(0, 3);
   toDisplay.forEach((s, i) => {
@@ -586,7 +637,7 @@ function renderLeaders() {
     `;
     container.appendChild(el);
   });
-  
+
   // If fewer than 3 qualify, append fallback note
   if (sorted.length < 3) {
     const fallbackEl = document.createElement("div");
@@ -668,20 +719,20 @@ function renderUnderperformers() {
 // RENDER BEAUTIFUL CHARTS
 function renderCharts() {
   if (!portfolioData) return;
-  
-  const w = appConfig ? appConfig.widgets : { sector_allocation: true, asset_allocation: true };
-  
+
+  const w = (appConfig && appConfig.widgets) ? appConfig.widgets : { sector_allocation: true, asset_allocation: true };
+
   // Theme styling helpers
   const cssVariables = getComputedStyle(document.body);
   const accentColor = cssVariables.getPropertyValue('--accent').trim() || '#10b981';
   const textSecondary = cssVariables.getPropertyValue('--text-secondary').trim() || '#94a3b8';
-  
+
   // 1. SECTOR ALLOCATION DOUGHNUT
   if (w.sector_allocation) {
     const sectorCtx = document.getElementById('chart-sector-allocation');
     if (sectorCtx) {
       if (sectorChart) sectorChart.destroy();
-      
+
       // Calculate sector totals
       const sectorsList = [];
       let totalStockValue = 0;
@@ -689,7 +740,7 @@ function renderCharts() {
         const sec = s["Sector"] || "Other";
         const val = s["Current Value"] || 0;
         totalStockValue += val;
-        
+
         let existing = sectorsList.find(item => item.sector === sec);
         if (existing) {
           existing.value += val;
@@ -697,36 +748,36 @@ function renderCharts() {
           sectorsList.push({ sector: sec, value: val });
         }
       });
-      
+
       const totalMfValue = portfolioData.summary.total_mf_value || 0;
       const totalPortfolioVal = totalStockValue + totalMfValue;
-      
+
       // Sort descending by value
       sectorsList.sort((a, b) => b.value - a.value);
-      
+
       const mainSectors = [];
       const othersSectors = [];
-      
+
       sectorsList.forEach((item) => {
         const pct = totalPortfolioVal > 0 ? (item.value / totalPortfolioVal) * 100 : 0;
         const isTooSmall = pct < 3.0;
         // Limit to Top 7 if total sectors > 8
         const isBeyondTop7 = sectorsList.length > 8 && mainSectors.length >= 7;
-        
+
         if (isTooSmall || isBeyondTop7) {
           othersSectors.push(item);
         } else {
           mainSectors.push(item);
         }
       });
-      
+
       // Fallback: If all sectors are tiny, keep the largest as main so we don't have 100% Others
       if (mainSectors.length === 0 && sectorsList.length > 0) {
         mainSectors.push(sectorsList[0]);
         const idx = othersSectors.findIndex(item => item.sector === sectorsList[0].sector);
         if (idx !== -1) othersSectors.splice(idx, 1);
       }
-      
+
       const finalSectors = [...mainSectors];
       if (othersSectors.length > 0) {
         const othersVal = othersSectors.reduce((sum, item) => sum + item.value, 0);
@@ -737,20 +788,20 @@ function renderCharts() {
           breakdown: othersSectors
         });
       }
-      
+
       let labels = [];
       let dataForChart = [];
-      
+
       if (finalSectors.length === 0) {
         labels.push("No Holdings");
         dataForChart.push(1);
       } else {
         labels = finalSectors.map(item => item.sector);
-        
+
         // Force minimum 1% for any slice with value > 0 for visual rendering
         const totalDisplayVal = finalSectors.reduce((sum, item) => sum + item.value, 0);
         const minVal = totalDisplayVal * 0.01;
-        
+
         let displayData = finalSectors.map(item => item.value);
         if (totalDisplayVal > 0) {
           let adjustedSum = 0;
@@ -761,7 +812,7 @@ function renderCharts() {
             }
             return item.value;
           });
-          
+
           const originalRemainingSum = finalSectors.reduce((sum, item) => (item.value >= minVal ? sum + item.value : sum), 0);
           const targetRemainingSum = totalDisplayVal - adjustedSum;
           if (originalRemainingSum > 0 && targetRemainingSum > 0) {
@@ -775,7 +826,7 @@ function renderCharts() {
         }
         dataForChart = displayData;
       }
-      
+
       sectorChart = new Chart(sectorCtx, {
         type: 'doughnut',
         data: {
@@ -800,14 +851,14 @@ function renderCharts() {
             },
             tooltip: {
               callbacks: {
-                label: function(context) {
+                label: function (context) {
                   const idx = context.dataIndex;
                   const item = finalSectors[idx];
                   if (!item) return '';
-                  
+
                   const actualVal = item.value;
                   const actualPct = totalPortfolioVal > 0 ? (actualVal / totalPortfolioVal) * 100 : 0;
-                  
+
                   if (item.isOthers) {
                     const lines = [`Others (${actualPct.toFixed(1)}%):`];
                     othersSectors.forEach(sub => {
@@ -816,7 +867,7 @@ function renderCharts() {
                     });
                     return lines;
                   }
-                  
+
                   return ` ${item.sector}: ${formatINR(actualVal)} (${actualPct.toFixed(1)}%)`;
                 }
               }
@@ -851,24 +902,24 @@ function renderCharts() {
     const assetCtx = document.getElementById('chart-asset-allocation');
     const chartContainer = document.getElementById('asset-chart-container');
     const emptyState = document.getElementById('asset-empty-state');
-    
+
     if (assetCtx) {
       if (assetChart) assetChart.destroy();
-      
+
       const stVal = portfolioData.summary.total_stock_value;
       const mfVal = portfolioData.summary.total_mf_value;
-      
+
       if (mfVal === 0) {
         if (chartContainer) chartContainer.style.display = 'none';
         if (emptyState) emptyState.style.display = 'flex';
       } else {
         if (chartContainer) chartContainer.style.display = 'flex';
         if (emptyState) emptyState.style.display = 'none';
-        
+
         const totalVal = stVal + mfVal;
         const stPct = totalVal > 0 ? ((stVal / totalVal) * 100).toFixed(1) : '0.0';
         const mfPct = totalVal > 0 ? ((mfVal / totalVal) * 100).toFixed(1) : '0.0';
-        
+
         assetChart = new Chart(assetCtx, {
           type: 'doughnut',
           data: {
@@ -909,10 +960,10 @@ async function fetchPerformanceData() {
   const loader = document.getElementById("perf-loading");
   const canvas = document.getElementById("chart-performance");
   const badge = document.getElementById("perf-outperf-badge");
-  
+
   if (loader) loader.style.display = "flex";
   if (canvas) canvas.style.display = "none";
-  
+
   try {
     const res = await authorizedFetch(`/api/portfolio/performance?period=${activePeriod}&benchmark=${activeBenchmark}`);
     if (!res.ok) {
@@ -920,10 +971,10 @@ async function fetchPerformanceData() {
       throw new Error(err.error || "Failed to fetch performance data");
     }
     const data = await res.json();
-    
+
     if (loader) loader.style.display = "none";
     if (canvas) canvas.style.display = "block";
-    
+
     renderPerformanceChart(data);
   } catch (err) {
     console.error("Error loading performance chart:", err);
@@ -951,11 +1002,11 @@ function formatDateCleanly(dateStr) {
 function renderPerformanceChart(data) {
   const ctx = document.getElementById('chart-performance');
   if (!ctx) return;
-  
+
   if (performanceChart) {
     performanceChart.destroy();
   }
-  
+
   // Theme styling colors
   const cssVars = getComputedStyle(document.body);
   const accentColor = cssVars.getPropertyValue('--accent').trim() || '#10b981';
@@ -1008,21 +1059,21 @@ function renderPerformanceChart(data) {
   const alpha = data.outperformance;
 
   if (stripPeriodEl) stripPeriodEl.innerText = data.period || activePeriod;
-  
+
   if (stripPortRetEl) {
     stripPortRetEl.innerText = `${portRet >= 0 ? '+' : ''}${portRet.toFixed(2)}%`;
     stripPortRetEl.className = `value ${portRet >= 0 ? 'positive' : 'negative'}`;
   }
-  
+
   if (stripBenchLabelEl) {
     stripBenchLabelEl.innerText = `${data.benchmark_name || 'Benchmark'} Return:`;
   }
-  
+
   if (stripBenchRetEl) {
     stripBenchRetEl.innerText = `${benchRet >= 0 ? '+' : ''}${benchRet.toFixed(2)}%`;
     stripBenchRetEl.className = `value ${benchRet >= 0 ? 'positive' : 'negative'}`;
   }
-  
+
   if (stripAlphaEl) {
     stripAlphaEl.innerText = `${alpha >= 0 ? '+' : ''}${alpha.toFixed(2)}%`;
     if (alpha > 0.5) {
@@ -1036,20 +1087,20 @@ function renderPerformanceChart(data) {
       stripAlphaEl.style.color = '#94a3b8';
     }
   }
-  
+
   if (stripAsOfEl) {
     let asOfDate = new Date();
     const timestamp = (portfolioData && portfolioData.last_updated) || localLastUpdatedTimestamp;
     if (timestamp) {
       asOfDate = new Date(timestamp * 1000);
     }
-    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const day = String(asOfDate.getDate()).padStart(2, '0');
     const mon = MONTHS[asOfDate.getMonth()];
     const year = asOfDate.getFullYear();
     stripAsOfEl.innerText = `${day} ${mon} ${year}`;
   }
-  
+
   // Update Legend Row
   const combinedColor = activeThemeMode === 'light' ? '#3b82f6' : '#38bdf8';
   const legendRow = document.getElementById("perf-chart-legend-row");
@@ -1135,7 +1186,7 @@ function renderPerformanceChart(data) {
     fill: false,
     tension: 0.2
   });
-  
+
   // Calculate dynamic min/max scaling
   const allValues = [];
   if (data.portfolio) {
@@ -1157,7 +1208,7 @@ function renderPerformanceChart(data) {
     yMin = minVal - margin;
     yMax = maxVal + margin;
   }
-  
+
   performanceChart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -1193,11 +1244,11 @@ function renderPerformanceChart(data) {
           titleFont: { family: 'Outfit', size: 13, weight: 'bold' },
           bodyFont: { family: 'Plus Jakarta Sans', size: 12 },
           callbacks: {
-            title: function(context) {
+            title: function (context) {
               const dateStr = context[0].label;
               return formatDateCleanly(dateStr);
             },
-            label: function(context) {
+            label: function (context) {
               let label = context.dataset.label || '';
               if (label) {
                 label += ': ';
@@ -1207,7 +1258,7 @@ function renderPerformanceChart(data) {
               }
               return label;
             },
-            footer: function(context) {
+            footer: function (context) {
               if (context.length >= 3) {
                 const combinedVal = context[1].parsed.y;
                 const benchVal = context[2].parsed.y;
@@ -1224,7 +1275,7 @@ function renderPerformanceChart(data) {
               return '';
             }
           },
-          footerColor: function(context) {
+          footerColor: function (context) {
             if (context.length >= 3) {
               const combinedVal = context[1].parsed.y;
               const benchVal = context[2].parsed.y;
@@ -1250,7 +1301,7 @@ function renderPerformanceChart(data) {
             maxRotation: 0,
             autoSkip: true,
             maxTicksLimit: 6,
-            callback: function(value, index, values) {
+            callback: function (value, index, values) {
               const label = this.getLabelForValue(value);
               return formatDateCleanly(label);
             }
@@ -1260,14 +1311,14 @@ function renderPerformanceChart(data) {
           min: yMin,
           max: yMax,
           grid: {
-            color: function(context) {
+            color: function (context) {
               // Brighter line at 100 baseline
               if (context.tick && Math.abs(context.tick.value - 100) < 0.001) {
                 return 'rgba(255, 255, 255, 0.18)';
               }
               return 'rgba(255, 255, 255, 0.04)';
             },
-            lineWidth: function(context) {
+            lineWidth: function (context) {
               if (context.tick && Math.abs(context.tick.value - 100) < 0.001) {
                 return 1.5;
               }
@@ -1277,7 +1328,7 @@ function renderPerformanceChart(data) {
           ticks: {
             color: textSecondary,
             font: { family: 'Plus Jakarta Sans', size: 11 },
-            callback: function(value) {
+            callback: function (value) {
               return value.toFixed(0);
             }
           }
@@ -1287,7 +1338,7 @@ function renderPerformanceChart(data) {
     plugins: [{
       // Draw "Start" label on the 100 baseline
       id: 'baselineLabel',
-      afterDraw: function(chart) {
+      afterDraw: function (chart) {
         const yScale = chart.scales['y'];
         const xScale = chart.scales['x'];
         if (!yScale || yScale.min > 100 || yScale.max < 100) return;
@@ -1307,7 +1358,7 @@ function renderPerformanceChart(data) {
 
 function setPeriod(period) {
   activePeriod = period;
-  
+
   // Update UI active buttons
   const buttons = document.querySelectorAll(".perf-period-btn");
   buttons.forEach(btn => {
@@ -1317,7 +1368,7 @@ function setPeriod(period) {
       btn.classList.remove("active");
     }
   });
-  
+
   fetchPerformanceData();
 }
 
@@ -1333,12 +1384,12 @@ async function fetchSectorContributionData() {
   const chartContainer = document.getElementById("contrib-chart-container");
   const summaryRow = document.getElementById("contrib-summary-row");
   const emptyState = document.getElementById("contrib-empty-state");
-  
+
   if (loader) loader.style.display = "flex";
   if (chartContainer) chartContainer.style.display = "none";
   if (summaryRow) summaryRow.style.display = "none";
   if (emptyState) emptyState.style.display = "none";
-  
+
   try {
     const res = await authorizedFetch(`/api/portfolio/sector-contribution?period=${activeContribPeriod}&benchmark=${activeBenchmark}`);
     if (!res.ok) {
@@ -1346,7 +1397,7 @@ async function fetchSectorContributionData() {
       throw new Error(err.error || "Failed to fetch sector attribution data");
     }
     const data = await res.json();
-    
+
     renderSectorContributionChart(data);
   } catch (err) {
     console.error("Error loading sector contribution:", err);
@@ -1396,7 +1447,7 @@ function getSectorColor(sectorName) {
   if (norm === 'others' || norm === 'other' || norm === 'etfs') {
     return 'rgba(71, 85, 105, 0.85)'; // slate-600 for "Others" / "ETFs"
   }
-  
+
   const explicitMappings = {
     'utilities': 'rgba(34, 197, 94, 0.85)', // green
     'energy': 'rgba(249, 115, 22, 0.85)', // orange
@@ -1427,15 +1478,15 @@ function getSectorColor(sectorName) {
     'mining & minerals': 'rgba(120, 113, 108, 0.85)', // brown
     'metal - non ferrous': 'rgba(148, 163, 184, 0.85)', // grey
   };
-  
+
   if (explicitMappings[norm]) {
     return explicitMappings[norm];
   }
-  
+
   if (sectorColorCache[norm]) {
     return sectorColorCache[norm];
   }
-  
+
   // Assign next unused backup color (never grey)
   let chosenColor = null;
   for (let i = 0; i < BACKUP_PALETTE.length; i++) {
@@ -1446,11 +1497,11 @@ function getSectorColor(sectorName) {
       break;
     }
   }
-  
+
   if (!chosenColor) {
     chosenColor = 'rgba(34, 197, 94, 0.85)';
   }
-  
+
   sectorColorCache[norm] = chosenColor;
   return chosenColor;
 }
@@ -1503,10 +1554,10 @@ function externalTooltipHandler(context) {
     if (sec) {
       const sign = sec.return_pct >= 0 ? '+' : '';
       const rupeesSign = sec.contrib_rupees >= 0 ? '+' : '';
-      
+
       const posColor = '#10b981';
       const negColor = '#ef4444';
-      
+
       let innerHtml = `
         <div style="font-weight: bold; font-family: 'Outfit'; font-size: 13px; color: #f8fafc; margin-bottom: 6px; display: flex; align-items: center; gap: 0.4rem;">
           <span>📁 Sector: ${sec.sector}</span>
@@ -1519,7 +1570,7 @@ function externalTooltipHandler(context) {
         <div style="font-weight: bold; color: #f8fafc; margin-bottom: 4px; font-size: 11px;">Holdings Detail:</div>
         <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px;">
       `;
-      
+
       sec.stocks.forEach(st => {
         const stSign = st.return_pct >= 0 ? '+' : '';
         const stRupeesSign = st.contrib_rupees >= 0 ? '+' : '';
@@ -1533,7 +1584,7 @@ function externalTooltipHandler(context) {
           </li>
         `;
       });
-      
+
       innerHtml += '</ul>';
       tooltipEl.innerHTML = innerHtml;
     }
@@ -1545,12 +1596,12 @@ function externalTooltipHandler(context) {
   tooltipEl.style.opacity = 1;
   const tooltipWidth = tooltipEl.offsetWidth;
   const viewportWidth = window.innerWidth;
-  
+
   let leftPos = window.pageXOffset + position.left + tooltipModel.caretX + 15;
   if (leftPos + tooltipWidth > viewportWidth - 20) {
     leftPos = window.pageXOffset + position.left + tooltipModel.caretX - tooltipWidth - 15;
   }
-  
+
   tooltipEl.style.left = leftPos + 'px';
   tooltipEl.style.top = window.pageYOffset + position.top + tooltipModel.caretY - 40 + 'px';
 }
@@ -1558,18 +1609,18 @@ function externalTooltipHandler(context) {
 function renderSectorContributionChart(data) {
   const ctx = document.getElementById('chart-sector-contribution');
   if (!ctx) return;
-  
+
   if (sectorContribChart) {
     sectorContribChart.destroy();
   }
-  
+
   // Clean elements
   const loader = document.getElementById("contrib-loading");
   const chartContainer = document.getElementById("contrib-chart-container");
   const summaryRow = document.getElementById("contrib-summary-row");
   const emptyState = document.getElementById("contrib-empty-state");
   const legendBox = document.getElementById("contrib-legend");
-  
+
   // Sort sectors based on active sorting mode
   let sortedSectors = [...data.sectors];
   if (contribSortMode === 'contribution') {
@@ -1577,7 +1628,7 @@ function renderSectorContributionChart(data) {
   } else {
     sortedSectors.sort((a, b) => a.sector.localeCompare(b.sector));
   }
-  
+
   // Empty State Check: If only 1 sector exists, show the requested empty state
   if (sortedSectors.length <= 1) {
     if (loader) loader.style.display = "none";
@@ -1596,10 +1647,10 @@ function renderSectorContributionChart(data) {
       legendBox.style.flexWrap = "unset";
       legendBox.style.justifyContent = "unset";
       legendBox.style.gap = "unset";
-      
+
       const top5 = sortedSectors.slice(0, 5);
       const remaining = sortedSectors.slice(5);
-      
+
       const renderLegendItem = (sec) => {
         const isNeg = sec.contrib_pct < 0;
         const color = getSectorColor(sec.sector);
@@ -1615,14 +1666,14 @@ function renderSectorContributionChart(data) {
           </div>
         `;
       };
-      
+
       let legendHTML = `
         <div style="width: 100%; display: flex; flex-direction: column; gap: 8px; font-size: 12px; padding: 0.5rem 0 0;">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
             ${top5.map(sec => renderLegendItem(sec)).join('')}
           </div>
       `;
-      
+
       if (remaining.length > 0) {
         legendHTML += `
           <div id="contrib-remaining-sectors" style="display: none; margin-top: 8px;">
@@ -1642,10 +1693,10 @@ function renderSectorContributionChart(data) {
           </div>
         `;
       }
-      
+
       legendHTML += `</div>`;
       legendBox.innerHTML = legendHTML;
-      
+
       if (remaining.length > 0) {
         const moreBtn = document.getElementById("contrib-more-btn");
         if (moreBtn) {
@@ -1667,26 +1718,26 @@ function renderSectorContributionChart(data) {
       }
     }
   }
-  
+
   // CSS Vars for styling tooltips
   const cssVars = getComputedStyle(document.body);
   const textPrimary = cssVars.getPropertyValue('--text-primary').trim() || '#f8fafc';
   const textSecondary = cssVars.getPropertyValue('--text-secondary').trim() || '#94a3b8';
-  
+
   // Update summary stats
   document.getElementById("contrib-summary-portfolio").innerText = `${data.portfolio_return_pct >= 0 ? '+' : ''}${data.portfolio_return_pct.toFixed(2)}%`;
   document.getElementById("contrib-summary-portfolio").className = data.portfolio_return_pct >= 0 ? 'positive' : 'negative';
-  
+
   document.getElementById("contrib-summary-bench-name").innerText = `${data.benchmark_name} Return`;
   document.getElementById("contrib-summary-bench").innerText = `${data.benchmark_return_pct >= 0 ? '+' : ''}${data.benchmark_return_pct.toFixed(2)}%`;
   document.getElementById("contrib-summary-bench").className = data.benchmark_return_pct >= 0 ? 'positive' : 'negative';
-  
+
   const alphaVal = data.alpha;
   const valEl = document.getElementById("contrib-summary-alpha");
   const labelEl = document.getElementById("contrib-summary-alpha-label");
   valEl.innerText = `${alphaVal >= 0 ? '+' : ''}${alphaVal.toFixed(2)}%`;
   valEl.style.color = '';
-  
+
   if (alphaVal > 0.5) {
     valEl.className = 'value positive';
     if (labelEl) labelEl.innerText = "Generated Alpha";
@@ -1715,12 +1766,12 @@ function renderSectorContributionChart(data) {
       downturnEl.style.display = "none";
     }
   }
-  
+
   // Build Chart.js horizontal stacked datasets
   const datasets = sortedSectors.map(sec => {
     const isNeg = sec.contrib_pct < 0;
     const color = getSectorColor(sec.sector);
-    
+
     // Ensure thin visible sliver for near-zero contributions (min +/- 0.35% display value for 3px width)
     const originalValue = sec.contrib_pct;
     let displayValue = originalValue;
@@ -1732,7 +1783,7 @@ function renderSectorContributionChart(data) {
         displayValue = Math.min(originalValue, -minVisPct);
       }
     }
-    
+
     return {
       label: sec.sector,
       data: [displayValue],
@@ -1744,7 +1795,7 @@ function renderSectorContributionChart(data) {
       originalValue: originalValue
     };
   });
-  
+
   // Inline Custom Plugin to render sector labels inside segments if they fit
   const segmentLabelsPlugin = {
     id: 'segmentLabels',
@@ -1776,7 +1827,7 @@ function renderSectorContributionChart(data) {
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
+
         // Smooth shadow for perfect readability on all gradients
         ctx.shadowColor = 'rgba(15, 23, 42, 0.75)';
         ctx.shadowBlur = 4;
@@ -1788,7 +1839,7 @@ function renderSectorContributionChart(data) {
       ctx.restore();
     }
   };
-  
+
   sectorContribChart = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -1812,7 +1863,7 @@ function renderSectorContributionChart(data) {
           ticks: {
             color: textSecondary,
             font: { family: 'Plus Jakarta Sans', size: 10 },
-            callback: function(value) {
+            callback: function (value) {
               return (value >= 0 ? '+' : '') + value.toFixed(1) + '%';
             }
           }
@@ -1838,7 +1889,7 @@ function renderSectorContributionChart(data) {
 
 function setContribPeriod(period) {
   activeContribPeriod = period;
-  
+
   // Update UI active buttons
   const buttons = document.querySelectorAll("#widget-sector-contribution-chart .perf-period-btn");
   buttons.forEach(btn => {
@@ -1848,7 +1899,7 @@ function setContribPeriod(period) {
       btn.classList.remove("active");
     }
   });
-  
+
   fetchSectorContributionData();
 }
 
@@ -1861,7 +1912,7 @@ function toggleContribSorting() {
     contribSortMode = 'contribution';
     btn.innerHTML = `<i class="fa-solid fa-sort-amount-down"></i> Sort: Contribution`;
   }
-  
+
   // Re-fetch or re-render
   fetchSectorContributionData();
 }
@@ -1871,27 +1922,27 @@ function toggleContribSorting() {
 // RENDER STOCKS GRID WITH CUSTOM COLUMNS
 function renderStocksTable() {
   if (!portfolioData) return;
-  
+
   const headersRow = document.getElementById("stocks-table-headers");
   const body = document.getElementById("stocks-table-body");
   headersRow.innerHTML = "";
   body.innerHTML = "";
-  
+
   // Determine visible columns from user config or default
-  const visCols = appConfig ? appConfig.display_columns.stocks : ALL_STOCK_COLUMNS;
-  
+  const visCols = (appConfig && appConfig.display_columns) ? appConfig.display_columns.stocks : ALL_STOCK_COLUMNS;
+
   // Generate Table Headers
   visCols.forEach(col => {
     const th = document.createElement("th");
     th.innerText = col;
     headersRow.appendChild(th);
   });
-  
+
   // Add Actions header
   const thActions = document.createElement("th");
   thActions.innerText = "Actions";
   headersRow.appendChild(thActions);
-  
+
   // Generate rows
   if (portfolioData.stocks.length === 0) {
     body.innerHTML = `<tr><td colspan="${visCols.length + 1}" style="text-align: center; color: var(--text-secondary); padding: 3rem 1rem;">
@@ -1906,18 +1957,18 @@ function renderStocksTable() {
     </td></tr>`;
     return;
   }
-  
+
   let hasMissingBuyDates = false;
   let missingSectorsCount = 0;
-  
+
   portfolioData.stocks.forEach(s => {
     const tr = document.createElement("tr");
     tr.id = `stock-row-${s.row_idx}`;
-    
+
     visCols.forEach(col => {
       const td = document.createElement("td");
       const rawVal = col === "Return (₹)" ? s["Total Return"] : s[col];
-      
+
       // Formatting cells beautifully
       if (col === "Scrip Name") {
         td.innerHTML = `<strong>${rawVal}</strong>`;
@@ -1991,10 +2042,10 @@ function renderStocksTable() {
       } else {
         td.innerText = rawVal !== null ? rawVal : "-";
       }
-      
+
       tr.appendChild(td);
     });
-    
+
     // Add edit/delete buttons
     const tdActions = document.createElement("td");
     tdActions.innerHTML = `
@@ -2006,7 +2057,7 @@ function renderStocksTable() {
     tr.appendChild(tdActions);
     body.appendChild(tr);
   });
-  
+
   const banner = document.getElementById("missing-buy-dates-banner");
   if (banner) {
     banner.style.display = hasMissingBuyDates ? "flex" : "none";
@@ -2028,7 +2079,7 @@ function renderStocksTable() {
 function filterStocksTable() {
   const q = document.getElementById("stock-search").value.toLowerCase();
   const rows = document.querySelectorAll("#stocks-table-body tr");
-  
+
   rows.forEach(row => {
     const text = row.innerText.toLowerCase();
     row.style.display = text.includes(q) ? "" : "none";
@@ -2041,21 +2092,21 @@ let mfSortDir = 1; // 1 = asc, -1 = desc
 
 function renderMfsTable() {
   if (!portfolioData) return;
-  
+
   const headersRow = document.getElementById("mfs-table-headers");
   const body = document.getElementById("mfs-table-body");
   headersRow.innerHTML = "";
   body.innerHTML = "";
-  
+
   // Use custom columns if loaded in config
-  const visCols = appConfig ? appConfig.display_columns.mf : ALL_MF_COLUMNS;
-  
+  const visCols = (appConfig && appConfig.display_columns) ? appConfig.display_columns.mf : ALL_MF_COLUMNS;
+
   // Build sortable headers
   visCols.forEach(col => {
     const th = document.createElement("th");
     th.className = "th-sortable";
     th.dataset.col = col;
-    
+
     // Nice display labels
     const labels = {
       "Fund Name": "Fund Name",
@@ -2070,9 +2121,9 @@ function renderMfsTable() {
       "Tax Flag": "Tax Type"
     };
     th.innerText = labels[col] || col;
-    
+
     if (mfSortCol === col) th.classList.add(mfSortDir === 1 ? "th-asc" : "th-desc");
-    
+
     th.addEventListener("click", () => {
       if (mfSortCol === col) mfSortDir *= -1;
       else { mfSortCol = col; mfSortDir = 1; }
@@ -2080,11 +2131,11 @@ function renderMfsTable() {
     });
     headersRow.appendChild(th);
   });
-  
+
   const thActions = document.createElement("th");
   thActions.innerText = "Actions";
   headersRow.appendChild(thActions);
-  
+
   if (portfolioData.mfs.length === 0) {
     body.innerHTML = `<tr><td colspan="${visCols.length + 1}" style="text-align: center; color: var(--text-secondary); padding: 3rem 1rem;">
       <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;">
@@ -2096,7 +2147,7 @@ function renderMfsTable() {
     renderMfSummaryFooter();
     return;
   }
-  
+
   // Sort data
   let mfRows = [...portfolioData.mfs];
   if (mfSortCol) {
@@ -2111,34 +2162,34 @@ function renderMfsTable() {
       return 0;
     });
   }
-  
+
   mfRows.forEach(m => {
     const tr = document.createElement("tr");
     tr.id = `mf-row-${m.row_idx}`;
     tr.dataset.category = (m["Category"] || "").toLowerCase();
     tr.dataset.taxflag = (m["Tax Flag"] || "").toLowerCase();
-    
+
     visCols.forEach(col => {
       const td = document.createElement("td");
-      
+
       if (col === "Fund Name") {
         td.innerHTML = `<span class="mf-fund-link" onclick="openMfDetailDrawer(${JSON.stringify(m).replace(/"/g, '&quot;')})">${m["Fund Name"]}</span>`;
-        
+
       } else if (col === "Category") {
         td.innerText = m["Category"] || "—";
         td.style.color = "var(--text-secondary)";
-        
+
       } else if (col === "Units Held") {
         td.innerText = (m["Units Held"] || 0).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-        
+
       } else if (col === "Invested Value" || col === "Current Value") {
         td.innerText = formatINR(m[col]);
-        
+
       } else if (col === "P&L") {
         const pnl = m["P&L"];
         td.innerText = formatINR(pnl);
         td.className = pnl >= 0 ? "positive" : "negative";
-        
+
       } else if (col === "Return %") {
         const ret = m["Absolute Return %"];
         if (ret !== null && ret !== undefined) {
@@ -2151,7 +2202,7 @@ function renderMfsTable() {
         } else {
           td.innerText = "N/A";
         }
-        
+
       } else if (col === "XIRR %") {
         const xirr = m["XIRR %"];
         if (xirr === null || xirr === undefined) {
@@ -2162,13 +2213,13 @@ function renderMfsTable() {
           td.innerText = `${xirr >= 0 ? "+" : ""}${xirr.toFixed(2)}%`;
           td.className = xirr >= 0 ? "positive" : "negative";
         }
-        
+
       } else if (col === "Holding Period") {
         const yrs = m["Holding Period Yrs"] || 0;
         const type = m["Holding Type"] || "ST";
         const badgeClass = type === "LT" ? "badge-lt" : "badge-st";
         td.innerHTML = `${yrs.toFixed(2)} Yrs<span class="${badgeClass}">${type}</span>`;
-        
+
       } else if (col === "Tax Flag") {
         const flag = m["Tax Flag"] || "";
         const est = m["Estimated Tax"] || 0;
@@ -2176,14 +2227,14 @@ function renderMfsTable() {
         const badgeCls = flag === "LTCG" ? "ltcg" : "stcg";
         const rateHint = flag === "LTCG" ? "12.5% above ₹1.25L" : "20% flat";
         td.innerHTML = `<span class="badge ${badgeCls}" title="Est. tax if redeemed today: ${formatINR(est)} (${rateHint})">${taxLabel}</span>`;
-        
+
       } else {
         td.innerText = m[col] !== null && m[col] !== undefined ? m[col] : "—";
       }
-      
+
       tr.appendChild(td);
     });
-    
+
     const tdActions = document.createElement("td");
     const mJson = JSON.stringify(m).replace(/"/g, '&quot;');
     tdActions.innerHTML = `
@@ -2196,7 +2247,7 @@ function renderMfsTable() {
     tr.appendChild(tdActions);
     body.appendChild(tr);
   });
-  
+
   renderMfSummaryFooter();
   filterMfsTable();
 }
@@ -2204,13 +2255,13 @@ function renderMfsTable() {
 function renderMfSummaryFooter() {
   const footer = document.getElementById("mf-summary-footer");
   if (!footer || !portfolioData) return;
-  
+
   const mfs = portfolioData.mfs;
   if (mfs.length === 0) { footer.style.display = "none"; return; }
-  
+
   const s = portfolioData.summary;
   const pnl = s.total_mf_pnl;
-  
+
   footer.style.display = "flex";
   document.getElementById("mf-sum-invested").innerText = formatINR(s.total_mf_invested);
   document.getElementById("mf-sum-value").innerText = formatINR(s.total_mf_value);
@@ -2225,10 +2276,10 @@ function openMfDetailDrawer(m) {
   const drawer = document.getElementById("mf-detail-drawer");
   const overlay = document.getElementById("mf-drawer-overlay");
   const body = document.getElementById("mf-drawer-body");
-  
+
   document.getElementById("mf-drawer-title").innerText = m["Fund Name"];
   document.getElementById("mf-drawer-subtitle").innerText = `${m["AMC"] || "—"}  ·  ${m["Category"] || "—"}`;
-  
+
   const pnl = m["P&L"] || 0;
   const pnlColor = pnl >= 0 ? "var(--positive)" : "var(--negative)";
   const xirr = m["XIRR %"];
@@ -2246,7 +2297,7 @@ function openMfDetailDrawer(m) {
     <div class="mf-drawer-section-title">NAV & Units</div>
     <div class="mf-drawer-row"><span class="mf-drawer-label">Buy NAV</span><span class="mf-drawer-value">${formatINR(m["Buy NAV"])}</span></div>
     <div class="mf-drawer-row"><span class="mf-drawer-label">Current NAV</span><span class="mf-drawer-value">${formatINR(m["Current NAV"])}</span></div>
-    <div class="mf-drawer-row"><span class="mf-drawer-label">Units Held</span><span class="mf-drawer-value">${(m["Units Held"] || 0).toLocaleString(undefined, {minimumFractionDigits:3, maximumFractionDigits:3})}</span></div>
+    <div class="mf-drawer-row"><span class="mf-drawer-label">Units Held</span><span class="mf-drawer-value">${(m["Units Held"] || 0).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span></div>
     <div class="mf-drawer-row"><span class="mf-drawer-label">Purchase Date</span><span class="mf-drawer-value">${m["Buy Date"] || "—"}</span></div>
     <div class="mf-drawer-row"><span class="mf-drawer-label">Holding Period</span><span class="mf-drawer-value">${(m["Holding Period Yrs"] || 0).toFixed(2)} Yrs <span class="${m["Holding Type"] === "LT" ? "badge-lt" : "badge-st"}">${m["Holding Type"] || "ST"}</span></span></div>
 
@@ -2263,13 +2314,13 @@ function openMfDetailDrawer(m) {
     <div class="mf-drawer-row"><span class="mf-drawer-label">Expense Ratio</span><span class="mf-drawer-value">${m["Expense Ratio %"] ? m["Expense Ratio %"].toFixed(2) + "%" : "—"}</span></div>
     <div class="mf-drawer-row"><span class="mf-drawer-label">Benchmark 1Y Return</span><span class="mf-drawer-value">${m["Benchmark 1Y Return %"] !== null && m["Benchmark 1Y Return %"] !== undefined ? m["Benchmark 1Y Return %"].toFixed(2) + "%" : "—"}</span></div>
   `;
-  
+
   // Wire up Edit button
   document.getElementById("mf-drawer-edit-btn").onclick = () => {
     closeMfDetailDrawer();
     openEditMfModal(m);
   };
-  
+
   drawer.classList.add("open");
   overlay.classList.add("open");
   document.body.style.overflow = "hidden";
@@ -2285,17 +2336,17 @@ function filterMfsTable() {
   const q = (document.getElementById("mf-search")?.value || "").toLowerCase();
   const catFilter = (document.getElementById("mf-category-filter")?.value || "").toLowerCase();
   const taxFilter = (document.getElementById("mf-tax-filter")?.value || "").toLowerCase();
-  
+
   const rows = document.querySelectorAll("#mfs-table-body tr");
   rows.forEach(row => {
     const text = row.innerText.toLowerCase();
     const cat = (row.dataset.category || "").toLowerCase();
     const tax = (row.dataset.taxflag || "").toLowerCase();
-    
+
     const matchQ = !q || text.includes(q);
     const matchCat = !catFilter || cat.includes(catFilter);
     const matchTax = !taxFilter || tax === taxFilter;
-    
+
     row.style.display = (matchQ && matchCat && matchTax) ? "" : "none";
   });
 }
@@ -2305,29 +2356,29 @@ function filterMfsTable() {
 // RENDER RISK & SIGNALS GRID
 function renderRiskSignals() {
   if (!portfolioData) return;
-  
+
   const body = document.getElementById("signals-table-body");
   if (!body) return;
   body.innerHTML = "";
-  
+
   const signals = portfolioData.signals || [];
-  
+
   // Summary counters — computed from all stock holdings (not just signals list)
   const allStocks = portfolioData.stocks || [];
   const totalStockVal = allStocks.reduce((sum, s) => sum + (s["Current Value"] || 0), 0);
-  const gCount     = allStocks.filter(s => (s["Return %"] || 0) > 20).length;
-  const lCount     = allStocks.filter(s => (s["Return %"] || 0) < 0).length;
+  const gCount = allStocks.filter(s => (s["Return %"] || 0) > 20).length;
+  const lCount = allStocks.filter(s => (s["Return %"] || 0) < 0).length;
   const underCount = allStocks.filter(s => (s["Return %"] || 0) < -10).length;
 
   document.getElementById("signal-cnt-gainers").innerText = gCount;
   document.getElementById("signal-cnt-losers").innerText = lCount;
   document.getElementById("signal-cnt-under").innerText = underCount;
-  
+
   if (signals.length === 0) {
     body.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">No action signals yet. Add buy dates to your holdings for accurate signals.</td></tr>`;
     return;
   }
-  
+
   // Render table rows — one row per stock, multiple badges per row
   signals.forEach(s => {
     const tr = document.createElement("tr");
@@ -2379,7 +2430,7 @@ function renderRiskSignals() {
     sigList.forEach(sigName => {
       const badge = document.createElement("span");
       let cls = "badge ltcg";                           // default: teal/blue
-      if (sigName.includes("Critical"))     cls = "badge stcg";          // red
+      if (sigName.includes("Critical")) cls = "badge stcg";          // red
       if (sigName.includes("Underperform")) cls = "badge stcg";          // red
       if (sigName.includes("Concentration")) cls = "badge warning-badge"; // yellow
       badge.className = cls;
@@ -2408,7 +2459,7 @@ function renderRiskSignals() {
 function filterSignalsTable() {
   const q = document.getElementById("signal-search").value.toLowerCase();
   const rows = document.querySelectorAll("#signals-table-body tr");
-  
+
   rows.forEach(row => {
     const text = row.innerText.toLowerCase();
     row.style.display = text.includes(q) ? "" : "none";
@@ -2590,9 +2641,9 @@ function evaluateRiskAlerts() {
   alerts.sort((a, b) => b.severityScore - a.severityScore);
 
   const criticalAlerts = alerts.filter(a => a.isCritical);
-  const otherAlerts    = alerts.filter(a => !a.isCritical);
-  const warnCount      = alerts.filter(a => a.severity === 'warning').length;
-  const lowCount       = alerts.filter(a => a.severity === 'low').length;
+  const otherAlerts = alerts.filter(a => !a.isCritical);
+  const warnCount = alerts.filter(a => a.severity === 'warning').length;
+  const lowCount = alerts.filter(a => a.severity === 'low').length;
 
   // Build the collapsed summary bar
   const summaryBar = document.createElement("div");
@@ -2674,11 +2725,11 @@ function openEditStockModal(s) {
   document.getElementById("stock-buy-date").value = s["Buy Date"] || "";
   document.getElementById("stock-current-price").value = s["Current Price"] || "";
   document.getElementById("stock-live-price-helper").innerText = "";
-  
+
   if (s["Scrip Name"]) {
     fetchLivePriceHelper(s["Scrip Name"]);
   }
-  
+
   document.getElementById("btn-stock-submit").innerText = "Save Changes";
   document.getElementById("modal-stock").classList.add("active");
 }
@@ -2691,27 +2742,27 @@ async function submitStockForm(e) {
   e.preventDefault();
   const rowIdx = document.getElementById("stock-row-idx").value;
   const url = rowIdx ? '/api/stock/edit' : '/api/stock/add';
-  
+
   const payload = {
     row_idx: rowIdx,
     holding_id: rowIdx,
-    "Company Name":       document.getElementById("stock-scrip").value.trim(),
-    "Sector":             document.getElementById("stock-sector").value.trim(),
-    "Total Quantity":     parseFloat(document.getElementById("stock-qty").value) || 0,
-    "Avg Trading Price":  parseFloat(document.getElementById("stock-buy-price").value) || 0,
-    "Buy Date":           document.getElementById("stock-buy-date").value.trim(),
-    "Current Price":      parseFloat(document.getElementById("stock-current-price").value) || null,
+    "Company Name": document.getElementById("stock-scrip").value.trim(),
+    "Sector": document.getElementById("stock-sector").value.trim(),
+    "Total Quantity": parseFloat(document.getElementById("stock-qty").value) || 0,
+    "Avg Trading Price": parseFloat(document.getElementById("stock-buy-price").value) || 0,
+    "Buy Date": document.getElementById("stock-buy-date").value.trim(),
+    "Current Price": parseFloat(document.getElementById("stock-current-price").value) || null,
     // For edit compatibility — these map to the same fields the backend reads
-    "Scrip Name":         document.getElementById("stock-scrip").value.trim(),
-    "Exchange":           "NSE",
-    "Qty":                parseFloat(document.getElementById("stock-qty").value) || 0,
-    "Buy Price":          parseFloat(document.getElementById("stock-buy-price").value) || 0,
+    "Scrip Name": document.getElementById("stock-scrip").value.trim(),
+    "Exchange": "NSE",
+    "Qty": parseFloat(document.getElementById("stock-qty").value) || 0,
+    "Buy Price": parseFloat(document.getElementById("stock-buy-price").value) || 0,
   };
 
   try {
     const res = await authorizedFetch(url, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
@@ -2902,7 +2953,7 @@ async function deleteStockHolding(rowIdx) {
   try {
     const res = await authorizedFetch('/api/stock/delete', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ holding_id: rowIdx, row_idx: rowIdx })
     });
     const data = await res.json();
@@ -2934,15 +2985,15 @@ async function submitDeleteAllStocks() {
     alert("Please type DELETE to confirm.");
     return;
   }
-  
+
   const btn = document.getElementById("btn-delete-all-submit");
   btn.disabled = true;
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
-  
+
   try {
     const res = await authorizedFetch('/api/stock/delete-all', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'}
+      headers: { 'Content-Type': 'application/json' }
     });
     const data = await res.json();
     if (data.status === 'success') {
@@ -2965,16 +3016,16 @@ async function submitDeleteAllStocks() {
 function formatHoldingPeriod(yrs) {
   if (yrs === null || yrs === undefined || isNaN(yrs)) return "—";
   if (yrs < 0) return "—";
-  
+
   const totalDays = Math.round(yrs * 365);
   if (totalDays < 30) {
     return `${totalDays} Day${totalDays !== 1 ? 's' : ''}`;
   }
-  
+
   const totalMonths = Math.round(yrs * 12);
   const years = Math.floor(totalMonths / 12);
   const months = totalMonths % 12;
-  
+
   let parts = [];
   if (years > 0) {
     parts.push(`${years} Yr${years !== 1 ? 's' : ''}`);
@@ -2991,14 +3042,14 @@ async function saveInlineBuyDate(rowIdx, btn) {
     alert("Please select a valid date first.");
     return;
   }
-  
+
   btn.disabled = true;
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-  
+
   try {
     const res = await authorizedFetch('/api/stock/save-buy-date', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         row_idx: rowIdx,
         "Buy Date": input.value
@@ -3023,13 +3074,13 @@ async function saveInlineBuyDate(rowIdx, btn) {
 async function saveInlineSector(rowIdx, selectElement) {
   const sector = selectElement.value;
   if (!sector) return;
-  
+
   selectElement.disabled = true;
-  
+
   try {
     const res = await authorizedFetch('/api/stock/save-sector', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         row_idx: rowIdx,
         Sector: sector
@@ -3072,7 +3123,7 @@ function openEditMfModal(m) {
   document.getElementById("mf-benchmark").value = m["Benchmark 1Y Return %"] || "";
   document.getElementById("mf-expense").value = m["Expense Ratio %"] || 0;
   document.getElementById("mf-investment-type").value = m["Investment Type"] || "Lumpsum";
-  
+
   document.getElementById("btn-mf-submit").innerText = "Save Changes";
   document.getElementById("modal-mf").classList.add("active");
 }
@@ -3085,7 +3136,7 @@ async function submitMfForm(e) {
   e.preventDefault();
   const rowIdx = document.getElementById("mf-row-idx").value;
   const url = rowIdx ? '/api/mf/edit' : '/api/mf/add';
-  
+
   const payload = {
     row_idx: rowIdx,
     holding_id: rowIdx,
@@ -3105,7 +3156,7 @@ async function submitMfForm(e) {
   try {
     const res = await authorizedFetch(url, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
@@ -3126,7 +3177,7 @@ async function deleteMfHolding(rowIdx) {
   try {
     const res = await authorizedFetch('/api/mf/delete', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ holding_id: rowIdx, row_idx: rowIdx })
     });
     const data = await res.json();
@@ -3143,17 +3194,17 @@ async function deleteMfHolding(rowIdx) {
 // VISUAL SETTINGS PANEL logic
 function loadSettingsIntoForm() {
   if (!appConfig) return;
-  
+
   // Theme highlights
   applyTheme(appConfig.theme);
   applyThemeMode(appConfig.theme_mode || 'dark');
-  
+
   // Columns Checkboxes inside Settings
   const stChecksContainer = document.getElementById("settings-stock-columns-checks");
   const mfChecksContainer = document.getElementById("settings-mf-columns-checks");
   stChecksContainer.innerHTML = "";
   mfChecksContainer.innerHTML = "";
-  
+
   ALL_STOCK_COLUMNS.forEach(col => {
     const isChecked = appConfig.display_columns.stocks.includes(col);
     const label = document.createElement("label");
@@ -3171,22 +3222,22 @@ function loadSettingsIntoForm() {
     label.querySelector("input").addEventListener("change", triggerCheckboxToast);
     mfChecksContainer.appendChild(label);
   });
-  
+
   // Widgets toggles
   document.getElementById("widget-check-sector").checked = appConfig.widgets.sector_allocation;
   document.getElementById("widget-check-asset").checked = appConfig.widgets.asset_allocation;
   document.getElementById("widget-check-leaders").checked = appConfig.widgets.top_performers;
   document.getElementById("widget-check-underperformers").checked = (appConfig.widgets.top_underperformers !== false);
   document.getElementById("widget-check-alerts").checked = (appConfig.widgets.risk_alerts !== false);
-  
+
   // Tax flags days
   document.getElementById("settings-stock-ltcg").value = appConfig.tax_rules.stocks_ltcg_days;
   document.getElementById("settings-mf-ltcg").value = appConfig.tax_rules.mf_ltcg_days;
-  
+
   // Custom limits
   document.getElementById("settings-alert-concentration").value = appConfig.custom_alerts.high_concentration_pct;
   document.getElementById("settings-alert-loss").value = appConfig.custom_alerts.high_loss_pct;
-  
+
   // Auto update price settings
   document.getElementById("settings-auto-update").checked = (appConfig.auto_update_prices !== false);
 }
@@ -3194,19 +3245,19 @@ function loadSettingsIntoForm() {
 // SAVE CONFIGURATION SETTINGS
 async function saveCustomSettings(e) {
   e.preventDefault();
-  
+
   // Gather active Stock columns checkboxes
   const stockCols = [];
   document.querySelectorAll("input[name='stock-col']:checked").forEach(cb => {
     stockCols.push(cb.value);
   });
-  
+
   // Gather active Mutual Fund columns checkboxes
   const mfCols = [];
   document.querySelectorAll("input[name='mf-col']:checked").forEach(cb => {
     mfCols.push(cb.value);
   });
-  
+
   // Map payload
   const payload = {
     theme: activeTheme,
@@ -3234,17 +3285,17 @@ async function saveCustomSettings(e) {
       high_loss_pct: parseInt(document.getElementById("settings-alert-loss").value)
     }
   };
-  
+
   await saveConfigOnServer(payload);
   appConfig = payload;
-  
+
   // Instantly apply settings without full reload
   updateDashboardMetrics();
   renderCharts();
   renderStocksTable();
   renderMfsTable();
   evaluateRiskAlerts();
-  
+
   showToast("Settings saved successfully!");
 }
 
@@ -3252,7 +3303,7 @@ async function saveConfigOnServer(config) {
   try {
     await authorizedFetch('/api/config', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config)
     });
   } catch (err) {
@@ -3289,11 +3340,11 @@ function checkScraperRunningOnStartup() {
         showScraperProgressWidget();
         startPollingProgress();
       }
-      
+
       if (data.last_updated) {
         localLastUpdatedTimestamp = data.last_updated;
       }
-      
+
       // Immediately set header badge
       const dotEl = document.getElementById("price-status-dot");
       const textEl = document.getElementById("price-status-text");
@@ -3308,12 +3359,12 @@ function checkScraperRunningOnStartup() {
         } else if (data.status === "error") {
           textEl.innerHTML = `<span style="color: var(--danger); font-weight: bold; cursor: pointer;" onclick="startLivePriceScraper()">Update failed — Retry</span>`;
         } else {
-          textEl.innerText = data.last_updated 
+          textEl.innerText = data.last_updated
             ? `Last updated: ${formatLastUpdated(data.last_updated)}`
             : "Last updated: Never";
         }
       }
-      
+
       // Start periodic status checking
       startPriceStatusPolling();
     });
@@ -3324,12 +3375,12 @@ let priceStatusIntervalMs = 10000;
 function startPriceStatusPolling(intervalMs = 10000) {
   if (priceStatusTimer) clearInterval(priceStatusTimer);
   priceStatusIntervalMs = intervalMs;
-  
+
   priceStatusTimer = setInterval(async () => {
     try {
       const res = await authorizedFetch('/api/update-status');
       const data = await res.json();
-      
+
       const dotEl = document.getElementById("price-status-dot");
       const textEl = document.getElementById("price-status-text");
       if (dotEl && textEl) {
@@ -3343,7 +3394,7 @@ function startPriceStatusPolling(intervalMs = 10000) {
         } else if (data.status === "error") {
           textEl.innerHTML = `<span style="color: var(--danger); font-weight: bold; cursor: pointer;" onclick="startLivePriceScraper()">Update failed — Retry</span>`;
         } else {
-          textEl.innerText = data.last_updated 
+          textEl.innerText = data.last_updated
             ? `Last updated: ${formatLastUpdated(data.last_updated)}`
             : "Last updated: Never";
         }
@@ -3355,7 +3406,7 @@ function startPriceStatusPolling(intervalMs = 10000) {
       } else if (data.status !== "running" && data.status !== "background_running" && priceStatusIntervalMs !== 10000) {
         startPriceStatusPolling(10000);
       }
-      
+
       // Refresh portfolio if new updates came in
       if (data.last_updated) {
         if (localLastUpdatedTimestamp === null) {
@@ -3391,21 +3442,21 @@ function showScraperProgressWidget() {
 
 function startPollingProgress() {
   if (priceUpdateTimer) clearInterval(priceUpdateTimer);
-  
+
   let lastLoggedLength = 0;
-  
+
   priceUpdateTimer = setInterval(async () => {
     try {
       const res = await authorizedFetch('/api/update-status');
       const data = await res.json();
-      
+
       // Update UI labels
       document.getElementById("updater-progress-pct").innerText = `${data.progress_pct}%`;
       document.getElementById("updater-progress-bar").style.width = `${data.progress_pct}%`;
-      document.getElementById("updater-current-ticker").innerText = data.current_ticker 
-        ? `Active scrip: ${data.current_ticker} (${data.current_index}/${data.total_tickers}) — Elapsed: ${data.elapsed_seconds}s` 
+      document.getElementById("updater-current-ticker").innerText = data.current_ticker
+        ? `Active scrip: ${data.current_ticker} (${data.current_index}/${data.total_tickers}) — Elapsed: ${data.elapsed_seconds}s`
         : "Checking sheet...";
-        
+
       // Redirect logs to console
       if (data.logs && data.logs.length > lastLoggedLength) {
         for (let i = lastLoggedLength; i < data.logs.length; i++) {
@@ -3413,20 +3464,20 @@ function startPollingProgress() {
         }
         lastLoggedLength = data.logs.length;
       }
-      
+
       if (data.status === 'completed') {
         clearInterval(priceUpdateTimer);
         document.getElementById("updater-status-title").innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--success);"></i> Live Price Update Complete!`;
         document.getElementById("btn-updater-close").style.display = "none";
-        
+
         // Refresh tables to see fresh prices
         await fetchPortfolio();
-        
+
         // Set local timestamp to match
         if (data.last_updated) {
           localLastUpdatedTimestamp = data.last_updated;
         }
-        
+
         // Auto-dismiss the widget after 3 seconds
         setTimeout(() => {
           document.getElementById("price-updater-container").style.display = "none";
@@ -3438,7 +3489,7 @@ function startPollingProgress() {
           <button class="btn btn-secondary btn-sm" onclick="startLivePriceScraper()" style="background: var(--danger); border-color: var(--danger); color: white; font-weight: bold; margin-top: 0.5rem;">Retry Now</button>
         `;
         document.getElementById("btn-updater-close").style.display = "inline-block";
-        
+
         // Auto-dismiss the widget after 10 seconds
         setTimeout(() => {
           authorizedFetch('/api/update-status')
@@ -3473,12 +3524,12 @@ async function submitAdvisorMessage() {
   const inputEl = document.getElementById("advisor-user-input");
   const promptText = inputEl.value.trim();
   if (!promptText) return;
-  
+
   // Clear input
   inputEl.value = "";
-  
+
   const chatBox = document.getElementById("advisor-chat-box");
-  
+
   // 1. Append User Message
   const userMsgDiv = document.createElement("div");
   userMsgDiv.className = "advisor-message user";
@@ -3486,7 +3537,7 @@ async function submitAdvisorMessage() {
   userMsgDiv.style.gap = "0.75rem";
   userMsgDiv.style.maxWidth = "85%";
   userMsgDiv.style.alignSelf = "flex-end";
-  
+
   userMsgDiv.innerHTML = `
     <div style="background: var(--accent-gradient); border-radius: 16px 0 16px 16px; padding: 1rem; color: #ffffff; font-size: 0.9rem; line-height: 1.5; box-shadow: 0 4px 15px var(--accent-glow);">
       ${promptText}
@@ -3497,7 +3548,7 @@ async function submitAdvisorMessage() {
   `;
   chatBox.appendChild(userMsgDiv);
   chatBox.scrollTop = chatBox.scrollHeight;
-  
+
   // 2. Append Spinner / Loading State
   const loadingDiv = document.createElement("div");
   loadingDiv.className = "advisor-message system loading";
@@ -3505,7 +3556,7 @@ async function submitAdvisorMessage() {
   loadingDiv.style.gap = "0.75rem";
   loadingDiv.style.maxWidth = "85%";
   loadingDiv.style.alignSelf = "flex-start";
-  
+
   loadingDiv.innerHTML = `
     <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--accent-gradient); display: flex; justify-content: center; align-items: center; color: white; font-size: 0.95rem; font-weight: 700; box-shadow: 0 0 10px var(--accent-glow); flex-shrink: 0;">
       <i class="fa-solid fa-user-tie"></i>
@@ -3516,7 +3567,7 @@ async function submitAdvisorMessage() {
   `;
   chatBox.appendChild(loadingDiv);
   chatBox.scrollTop = chatBox.scrollHeight;
-  
+
   // 3. Post to API
   try {
     const res = await authorizedFetch('/api/advisor/chat', {
@@ -3525,10 +3576,10 @@ async function submitAdvisorMessage() {
       body: JSON.stringify({ prompt: promptText })
     });
     const data = await res.json();
-    
+
     // Remove loading indicator
     chatBox.removeChild(loadingDiv);
-    
+
     // Append Advisor Response
     const responseDiv = document.createElement("div");
     responseDiv.className = "advisor-message system";
@@ -3536,7 +3587,7 @@ async function submitAdvisorMessage() {
     responseDiv.style.gap = "0.75rem";
     responseDiv.style.maxWidth = "85%";
     responseDiv.style.alignSelf = "flex-start";
-    
+
     responseDiv.innerHTML = `
       <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--accent-gradient); display: flex; justify-content: center; align-items: center; color: white; font-size: 0.95rem; font-weight: 700; box-shadow: 0 0 10px var(--accent-glow); flex-shrink: 0;">
         <i class="fa-solid fa-user-tie"></i>
@@ -3548,7 +3599,7 @@ async function submitAdvisorMessage() {
     `;
     chatBox.appendChild(responseDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
-    
+
   } catch (err) {
     if (chatBox.contains(loadingDiv)) {
       chatBox.removeChild(loadingDiv);
@@ -3586,7 +3637,7 @@ async function deleteAllHoldings() {
 // DEBOUNCE HELPER
 function debounce(func, delay) {
   let timeout;
-  return function(...args) {
+  return function (...args) {
     clearTimeout(timeout);
     timeout = setTimeout(() => func.apply(this, args), delay);
   };
@@ -3627,12 +3678,12 @@ function showCustomPrompt(title, message, isPassword = false, placeholder = "", 
     const modal = document.getElementById("modal-custom-prompt");
     document.getElementById("custom-prompt-title-text").innerText = title;
     document.getElementById("custom-prompt-message").innerText = message;
-    
+
     const input = document.getElementById("custom-prompt-input");
     input.type = isPassword ? "password" : "text";
     input.placeholder = placeholder;
     input.value = defaultValue;
-    
+
     if (isPassword) {
       input.maxLength = 6;
       input.pattern = "\\d*";
@@ -3646,14 +3697,14 @@ function showCustomPrompt(title, message, isPassword = false, placeholder = "", 
       input.style.textAlign = "left";
       input.style.fontFamily = "inherit";
     }
-    
+
     modal.classList.add("active");
     setTimeout(() => input.focus(), 50);
-    
+
     if (defaultValue) {
       input.setSelectionRange(defaultValue.length, defaultValue.length);
     }
-    
+
     customPromptPromiseResolver = resolve;
   });
 }
@@ -3696,9 +3747,9 @@ function showCustomConfirm(title, message) {
     const modal = document.getElementById("modal-custom-confirm");
     document.getElementById("custom-confirm-title-text").innerText = title;
     document.getElementById("custom-confirm-message").innerText = message;
-    
+
     modal.classList.add("active");
-    
+
     customConfirmPromiseResolver = resolve;
   });
 }
@@ -3723,5 +3774,3 @@ document.addEventListener("DOMContentLoaded", () => {
     }, { once: true });
   });
 });
-
-
