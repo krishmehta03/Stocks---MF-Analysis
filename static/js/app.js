@@ -1928,6 +1928,11 @@ function toggleContribSorting() {
 function renderStocksTable() {
   if (!portfolioData) return;
 
+  const countBadge = document.getElementById("stock-holdings-count-badge");
+  if (countBadge) {
+    countBadge.textContent = portfolioData.stocks ? portfolioData.stocks.length : 0;
+  }
+
   const headersRow = document.getElementById("stocks-table-headers");
   const body = document.getElementById("stocks-table-body");
   headersRow.innerHTML = "";
