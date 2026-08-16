@@ -257,6 +257,11 @@ async function fetchPortfolio() {
       return;
     }
 
+    // Normalize shape so downstream code can always safely rely on
+    // portfolioData.stocks / .mfs being arrays, even if the API omits them.
+    if (!Array.isArray(portfolioData.stocks)) portfolioData.stocks = [];
+    if (!Array.isArray(portfolioData.mfs)) portfolioData.mfs = [];
+
     updateDashboardMetrics();
     renderCharts();
     renderStocksTable();
