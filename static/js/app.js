@@ -866,6 +866,8 @@ function renderCharts() {
                         return {
                           text: `${label} — ${actualPct.toFixed(1)}%`,
                           fillStyle: fill,
+                          fontColor: textSecondary,
+                          color: textSecondary,
                           strokeStyle: 'rgba(255, 255, 255, 0.05)',
                           lineWidth: 1,
                           hidden: !chart.isDatasetVisible(0) || (chart.getDatasetMeta(0).data[i] && chart.getDatasetMeta(0).data[i].hidden),
