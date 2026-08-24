@@ -2434,6 +2434,11 @@ body.light-mode .form-control:focus {
   box-shadow: 0 0 8px var(--accent-glow) !important;
 }
 
+body.light-mode select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
 /* Modals in light mode */
 body.light-mode .modal-content {
   background: #ffffff !important;
