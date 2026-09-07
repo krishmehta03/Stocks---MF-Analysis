@@ -267,6 +267,9 @@
         <button class="tab-btn" onclick="switchTab('mfs')">
           <i class="fa-solid fa-wallet"></i> Mutual Funds
         </button>
+        <button class="tab-btn" onclick="switchTab('realized')">
+          <i class="fa-solid fa-hand-holding-dollar"></i> Realized Trades
+        </button>
         <button class="tab-btn" onclick="switchTab('signals')">
           <i class="fa-solid fa-triangle-exclamation"></i> Risk & Signals
         </button>
@@ -347,6 +350,13 @@
               <option value="bse500">BSE 500</option>
               <option value="crisil_hybrid">CRISIL Hybrid Index</option>
             </select>
+            <!-- Portfolio View Mode toggle buttons -->
+            <div id="perf-mode-toggle" style="display:flex;gap:0.3rem;background:rgba(255,255,255,0.04);border-radius:10px;padding:0.25rem;">
+              <button id="perf-mode-btn-combined" onclick="setPerfMode('combined')" class="perf-period-btn active" title="View Combined Portfolio vs Benchmark">Combined</button>
+              <button id="perf-mode-btn-stocks"   onclick="setPerfMode('stocks')"   class="perf-period-btn" title="View Equity Stocks Portfolio vs Benchmark">Stocks</button>
+              <button id="perf-mode-btn-mf"       onclick="setPerfMode('mf')"       class="perf-period-btn" title="View Mutual Funds Portfolio vs Benchmark">MFs</button>
+              <button id="perf-mode-btn-all"      onclick="setPerfMode('all')"      class="perf-period-btn" title="Compare All Portfolios vs Benchmark">All</button>
+            </div>
             <!-- Period toggle buttons -->
             <div style="display:flex;gap:0.3rem;background:rgba(255,255,255,0.04);border-radius:10px;padding:0.25rem;">
               <button id="perf-btn-1W"  onclick="setPeriod('1W')"  class="perf-period-btn">1W</button>
@@ -926,6 +936,81 @@
       </div>
     </div>
 
+    <!-- TAB 6: REALIZED TRADES & SALES HISTORY -->
+    <div id="tab-realized" class="tab-content" style="display: none;">
+      <div class="card" style="margin-bottom: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.4rem; display: flex; align-items: center; gap: 0.6rem;">
+              <i class="fa-solid fa-hand-holding-dollar" style="color: #f59e0b;"></i> Realized Trades & Sales History
+            </h2>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.2rem;">
+              Historical log of full and partial sales with realized P&L tracking across stocks and mutual funds.
+            </p>
+          </div>
+        </div>
+
+        <!-- Summary Metrics Grid -->
+        <div class="summary-grid" style="margin-bottom: 1.5rem;">
+          <div class="card summary-card" id="card-realized-pnl">
+            <h3>Net Realized P&L</h3>
+            <div class="value" id="val-realized-pnl">₹0.00</div>
+            <div class="sub-value text-secondary" id="sub-realized-pnl">Combined realized net return</div>
+          </div>
+          <div class="card summary-card positive" id="card-realized-gains">
+            <h3>Realized Gains</h3>
+            <div class="value" id="val-realized-gains">₹0.00</div>
+            <div class="sub-value text-secondary">From profitable sales</div>
+          </div>
+          <div class="card summary-card negative" id="card-realized-losses">
+            <h3>Realized Losses</h3>
+            <div class="value" id="val-realized-losses">₹0.00</div>
+            <div class="sub-value text-secondary">From loss sales</div>
+          </div>
+          <div class="card summary-card" id="card-realized-count">
+            <h3>Total Trades Closed</h3>
+            <div class="value" id="val-realized-count">0</div>
+            <div class="sub-value text-secondary">Recorded sales</div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="mf-filter-bar" style="margin-bottom: 1.25rem;">
+          <input type="text" class="form-control" id="realized-search" onkeyup="filterRealizedTable()" placeholder="Search scrip, fund, sector..." style="max-width: 240px; font-size: 0.85rem;">
+          <select class="mf-filter-select" id="realized-type-filter" onchange="filterRealizedTable()">
+            <option value="">All Asset Types</option>
+            <option value="stock">Stocks Only</option>
+            <option value="mf">Mutual Funds Only</option>
+          </select>
+        </div>
+
+        <div class="table-container">
+          <table id="realized-trades-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Asset Name</th>
+                <th>Sector / Category</th>
+                <th>Date Sold</th>
+                <th>Qty / Units</th>
+                <th>Buy Price / NAV</th>
+                <th>Sell Price / NAV</th>
+                <th>Realized P&L</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="realized-trades-table-body">
+              <!-- Dynamically populated by JS -->
+            </tbody>
+          </table>
+        </div>
+        <div class="scroll-hint" id="realized-table-scroll-hint">
+          <i class="fa-solid fa-arrow-right"></i> Swipe to see more
+        </div>
+      </div>
+    </div>
+
+
     <!-- Disclaimer Banner -->
     <div style="
       text-align: center;
@@ -1201,10 +1286,12 @@
     <div class="mf-drawer-body" id="mf-drawer-body">
       <!-- Populated by JS -->
     </div>
-    <div class="mf-drawer-footer">
+    <div class="mf-drawer-footer" style="display: flex; gap: 0.5rem; padding: 1rem;">
+      <button class="btn btn-warning" style="flex:1;" id="mf-drawer-sell-btn"><i class="fa-solid fa-hand-holding-dollar"></i> Sell</button>
+      <button class="btn btn-secondary" style="flex:1;" id="mf-drawer-edit-btn"><i class="fa-solid fa-edit"></i> Edit</button>
       <button class="btn btn-secondary" style="flex:1;" onclick="closeMfDetailDrawer()"><i class="fa-solid fa-times"></i> Close</button>
-      <button class="btn" style="flex:1;" id="mf-drawer-edit-btn"><i class="fa-solid fa-edit"></i> Edit Holding</button>
     </div>
+
   </div>
 
   <!-- MODAL: CUSTOM PROMPT (Replaces native window.prompt) -->
@@ -1226,6 +1313,118 @@
           <button type="button" class="btn" id="btn-custom-prompt-submit" onclick="submitCustomPrompt()">OK</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SELL STOCK -->
+  <div class="modal-overlay" id="modal-sell-stock">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header" style="border-bottom: 1px solid rgba(245, 158, 11, 0.3);">
+        <h3><i class="fa-solid fa-hand-holding-dollar" style="color: #f59e0b;"></i> Record Stock Sale</h3>
+        <button class="modal-close" onclick="closeSellStockModal()">&times;</button>
+      </div>
+      <form id="sell-stock-form" onsubmit="submitSellStockForm(event)">
+        <input type="hidden" id="sell-stock-holding-id">
+        <input type="hidden" id="sell-stock-buy-price">
+        <input type="hidden" id="sell-stock-max-qty">
+
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong id="sell-stock-scrip-name" style="font-size: 1.05rem; color: var(--text-primary);">Stock Name</strong>
+            <span id="sell-stock-holding-qty-badge" class="badge" style="background: rgba(255,255,255,0.08); color: var(--text-secondary);">Qty: 0</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top: 0.4rem; font-size: 0.82rem; color: var(--text-secondary);">
+            <span>Avg Buy Price: <strong id="sell-stock-buy-price-display" style="color:var(--text-primary);">₹0.00</strong></span>
+            <span>Sector: <strong id="sell-stock-sector-display" style="color:var(--text-primary);">-</strong></span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantity to Sell *</label>
+            <input type="number" class="form-control" id="sell-stock-qty" step="any" min="0.001" required placeholder="e.g. 5" oninput="updateSellStockPnlPreview()">
+          </div>
+          <div class="form-group">
+            <label>Sell Price per Share (₹) *</label>
+            <input type="number" class="form-control" id="sell-stock-price" step="0.01" min="0.01" required placeholder="e.g. 350.00" oninput="updateSellStockPnlPreview()">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Sell Date *</label>
+          <input type="date" class="form-control" id="sell-stock-date" required>
+        </div>
+
+        <!-- Live Realized P&L Preview Card -->
+        <div id="sell-stock-pnl-preview-card" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 0.85rem 1rem; margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-size: 0.8rem; color: var(--text-secondary); display: block;">Estimated Realized P&L</span>
+            <strong id="sell-stock-pnl-preview-val" style="font-size: 1.25rem; font-family: 'Outfit'; color: #10b981;">+₹0.00</strong>
+          </div>
+          <span id="sell-stock-sale-type-badge" style="font-size: 0.78rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.1); color: var(--text-primary);">Full Sale</span>
+        </div>
+
+        <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeSellStockModal()">Cancel</button>
+          <button type="submit" class="btn" style="background: #f59e0b; color: #000; font-weight: 700;" id="btn-sell-stock-submit"><i class="fa-solid fa-check"></i> Record Sale</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SELL MUTUAL FUND -->
+  <div class="modal-overlay" id="modal-sell-mf">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header" style="border-bottom: 1px solid rgba(245, 158, 11, 0.3);">
+        <h3><i class="fa-solid fa-hand-holding-dollar" style="color: #f59e0b;"></i> Record Mutual Fund Sale</h3>
+        <button class="modal-close" onclick="closeSellMfModal()">&times;</button>
+      </div>
+      <form id="sell-mf-form" onsubmit="submitSellMfForm(event)">
+        <input type="hidden" id="sell-mf-holding-id">
+        <input type="hidden" id="sell-mf-buy-nav">
+        <input type="hidden" id="sell-mf-max-units">
+
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong id="sell-mf-fund-name" style="font-size: 1.05rem; color: var(--text-primary);">Fund Name</strong>
+            <span id="sell-mf-units-badge" class="badge" style="background: rgba(255,255,255,0.08); color: var(--text-secondary);">Units: 0</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top: 0.4rem; font-size: 0.82rem; color: var(--text-secondary);">
+            <span>Buy NAV: <strong id="sell-mf-buy-nav-display" style="color:var(--text-primary);">₹0.00</strong></span>
+            <span>Category: <strong id="sell-mf-category-display" style="color:var(--text-primary);">-</strong></span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Units to Sell *</label>
+            <input type="number" class="form-control" id="sell-mf-units" step="any" min="0.0001" required placeholder="e.g. 50.5" oninput="updateSellMfPnlPreview()">
+          </div>
+          <div class="form-group">
+            <label>Sell NAV (₹) *</label>
+            <input type="number" class="form-control" id="sell-mf-nav" step="0.0001" min="0.0001" required placeholder="e.g. 62.50" oninput="updateSellMfPnlPreview()">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Sell Date *</label>
+          <input type="date" class="form-control" id="sell-mf-date" required>
+        </div>
+
+        <!-- Live Realized P&L Preview Card -->
+        <div id="sell-mf-pnl-preview-card" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 0.85rem 1rem; margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-size: 0.8rem; color: var(--text-secondary); display: block;">Estimated Realized P&L</span>
+            <strong id="sell-mf-pnl-preview-val" style="font-size: 1.25rem; font-family: 'Outfit'; color: #10b981;">+₹0.00</strong>
+          </div>
+          <span id="sell-mf-sale-type-badge" style="font-size: 0.78rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.1); color: var(--text-primary);">Full Redemption</span>
+        </div>
+
+        <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeSellMfModal()">Cancel</button>
+          <button type="submit" class="btn" style="background: #f59e0b; color: #000; font-weight: 700;" id="btn-sell-mf-submit"><i class="fa-solid fa-check"></i> Record Sale</button>
+        </div>
+      </form>
     </div>
   </div>
 

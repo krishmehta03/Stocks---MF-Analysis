@@ -465,6 +465,20 @@ tr:hover td {
   box-shadow: 0 6px 18px rgba(239, 68, 68, 0.4);
 }
 
+.btn-warning {
+  background: #f59e0b;
+  color: #000000;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-warning:hover {
+  background: #d97706;
+  color: #000000;
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.4);
+}
+
+
 .btn-sm {
   padding: 0.4rem 0.8rem;
   font-size: 0.8rem;

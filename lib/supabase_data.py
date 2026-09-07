@@ -194,3 +194,132 @@ def update_stock_prices(user_id: str, price_updates: list):
         print(f"Error bulk updating prices: {e}")
         return False
 
+
+def sell_stock_holding(user_id: str, holding_id: str, sold_qty: float, sell_price: float, sell_date: str):
+    """Process a stock sale (full or partial) and log to realized_trades."""
+    try:
+        supabase = get_supabase_admin()
+        res = supabase.table('stock_holdings').select('*').eq('id', holding_id).eq('user_id', user_id).execute()
+        if not res.data:
+            return {"success": False, "error": "Stock holding not found"}
+        
+        holding = res.data[0]
+        curr_qty = float(holding.get('quantity', 0))
+        sold_qty = float(sold_qty)
+        
+        if sold_qty <= 0 or sold_qty > curr_qty:
+            return {"success": False, "error": f"Invalid sold quantity ({sold_qty}). Current quantity is {curr_qty}"}
+        
+        buy_price = float(holding.get('buy_price', 0))
+        sell_price = float(sell_price)
+        realized_pnl = round((sell_price - buy_price) * sold_qty, 2)
+        
+        trade_payload = {
+            'user_id': user_id,
+            'holding_type': 'stock',
+            'scrip_name': holding.get('scrip_name'),
+            'sold_qty': sold_qty,
+            'sell_price': sell_price,
+            'sell_date': sell_date,
+            'buy_price': buy_price,
+            'buy_date': holding.get('buy_date'),
+            'realized_pnl': realized_pnl,
+            'sector': holding.get('sector')
+        }
+        
+        supabase.table('realized_trades').insert(trade_payload).execute()
+        
+        if abs(curr_qty - sold_qty) < 1e-4 or sold_qty >= curr_qty:
+            deleted = delete_stock_holding(user_id, holding_id)
+            if not deleted:
+                return {"success": False, "error": "Sale was recorded but failed to remove the original holding. Please contact support before selling this position again."}
+        else:
+            new_qty = int(curr_qty - sold_qty)
+            supabase.table('stock_holdings').update({'quantity': new_qty}).eq('id', holding_id).eq('user_id', user_id).execute()
+            
+        return {"success": True, "realized_pnl": realized_pnl}
+    except Exception as e:
+        print(f"Error selling stock holding: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def sell_mf_holding(user_id: str, holding_id: str, sold_units: float, sell_nav: float, sell_date: str):
+    """Process a mutual fund sale (full or partial) and log to realized_trades."""
+    try:
+        supabase = get_supabase_admin()
+        res = supabase.table('mf_holdings').select('*').eq('id', holding_id).eq('user_id', user_id).execute()
+        if not res.data:
+            return {"success": False, "error": "Mutual fund holding not found"}
+        
+        holding = res.data[0]
+        curr_units = float(holding.get('units_held', 0))
+        sold_units = float(sold_units)
+        
+        if sold_units <= 0 or sold_units > curr_units:
+            return {"success": False, "error": f"Invalid sold units ({sold_units}). Current units held: {curr_units}"}
+        
+        buy_nav = float(holding.get('buy_nav', 0))
+        sell_nav = float(sell_nav)
+        realized_pnl = round((sell_nav - buy_nav) * sold_units, 2)
+        
+        trade_payload = {
+            'user_id': user_id,
+            'holding_type': 'mf',
+            'scrip_name': holding.get('fund_name'),
+            'sold_qty': sold_units,
+            'sell_price': sell_nav,
+            'sell_date': sell_date,
+            'buy_price': buy_nav,
+            'buy_date': holding.get('purchase_date'),
+            'realized_pnl': realized_pnl,
+            'sector': holding.get('category')
+        }
+        
+        supabase.table('realized_trades').insert(trade_payload).execute()
+        
+        if abs(curr_units - sold_units) < 1e-4 or sold_units >= curr_units:
+            deleted = delete_mf_holding(user_id, holding_id)
+            if not deleted:
+                return {"success": False, "error": "Sale was recorded but failed to remove the original holding. Please contact support before selling this position again."}
+        else:
+            new_units = round(curr_units - sold_units, 4)
+            supabase.table('mf_holdings').update({'units_held': new_units}).eq('id', holding_id).eq('user_id', user_id).execute()
+            
+        return {"success": True, "realized_pnl": realized_pnl}
+    except Exception as e:
+        print(f"Error selling MF holding: {e}")
+        return {"success": False, "error": str(e)}
+
+
+
+def get_user_realized_trades(user_id: str):
+    """Fetch all realized trades for a user sorted by sell_date desc."""
+    try:
+        supabase = get_supabase_admin()
+        result = supabase.table('realized_trades')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .order('sell_date', desc=True)\
+            .order('created_at', desc=True)\
+            .execute()
+        return result.data or []
+    except Exception as e:
+        print(f"Error fetching realized trades: {e}")
+        return []
+
+
+def delete_realized_trade(user_id: str, trade_id: str):
+    """Delete a trade record from realized_trades."""
+    try:
+        supabase = get_supabase_admin()
+        supabase.table('realized_trades')\
+            .delete()\
+            .eq('id', trade_id)\
+            .eq('user_id', user_id)\
+            .execute()
+        return True
+    except Exception as e:
+        print(f"Error deleting trade record: {e}")
+        return False
+
+

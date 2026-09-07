@@ -39,6 +39,8 @@ let activeTab = 'dashboard';
 let priceUpdateTimer = null;
 let activePeriod = '1M';
 let activeBenchmark = 'nifty50';
+let activePerfMode = 'combined';
+let cachedPerfData = null;
 let activeContribPeriod = '1M';
 let contribSortMode = 'contribution';
 let profilesList = [];
@@ -205,11 +207,14 @@ function switchTab(tabId) {
     }
   });
 
-  // Re-render charts to prevent sizing bugs on tab reveal
+  // Re-render charts or fetch data on tab reveal
   if (tabId === 'dashboard') {
     renderCharts();
+  } else if (tabId === 'realized') {
+    fetchRealizedTrades();
   }
 }
+
 
 // FETCH SYSTEM DATA
 async function fetchConfig() {
@@ -1002,6 +1007,7 @@ async function fetchPerformanceData() {
       throw new Error(err.error || "Failed to fetch performance data");
     }
     const data = await res.json();
+    cachedPerfData = data;
 
     if (loader) loader.style.display = "none";
     if (canvas) canvas.style.display = "block";
@@ -1043,11 +1049,49 @@ function renderPerformanceChart(data) {
   const accentColor = cssVars.getPropertyValue('--accent').trim() || '#10b981';
   const textPrimary = cssVars.getPropertyValue('--text-primary').trim() || '#f8fafc';
   const textSecondary = cssVars.getPropertyValue('--text-secondary').trim() || '#94a3b8';
+  const combinedColor = activeThemeMode === 'light' ? '#3b82f6' : '#38bdf8';
+  const stocksColor   = '#ec4899';
+  const mfColor       = '#a855f7';
+
+  const hasCombined = !!(data.combined && data.combined.length > 0);
+  const hasMF       = !!(data.mf && data.mf.length > 0);
+
+  // Show/hide MF & All mode buttons if user does not have mutual funds
+  const mfModeBtn = document.getElementById("perf-mode-btn-mf");
+  const allModeBtn = document.getElementById("perf-mode-btn-all");
+  if (mfModeBtn) mfModeBtn.style.display = hasMF ? "inline-block" : "none";
+  if (allModeBtn) allModeBtn.style.display = (hasMF && hasCombined) ? "inline-block" : "none";
+
+  let targetMode = activePerfMode;
+  if (!hasMF && (targetMode === 'mf' || targetMode === 'all')) {
+    targetMode = hasCombined ? 'combined' : 'stocks';
+  }
+
+  // Pick target series for metrics
+  let primarySeries = data.portfolio;
+  let primaryName   = "Your Portfolio";
+
+  if (targetMode === 'combined' && hasCombined) {
+    primarySeries = data.combined;
+    primaryName   = "Combined Portfolio";
+  } else if (targetMode === 'mf' && hasMF) {
+    primarySeries = data.mf;
+    primaryName   = "Mutual Funds Portfolio";
+  } else if (targetMode === 'stocks') {
+    primarySeries = data.portfolio;
+    primaryName   = "Stocks Portfolio";
+  } else if (targetMode === 'all' && hasCombined) {
+    primarySeries = data.combined;
+    primaryName   = "Combined Portfolio";
+  }
+
+  const lastPortVal  = primarySeries && primarySeries.length > 0 ? primarySeries[primarySeries.length - 1] : 100;
+  const lastBenchVal = data.benchmark && data.benchmark.length > 0 ? data.benchmark[data.benchmark.length - 1] : 100;
+  const diff         = lastPortVal - lastBenchVal;
 
   // Update dynamic Outperformance Badge
   const badge = document.getElementById("perf-outperf-badge");
   if (badge) {
-    const diff = data.outperformance;
     if (diff > 0.5) {
       badge.innerText = `+${diff.toFixed(2)}% Outperformance`;
       badge.style.background = "rgba(16, 185, 129, 0.15)";
@@ -1067,10 +1111,6 @@ function renderPerformanceChart(data) {
   }
 
   // Update Contextual Downturn Note
-  const hasCombined = !!data.combined;
-  const portfolioArray = hasCombined ? data.combined : data.portfolio;
-  const lastPortVal = portfolioArray && portfolioArray.length > 0 ? portfolioArray[portfolioArray.length - 1] : 100;
-  const lastBenchVal = data.benchmark && data.benchmark.length > 0 ? data.benchmark[data.benchmark.length - 1] : 100;
   const isDownturn = (lastPortVal < 100) && (lastBenchVal < 100);
   const downturnNote = document.getElementById("perf-downturn-note");
   if (downturnNote) {
@@ -1078,16 +1118,16 @@ function renderPerformanceChart(data) {
   }
 
   // Update Portfolio Context Strip
-  const stripPeriodEl = document.getElementById("strip-period");
-  const stripPortRetEl = document.getElementById("strip-portfolio-return");
+  const stripPeriodEl     = document.getElementById("strip-period");
+  const stripPortRetEl    = document.getElementById("strip-portfolio-return");
   const stripBenchLabelEl = document.getElementById("strip-bench-label");
-  const stripBenchRetEl = document.getElementById("strip-bench-return");
-  const stripAlphaEl = document.getElementById("strip-alpha");
-  const stripAsOfEl = document.getElementById("strip-as-of");
+  const stripBenchRetEl   = document.getElementById("strip-bench-return");
+  const stripAlphaEl      = document.getElementById("strip-alpha");
+  const stripAsOfEl       = document.getElementById("strip-as-of");
 
-  const portRet = lastPortVal - 100;
+  const portRet  = lastPortVal - 100;
   const benchRet = lastBenchVal - 100;
-  const alpha = data.outperformance;
+  const alpha    = diff;
 
   if (stripPeriodEl) stripPeriodEl.innerText = data.period || activePeriod;
 
@@ -1133,15 +1173,10 @@ function renderPerformanceChart(data) {
   }
 
   // Update Legend Row
-  const combinedColor = activeThemeMode === 'light' ? '#3b82f6' : '#38bdf8';
   const legendRow = document.getElementById("perf-chart-legend-row");
   if (legendRow) {
-    if (hasCombined) {
+    if (targetMode === 'combined') {
       legendRow.innerHTML = `
-        <div style="display:flex;align-items:center;gap:0.4rem;">
-          <div style="width:24px;height:3px;background:#ec4899;border-radius:2px;"></div>
-          <span style="color:var(--text-secondary);">Stocks Portfolio</span>
-        </div>
         <div style="display:flex;align-items:center;gap:0.4rem;">
           <div style="width:24px;height:3px;background:${combinedColor};border-radius:2px;"></div>
           <span style="color:var(--text-secondary);">Combined Portfolio</span>
@@ -1151,11 +1186,41 @@ function renderPerformanceChart(data) {
           <span id="perf-bench-legend" style="color:var(--text-secondary);">${data.benchmark_name}</span>
         </div>
       `;
-    } else {
+    } else if (targetMode === 'stocks') {
       legendRow.innerHTML = `
         <div style="display:flex;align-items:center;gap:0.4rem;">
-          <div style="width:24px;height:3px;background:${accentColor};border-radius:2px;"></div>
-          <span style="color:var(--text-secondary);">Your Portfolio</span>
+          <div style="width:24px;height:3px;background:${stocksColor};border-radius:2px;"></div>
+          <span style="color:var(--text-secondary);">Stocks Portfolio</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:2px;background:rgba(148,163,184,0.6);border-radius:2px;border-top:2px dashed rgba(148,163,184,0.6);"></div>
+          <span id="perf-bench-legend" style="color:var(--text-secondary);">${data.benchmark_name}</span>
+        </div>
+      `;
+    } else if (targetMode === 'mf') {
+      legendRow.innerHTML = `
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:3px;background:${mfColor};border-radius:2px;"></div>
+          <span style="color:var(--text-secondary);">Mutual Funds Portfolio</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:2px;background:rgba(148,163,184,0.6);border-radius:2px;border-top:2px dashed rgba(148,163,184,0.6);"></div>
+          <span id="perf-bench-legend" style="color:var(--text-secondary);">${data.benchmark_name}</span>
+        </div>
+      `;
+    } else if (targetMode === 'all') {
+      legendRow.innerHTML = `
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:3px;background:${stocksColor};border-radius:2px;"></div>
+          <span style="color:var(--text-secondary);">Stocks</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:3px;background:${mfColor};border-radius:2px;"></div>
+          <span style="color:var(--text-secondary);">Mutual Funds</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <div style="width:24px;height:3px;background:${combinedColor};border-radius:2px;"></div>
+          <span style="color:var(--text-secondary);">Combined</span>
         </div>
         <div style="display:flex;align-items:center;gap:0.4rem;">
           <div style="width:24px;height:2px;background:rgba(148,163,184,0.6);border-radius:2px;border-top:2px dashed rgba(148,163,184,0.6);"></div>
@@ -1165,23 +1230,13 @@ function renderPerformanceChart(data) {
     }
   }
 
-  // Set up datasets dynamically
+  // Set up datasets dynamically according to active mode
   const datasets = [];
-  if (hasCombined) {
-    datasets.push({
-      label: 'Stocks Portfolio',
-      data: data.portfolio,
-      borderColor: '#ec4899',
-      borderWidth: 3,
-      pointRadius: 0,
-      pointHoverRadius: 6,
-      pointBackgroundColor: '#ec4899',
-      fill: false,
-      tension: 0.25
-    });
+
+  if (targetMode === 'combined') {
     datasets.push({
       label: 'Combined Portfolio',
-      data: data.combined,
+      data: data.combined || data.portfolio,
       borderColor: combinedColor,
       borderWidth: 3,
       pointRadius: 0,
@@ -1190,18 +1245,68 @@ function renderPerformanceChart(data) {
       fill: false,
       tension: 0.25
     });
-  } else {
+  } else if (targetMode === 'stocks') {
     datasets.push({
-      label: 'Your Portfolio',
+      label: 'Stocks Portfolio',
       data: data.portfolio,
-      borderColor: accentColor,
+      borderColor: stocksColor,
       borderWidth: 3,
       pointRadius: 0,
       pointHoverRadius: 6,
-      pointBackgroundColor: accentColor,
+      pointBackgroundColor: stocksColor,
       fill: false,
       tension: 0.25
     });
+  } else if (targetMode === 'mf') {
+    datasets.push({
+      label: 'Mutual Funds Portfolio',
+      data: data.mf || [],
+      borderColor: mfColor,
+      borderWidth: 3,
+      pointRadius: 0,
+      pointHoverRadius: 6,
+      pointBackgroundColor: mfColor,
+      fill: false,
+      tension: 0.25
+    });
+  } else if (targetMode === 'all') {
+    datasets.push({
+      label: 'Stocks Portfolio',
+      data: data.portfolio,
+      borderColor: stocksColor,
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      pointBackgroundColor: stocksColor,
+      fill: false,
+      tension: 0.25
+    });
+    if (data.mf) {
+      datasets.push({
+        label: 'Mutual Funds Portfolio',
+        data: data.mf,
+        borderColor: mfColor,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointBackgroundColor: mfColor,
+        fill: false,
+        tension: 0.25
+      });
+    }
+    if (data.combined) {
+      datasets.push({
+        label: 'Combined Portfolio',
+        data: data.combined,
+        borderColor: combinedColor,
+        borderWidth: 3,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointBackgroundColor: combinedColor,
+        fill: false,
+        tension: 0.25
+      });
+    }
   }
 
   // Add Benchmark dataset
@@ -1220,15 +1325,12 @@ function renderPerformanceChart(data) {
 
   // Calculate dynamic min/max scaling
   const allValues = [];
-  if (data.portfolio) {
-    data.portfolio.forEach(v => { if (v !== null && v !== undefined && !isNaN(v)) allValues.push(v); });
-  }
-  if (data.combined) {
-    data.combined.forEach(v => { if (v !== null && v !== undefined && !isNaN(v)) allValues.push(v); });
-  }
-  if (data.benchmark) {
-    data.benchmark.forEach(v => { if (v !== null && v !== undefined && !isNaN(v)) allValues.push(v); });
-  }
+  datasets.forEach(ds => {
+    if (ds.data) {
+      ds.data.forEach(v => { if (v !== null && v !== undefined && !isNaN(v)) allValues.push(v); });
+    }
+  });
+
   let yMin = 100;
   let yMax = 100;
   if (allValues.length > 0) {
@@ -1290,30 +1392,22 @@ function renderPerformanceChart(data) {
               return label;
             },
             footer: function (context) {
-              if (context.length >= 3) {
-                const combinedVal = context[1].parsed.y;
-                const benchVal = context[2].parsed.y;
-                const gap = combinedVal - benchVal;
-                const sign = gap >= 0 ? '+' : '';
-                return `Combined Gap: ${sign}${gap.toFixed(2)}%`;
-              } else if (context.length === 2) {
-                const portVal = context[0].parsed.y;
-                const benchVal = context[1].parsed.y;
-                const gap = portVal - benchVal;
-                const sign = gap >= 0 ? '+' : '';
-                return `Gap: ${sign}${gap.toFixed(2)}%`;
+              if (context.length >= 2) {
+                const benchIdx    = context.length - 1;
+                const portVal     = context[0].parsed.y;
+                const benchVal    = context[benchIdx].parsed.y;
+                const gap         = portVal - benchVal;
+                const sign        = gap >= 0 ? '+' : '';
+                return `Gap vs ${data.benchmark_name}: ${sign}${gap.toFixed(2)}%`;
               }
               return '';
             }
           },
           footerColor: function (context) {
-            if (context.length >= 3) {
-              const combinedVal = context[1].parsed.y;
-              const benchVal = context[2].parsed.y;
-              return (combinedVal - benchVal >= 0) ? '#10b981' : '#ef4444';
-            } else if (context.length === 2) {
-              const portVal = context[0].parsed.y;
-              const benchVal = context[1].parsed.y;
+            if (context.length >= 2) {
+              const benchIdx = context.length - 1;
+              const portVal  = context[0].parsed.y;
+              const benchVal = context[benchIdx].parsed.y;
               return (portVal - benchVal >= 0) ? '#10b981' : '#ef4444';
             }
             return '#94a3b8';
@@ -1343,7 +1437,6 @@ function renderPerformanceChart(data) {
           max: yMax,
           grid: {
             color: function (context) {
-              // Brighter line at 100 baseline
               if (context.tick && Math.abs(context.tick.value - 100) < 0.001) {
                 return 'rgba(255, 255, 255, 0.18)';
               }
@@ -1367,7 +1460,6 @@ function renderPerformanceChart(data) {
       }
     },
     plugins: [{
-      // Draw "Start" label on the 100 baseline
       id: 'baselineLabel',
       afterDraw: function (chart) {
         const yScale = chart.scales['y'];
@@ -1387,11 +1479,29 @@ function renderPerformanceChart(data) {
   });
 }
 
+function setPerfMode(mode) {
+  activePerfMode = mode;
+  const modeBtns = document.querySelectorAll("#perf-mode-toggle .perf-period-btn");
+  modeBtns.forEach(btn => {
+    if (btn.id === `perf-mode-btn-${mode}`) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  if (cachedPerfData) {
+    renderPerformanceChart(cachedPerfData);
+  } else {
+    fetchPerformanceData();
+  }
+}
+
 function setPeriod(period) {
   activePeriod = period;
 
-  // Update UI active buttons
-  const buttons = document.querySelectorAll(".perf-period-btn");
+  // Update UI active period buttons
+  const buttons = document.querySelectorAll("#perf-btn-1W, #perf-btn-1M, #perf-btn-3M, #perf-btn-1Y, #perf-btn-All");
   buttons.forEach(btn => {
     if (btn.id === `perf-btn-${period}`) {
       btn.classList.add("active");
@@ -2082,14 +2192,17 @@ function renderStocksTable() {
       tr.appendChild(td);
     });
 
-    // Add edit/delete buttons
+    // Add edit/delete/sell buttons
     const tdActions = document.createElement("td");
+    const stockJson = JSON.stringify(s).replace(/"/g, '&quot;');
     tdActions.innerHTML = `
       <div style="display: flex; gap: 0.5rem;">
-        <button class="btn btn-secondary btn-sm" onclick="openEditStockModal(${JSON.stringify(s).replace(/"/g, '&quot;')})" title="Edit"><i class="fa-solid fa-edit"></i></button>
+        <button class="btn btn-warning btn-sm" onclick="openSellStockModal(${stockJson})" title="Sell Holding"><i class="fa-solid fa-hand-holding-dollar"></i> Sell</button>
+        <button class="btn btn-secondary btn-sm" onclick="openEditStockModal(${stockJson})" title="Edit"><i class="fa-solid fa-edit"></i></button>
         <button class="btn btn-danger btn-sm" onclick="deleteStockHolding('${s.row_idx}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
       </div>
     `;
+
     tr.appendChild(tdActions);
     body.appendChild(tr);
   });
@@ -2276,10 +2389,12 @@ function renderMfsTable() {
     tdActions.innerHTML = `
       <div style="display: flex; gap: 0.5rem;">
         <button class="btn btn-secondary btn-sm" onclick="openMfDetailDrawer(${mJson})" title="View Details"><i class="fa-solid fa-eye"></i></button>
+        <button class="btn btn-warning btn-sm" onclick="openSellMfModal(${mJson})" title="Sell Holding"><i class="fa-solid fa-hand-holding-dollar"></i> Sell</button>
         <button class="btn btn-secondary btn-sm" onclick="openEditMfModal(${mJson})" title="Edit"><i class="fa-solid fa-edit"></i></button>
         <button class="btn btn-danger btn-sm" onclick="deleteMfHolding('${m.row_idx}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
       </div>
     `;
+
     tr.appendChild(tdActions);
     body.appendChild(tr);
   });
@@ -2351,11 +2466,22 @@ function openMfDetailDrawer(m) {
     <div class="mf-drawer-row"><span class="mf-drawer-label">Benchmark 1Y Return</span><span class="mf-drawer-value">${m["Benchmark 1Y Return %"] !== null && m["Benchmark 1Y Return %"] !== undefined ? m["Benchmark 1Y Return %"].toFixed(2) + "%" : "—"}</span></div>
   `;
 
-  // Wire up Edit button
-  document.getElementById("mf-drawer-edit-btn").onclick = () => {
-    closeMfDetailDrawer();
-    openEditMfModal(m);
-  };
+  // Wire up Sell & Edit buttons
+  const sellBtn = document.getElementById("mf-drawer-sell-btn");
+  if (sellBtn) {
+    sellBtn.onclick = () => {
+      closeMfDetailDrawer();
+      openSellMfModal(m);
+    };
+  }
+  const editBtn = document.getElementById("mf-drawer-edit-btn");
+  if (editBtn) {
+    editBtn.onclick = () => {
+      closeMfDetailDrawer();
+      openEditMfModal(m);
+    };
+  }
+
 
   drawer.classList.add("open");
   overlay.classList.add("open");
@@ -3230,6 +3356,9 @@ async function deleteMfHolding(rowIdx) {
 // VISUAL SETTINGS PANEL logic
 function loadSettingsIntoForm() {
   if (!appConfig) return;
+  if (!appConfig.display_columns) {
+    appConfig.display_columns = { stocks: DEFAULT_STOCK_COLUMNS, mf: DEFAULT_MF_COLUMNS };
+  }
 
   // Theme highlights
   applyTheme(appConfig.theme);
@@ -3799,6 +3928,55 @@ function closeCustomConfirm(result) {
   }
 }
 
+// Floating Notification System
+
+function showNotification(message, type = "success") {
+  let toastEl = document.getElementById("app-toast");
+  if (!toastEl) {
+    toastEl = document.createElement("div");
+    toastEl.id = "app-toast";
+    toastEl.style.position = "fixed";
+    toastEl.style.bottom = "20px";
+    toastEl.style.right = "20px";
+    toastEl.style.padding = "10px 16px";
+    toastEl.style.borderRadius = "8px";
+    toastEl.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.3)";
+    toastEl.style.display = "flex";
+    toastEl.style.alignItems = "center";
+    toastEl.style.gap = "8px";
+    toastEl.style.fontFamily = "'Outfit', sans-serif";
+    toastEl.style.fontSize = "13px";
+    toastEl.style.zIndex = "10000";
+    toastEl.style.transition = "opacity 0.3s ease, transform 0.3s ease";
+    document.body.appendChild(toastEl);
+  }
+
+  const isError = type === "error";
+  toastEl.style.background = isError ? "rgba(239, 68, 68, 0.95)" : "rgba(15, 23, 42, 0.95)";
+  toastEl.style.color = "#ffffff";
+  const icon = isError ? "fa-circle-xmark" : "fa-circle-check";
+  const iconColor = isError ? "#ffffff" : "#10b981";
+  toastEl.innerHTML = `<i class="fa-solid ${icon}" style="color: ${iconColor};"></i> <span>${message}</span>`;
+
+  toastEl.style.opacity = "0";
+  toastEl.style.transform = "translateY(10px)";
+  toastEl.style.display = "flex";
+
+  setTimeout(() => {
+    toastEl.style.opacity = "1";
+    toastEl.style.transform = "translateY(0)";
+  }, 10);
+
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => {
+    toastEl.style.opacity = "0";
+    toastEl.style.transform = "translateY(10px)";
+    setTimeout(() => { toastEl.style.display = "none"; }, 300);
+  }, 4000);
+}
+
+
+
 // Hide scroll hint once user first swipes/scrolls table
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".table-container").forEach((container) => {
@@ -3810,3 +3988,404 @@ document.addEventListener("DOMContentLoaded", () => {
     }, { once: true });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// STOCK & MUTUAL FUND SELL MODALS & REALIZED TRADES
+// ═══════════════════════════════════════════════════════════════════
+
+let realizedTradesData = [];
+
+// ── SELL STOCK MODAL HANDLERS ──
+function openSellStockModal(stockData) {
+  if (!stockData) return;
+  const modal = document.getElementById("modal-sell-stock");
+  if (!modal) return;
+
+  const holdingId = stockData.row_idx || stockData.id || stockData.holding_id;
+  const scripName = stockData["Company Name"] || stockData["Scrip Name"] || "";
+  const qty = parseFloat(stockData["Total Quantity"] || stockData["Qty"] || stockData["quantity"] || 0);
+  const buyPrice = parseFloat(stockData["Avg Trading Price"] || stockData["Buy Price"] || stockData["buy_price"] || 0);
+  const currPrice = parseFloat(stockData["Current Price"] || stockData["current_price"] || buyPrice);
+  const sector = stockData["Sector"] || stockData["sector"] || "Other";
+
+  document.getElementById("sell-stock-holding-id").value = holdingId;
+  document.getElementById("sell-stock-buy-price").value = buyPrice;
+  document.getElementById("sell-stock-max-qty").value = qty;
+
+  document.getElementById("sell-stock-scrip-name").innerText = scripName;
+  document.getElementById("sell-stock-holding-qty-badge").innerText = `Available Qty: ${qty}`;
+  document.getElementById("sell-stock-buy-price-display").innerText = formatINR(buyPrice);
+  document.getElementById("sell-stock-sector-display").innerText = sector;
+
+  const qtyInput = document.getElementById("sell-stock-qty");
+  qtyInput.value = qty;
+  qtyInput.max = qty;
+
+  const priceInput = document.getElementById("sell-stock-price");
+  priceInput.value = currPrice > 0 ? currPrice.toFixed(2) : buyPrice.toFixed(2);
+
+  // Set today's date YYYY-MM-DD
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById("sell-stock-date").value = today;
+
+  updateSellStockPnlPreview();
+  modal.classList.add("active");
+}
+
+function closeSellStockModal() {
+  const modal = document.getElementById("modal-sell-stock");
+  if (modal) modal.classList.remove("active");
+}
+
+function updateSellStockPnlPreview() {
+  const buyPrice = parseFloat(document.getElementById("sell-stock-buy-price").value || 0);
+  const maxQty = parseFloat(document.getElementById("sell-stock-max-qty").value || 0);
+  const soldQty = parseFloat(document.getElementById("sell-stock-qty").value || 0);
+  const sellPrice = parseFloat(document.getElementById("sell-stock-price").value || 0);
+
+  const pnlValEl = document.getElementById("sell-stock-pnl-preview-val");
+  const pnlCardEl = document.getElementById("sell-stock-pnl-preview-card");
+  const badgeEl = document.getElementById("sell-stock-sale-type-badge");
+
+  if (soldQty <= 0 || isNaN(soldQty) || sellPrice <= 0 || isNaN(sellPrice)) {
+    if (pnlValEl) pnlValEl.innerText = "₹0.00";
+    return;
+  }
+
+  const estPnl = (sellPrice - buyPrice) * soldQty;
+  if (pnlValEl) {
+    pnlValEl.innerText = (estPnl >= 0 ? "+" : "") + formatINR(estPnl);
+    pnlValEl.style.color = estPnl >= 0 ? "#10b981" : "#ef4444";
+  }
+
+  if (pnlCardEl) {
+    pnlCardEl.style.background = estPnl >= 0 ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)";
+    pnlCardEl.style.borderColor = estPnl >= 0 ? "rgba(16, 185, 129, 0.25)" : "rgba(239, 68, 68, 0.25)";
+  }
+
+  if (badgeEl) {
+    if (Math.abs(maxQty - soldQty) < 1e-4 || soldQty >= maxQty) {
+      badgeEl.innerText = "Full Sale (Holding Removed)";
+      badgeEl.style.background = "rgba(239, 68, 68, 0.2)";
+      badgeEl.style.color = "#f87171";
+    } else {
+      badgeEl.innerText = `Partial Sale (${(maxQty - soldQty)} remaining)`;
+      badgeEl.style.background = "rgba(245, 158, 11, 0.2)";
+      badgeEl.style.color = "#fbbf24";
+    }
+  }
+}
+
+async function submitSellStockForm(event) {
+  event.preventDefault();
+  const holdingId = document.getElementById("sell-stock-holding-id").value;
+  const soldQty = parseFloat(document.getElementById("sell-stock-qty").value);
+  const maxQty = parseFloat(document.getElementById("sell-stock-max-qty").value);
+  const sellPrice = parseFloat(document.getElementById("sell-stock-price").value);
+  const sellDate = document.getElementById("sell-stock-date").value;
+
+  if (!holdingId || isNaN(soldQty) || soldQty <= 0 || isNaN(sellPrice) || sellPrice <= 0) {
+    showNotification("Please provide valid sale quantity and price.", "error");
+    return;
+  }
+
+  if (soldQty > maxQty) {
+    showNotification(`Sold quantity cannot exceed holding quantity (${maxQty}).`, "error");
+    return;
+  }
+
+  const submitBtn = document.getElementById("btn-sell-stock-submit");
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const res = await authorizedFetch("/api/stock/sell", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        holding_id: holdingId,
+        sold_qty: soldQty,
+        sell_price: sellPrice,
+        sell_date: sellDate
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      const pnlMsg = data.realized_pnl >= 0 ? `+₹${data.realized_pnl.toLocaleString('en-IN')}` : `-₹${Math.abs(data.realized_pnl).toLocaleString('en-IN')}`;
+      showNotification(`Recorded stock sale! Realized P&L: ${pnlMsg}`, "success");
+      closeSellStockModal();
+      await fetchPortfolio();
+    } else {
+      showNotification(data.message || "Failed to record stock sale.", "error");
+    }
+  } catch (err) {
+    console.error("Error selling stock:", err);
+    showNotification("Error recording stock sale. Please try again.", "error");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+// ── SELL MUTUAL FUND MODAL HANDLERS ──
+function openSellMfModal(mfData) {
+  if (!mfData) return;
+  const modal = document.getElementById("modal-sell-mf");
+  if (!modal) return;
+
+  const holdingId = mfData.row_idx || mfData.id || mfData.holding_id;
+  const fundName = mfData["Fund Name"] || mfData["fund_name"] || "";
+  const units = parseFloat(mfData["Units Held"] || mfData["units_held"] || 0);
+  const buyNav = parseFloat(mfData["Buy NAV"] || mfData["buy_nav"] || 0);
+  const currNav = parseFloat(mfData["Current NAV"] || mfData["current_nav"] || buyNav);
+  const category = mfData["Category"] || mfData["category"] || "Other";
+
+  document.getElementById("sell-mf-holding-id").value = holdingId;
+  document.getElementById("sell-mf-buy-nav").value = buyNav;
+  document.getElementById("sell-mf-max-units").value = units;
+
+  document.getElementById("sell-mf-fund-name").innerText = fundName;
+  document.getElementById("sell-mf-units-badge").innerText = `Available Units: ${units.toFixed(3)}`;
+  document.getElementById("sell-mf-buy-nav-display").innerText = formatINR(buyNav);
+  document.getElementById("sell-mf-category-display").innerText = category;
+
+  const unitsInput = document.getElementById("sell-mf-units");
+  unitsInput.value = units;
+  unitsInput.max = units;
+
+  const navInput = document.getElementById("sell-mf-nav");
+  navInput.value = currNav > 0 ? currNav.toFixed(4) : buyNav.toFixed(4);
+
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById("sell-mf-date").value = today;
+
+  updateSellMfPnlPreview();
+  modal.classList.add("active");
+}
+
+function closeSellMfModal() {
+  const modal = document.getElementById("modal-sell-mf");
+  if (modal) modal.classList.remove("active");
+}
+
+function updateSellMfPnlPreview() {
+  const buyNav = parseFloat(document.getElementById("sell-mf-buy-nav").value || 0);
+  const maxUnits = parseFloat(document.getElementById("sell-mf-max-units").value || 0);
+  const soldUnits = parseFloat(document.getElementById("sell-mf-units").value || 0);
+  const sellNav = parseFloat(document.getElementById("sell-mf-nav").value || 0);
+
+  const pnlValEl = document.getElementById("sell-mf-pnl-preview-val");
+  const pnlCardEl = document.getElementById("sell-mf-pnl-preview-card");
+  const badgeEl = document.getElementById("sell-mf-sale-type-badge");
+
+  if (soldUnits <= 0 || isNaN(soldUnits) || sellNav <= 0 || isNaN(sellNav)) {
+    if (pnlValEl) pnlValEl.innerText = "₹0.00";
+    return;
+  }
+
+  const estPnl = (sellNav - buyNav) * soldUnits;
+  if (pnlValEl) {
+    pnlValEl.innerText = (estPnl >= 0 ? "+" : "") + formatINR(estPnl);
+    pnlValEl.style.color = estPnl >= 0 ? "#10b981" : "#ef4444";
+  }
+
+  if (pnlCardEl) {
+    pnlCardEl.style.background = estPnl >= 0 ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)";
+    pnlCardEl.style.borderColor = estPnl >= 0 ? "rgba(16, 185, 129, 0.25)" : "rgba(239, 68, 68, 0.25)";
+  }
+
+  if (badgeEl) {
+    if (Math.abs(maxUnits - soldUnits) < 1e-4 || soldUnits >= maxUnits) {
+      badgeEl.innerText = "Full Redemption (Holding Removed)";
+      badgeEl.style.background = "rgba(239, 68, 68, 0.2)";
+      badgeEl.style.color = "#f87171";
+    } else {
+      badgeEl.innerText = `Partial Redemption (${(maxUnits - soldUnits).toFixed(3)} units remaining)`;
+      badgeEl.style.background = "rgba(245, 158, 11, 0.2)";
+      badgeEl.style.color = "#fbbf24";
+    }
+  }
+}
+
+async function submitSellMfForm(event) {
+  event.preventDefault();
+  const holdingId = document.getElementById("sell-mf-holding-id").value;
+  const soldUnits = parseFloat(document.getElementById("sell-mf-units").value);
+  const maxUnits = parseFloat(document.getElementById("sell-mf-max-units").value);
+  const sellNav = parseFloat(document.getElementById("sell-mf-nav").value);
+  const sellDate = document.getElementById("sell-mf-date").value;
+
+  if (!holdingId || isNaN(soldUnits) || soldUnits <= 0 || isNaN(sellNav) || sellNav <= 0) {
+    showNotification("Please provide valid units and sell NAV.", "error");
+    return;
+  }
+
+  if (soldUnits > maxUnits) {
+    showNotification(`Sold units cannot exceed held units (${maxUnits}).`, "error");
+    return;
+  }
+
+  const submitBtn = document.getElementById("btn-sell-mf-submit");
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const res = await authorizedFetch("/api/mf/sell", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        holding_id: holdingId,
+        sold_units: soldUnits,
+        sell_nav: sellNav,
+        sell_date: sellDate
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      const pnlMsg = data.realized_pnl >= 0 ? `+₹${data.realized_pnl.toLocaleString('en-IN')}` : `-₹${Math.abs(data.realized_pnl).toLocaleString('en-IN')}`;
+      showNotification(`Recorded Mutual Fund redemption! Realized P&L: ${pnlMsg}`, "success");
+      closeSellMfModal();
+      await fetchPortfolio();
+    } else {
+      showNotification(data.message || "Failed to record Mutual Fund sale.", "error");
+    }
+  } catch (err) {
+    console.error("Error selling MF:", err);
+    showNotification("Error recording Mutual Fund sale.", "error");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+// ── REALIZED TRADES & SALES HISTORY TAB ──
+async function fetchRealizedTrades() {
+  try {
+    const res = await authorizedFetch("/api/realized-trades");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === "success") {
+        realizedTradesData = data.trades || [];
+        renderRealizedTradesTable(data.summary);
+      }
+    }
+  } catch (err) {
+    console.error("Error fetching realized trades:", err);
+  }
+}
+
+function renderRealizedTradesTable(summaryObj) {
+  const tbody = document.getElementById("realized-trades-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  // Update summary metrics
+  const trades = realizedTradesData || [];
+  let totalPnl = 0;
+  let totalGains = 0;
+  let totalLosses = 0;
+
+  trades.forEach(t => {
+    const pnl = parseFloat(t.realized_pnl || 0);
+    totalPnl += pnl;
+    if (pnl > 0) totalGains += pnl;
+    if (pnl < 0) totalLosses += pnl;
+  });
+
+  const pnlValEl = document.getElementById("val-realized-pnl");
+  if (pnlValEl) {
+    pnlValEl.innerText = formatINR(totalPnl);
+    pnlValEl.style.color = totalPnl >= 0 ? "#10b981" : "#ef4444";
+  }
+
+  const gainsValEl = document.getElementById("val-realized-gains");
+  if (gainsValEl) gainsValEl.innerText = formatINR(totalGains);
+
+  const lossesValEl = document.getElementById("val-realized-losses");
+  if (lossesValEl) lossesValEl.innerText = formatINR(totalLosses);
+
+  const countValEl = document.getElementById("val-realized-count");
+  if (countValEl) countValEl.innerText = trades.length;
+
+  // Filter rows
+  const searchQ = (document.getElementById("realized-search")?.value || "").toLowerCase();
+  const typeFilter = document.getElementById("realized-type-filter")?.value || "";
+
+  const filtered = trades.filter(t => {
+    const textMatch = !searchQ ||
+      (t.scrip_name || "").toLowerCase().includes(searchQ) ||
+      (t.sector || "").toLowerCase().includes(searchQ);
+    const typeMatch = !typeFilter || t.holding_type === typeFilter;
+    return textMatch && typeMatch;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+          No realized sales recorded yet. Click <strong>Sell</strong> on any Stock or Mutual Fund holding to log a sale!
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  filtered.forEach(t => {
+    const tr = document.createElement("tr");
+    const pnl = parseFloat(t.realized_pnl || 0);
+    const pnlClass = pnl >= 0 ? "positive" : "negative";
+    const pnlStr = (pnl >= 0 ? "+" : "") + formatINR(pnl);
+    const isStock = t.holding_type === "stock";
+    const typeBadge = isStock
+      ? `<span class="badge" style="background: rgba(59,130,246,0.15); color: #60a5fa;"><i class="fa-solid fa-chart-simple"></i> Stock</span>`
+      : `<span class="badge" style="background: rgba(168,85,247,0.15); color: #c084fc;"><i class="fa-solid fa-wallet"></i> Mutual Fund</span>`;
+
+    const soldQtyFormatted = isStock ? parseInt(t.sold_qty || 0) : parseFloat(t.sold_qty || 0).toFixed(3);
+    const buyPriceFormatted = formatINR(t.buy_price || 0);
+    const sellPriceFormatted = formatINR(t.sell_price || 0);
+    const sellDateStr = t.sell_date ? t.sell_date : "-";
+
+    tr.innerHTML = `
+      <td>${typeBadge}</td>
+      <td><strong>${t.scrip_name || "—"}</strong></td>
+      <td>${t.sector || "Other"}</td>
+      <td>${sellDateStr}</td>
+      <td>${soldQtyFormatted}</td>
+      <td>${buyPriceFormatted}</td>
+      <td>${sellPriceFormatted}</td>
+      <td class="${pnlClass}" style="font-weight: 700;">${pnlStr}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="deleteRealizedTradeEntry('${t.id}')" title="Delete Sale Record" style="color: var(--danger);">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function filterRealizedTable() {
+  renderRealizedTradesTable();
+}
+
+async function deleteRealizedTradeEntry(tradeId) {
+  if (!tradeId) return;
+  const confirmDelete = await showCustomConfirm("Are you sure you want to delete this sale record from your history?", "Delete Realized Trade");
+  if (!confirmDelete) return;
+
+  try {
+    const res = await authorizedFetch("/api/realized-trades/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trade_id: tradeId })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      showNotification("Trade record deleted.", "success");
+      await fetchRealizedTrades();
+    } else {
+      showNotification(data.message || "Failed to delete trade record.", "error");
+    }
+  } catch (err) {
+    console.error("Error deleting trade entry:", err);
+    showNotification("Error deleting trade entry.", "error");
+  }
+}

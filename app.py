@@ -356,6 +356,17 @@ def load_config(user_id=None):
             data["widgets"]["risk_alerts"] = True
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
+        
+        # Ensure display_columns exists with sensible defaults (same pattern as widgets above)
+        if "display_columns" not in data:
+            data["display_columns"] = {
+                "stocks": ["Scrip Name", "Exchange", "Sector", "Qty", "Buy Price", "Buy Date",
+                           "Current Price", "Invested Value", "Current Value", "P&L", "Return %", "Tax Flag"],
+                "mf": ["Fund Name", "Category", "Units Held", "Invested Value",
+                       "Current Value", "P&L", "Return %", "XIRR %", "Holding Period", "Tax Flag"]
+            }
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
         return data
     except Exception as e:
         print(f"Error loading/updating config file at {path}: {e}")
@@ -542,11 +553,11 @@ def get_broad_sector(granular_sector: str) -> str:
 def resolve_stock_sector(raw_sector: str, sym: str | None, scrip_name: str = "") -> tuple:
     """
     Resolve the (sector, industry, is_sector_missing) tuple for a stock.
-    If the raw sector is generic/missing ('Other', 'ETFs', 'ETF', ''), try to look it up
-    from yfinance cache or yfinance info.
+    If a raw sector is assigned in DB, accept it as assigned!
+    If the raw sector is missing/empty, try to look it up from yfinance cache or info.
     """
     raw_clean = str(raw_sector or "").strip()
-    if raw_clean and raw_clean.lower() not in ("other", "etfs", "etf", "none", "null", ""):
+    if raw_clean and raw_clean.lower() not in ("none", "null", "", "select sector...", "unassigned"):
         return get_broad_sector(raw_clean), raw_clean, False
         
     # Try resolving from yfinance
@@ -2048,6 +2059,7 @@ def portfolio_performance():
 
     if has_mf:
         combined_norm = normalize(combined_series)
+        mf_norm       = normalize(mf_series)
         cur_port  = float(combined_norm.dropna().iloc[-1]) if not combined_norm.dropna().empty else 100.0
     else:
         cur_port  = float(stock_norm.dropna().iloc[-1])  if not stock_norm.dropna().empty  else 100.0
@@ -2070,6 +2082,7 @@ def portfolio_performance():
 
     if has_mf:
         payload['combined'] = [v if pd.notna(v) else None for v in combined_norm.tolist()]
+        payload['mf']       = [v if pd.notna(v) else None for v in mf_norm.tolist()]
 
     _perf_cache[cache_key] = (time.time(), payload)
     return jsonify(payload)
@@ -2684,7 +2697,8 @@ def save_stock_sector():
     try:
         from lib.supabase_data import update_stock_holding
         res = update_stock_holding(user_id, row_idx, {
-            'Sector': sector
+            'Sector': sector,
+            'Industry': sector
         })
         if res:
             clear_user_caches(user_id)
@@ -2716,6 +2730,49 @@ def delete_stock():
             return jsonify({"status": "error", "message": "Failed to delete stock from Supabase."}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/stock/sell', methods=['POST'])
+def sell_stock():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    data = request.json or {}
+    holding_id = (data.get("holding_id") or data.get("row_idx") or data.get("id"))
+    sold_qty = data.get("sold_qty") or data.get("quantity") or data.get("Qty")
+    sell_price = data.get("sell_price") or data.get("price")
+    sell_date = data.get("sell_date") or data.get("date")
+
+    if not holding_id or sold_qty is None or sell_price is None:
+        return jsonify({"status": "error", "message": "holding_id, sold_qty, and sell_price are required."}), 400
+
+    try:
+        sold_qty = float(sold_qty)
+        sell_price = float(sell_price)
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid numeric values for sold_qty or sell_price."}), 400
+
+    if not sell_date:
+        sell_date = datetime.now().strftime('%Y-%m-%d')
+    else:
+        parsed_d = parse_date(sell_date)
+        sell_date = parsed_d.strftime('%Y-%m-%d') if parsed_d else datetime.now().strftime('%Y-%m-%d')
+
+    try:
+        from lib.supabase_data import sell_stock_holding
+        res = sell_stock_holding(user_id, str(holding_id), sold_qty, sell_price, sell_date)
+        if res.get("success"):
+            clear_user_caches(user_id)
+            return jsonify({
+                "status": "success",
+                "message": "Stock sale recorded successfully!",
+                "realized_pnl": res.get("realized_pnl")
+            })
+        else:
+            return jsonify({"status": "error", "message": res.get("error", "Failed to record stock sale.")}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 @app.route('/api/stock/delete-all', methods=['POST'])
@@ -2900,6 +2957,94 @@ def delete_mf():
             return jsonify({"status": "error", "message": "Failed to delete mutual fund"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mf/sell', methods=['POST'])
+def sell_mf():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    data = request.json or {}
+    holding_id = (data.get("holding_id") or data.get("row_idx") or data.get("id"))
+    sold_units = data.get("sold_units") or data.get("sold_qty") or data.get("units")
+    sell_nav = data.get("sell_nav") or data.get("sell_price") or data.get("nav")
+    sell_date = data.get("sell_date") or data.get("date")
+
+    if not holding_id or sold_units is None or sell_nav is None:
+        return jsonify({"status": "error", "message": "holding_id, sold_units, and sell_nav are required."}), 400
+
+    try:
+        sold_units = float(sold_units)
+        sell_nav = float(sell_nav)
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid numeric values for sold_units or sell_nav."}), 400
+
+    if not sell_date:
+        sell_date = datetime.now().strftime('%Y-%m-%d')
+    else:
+        parsed_d = parse_date(sell_date)
+        sell_date = parsed_d.strftime('%Y-%m-%d') if parsed_d else datetime.now().strftime('%Y-%m-%d')
+
+    try:
+        from lib.supabase_data import sell_mf_holding
+        res = sell_mf_holding(user_id, str(holding_id), sold_units, sell_nav, sell_date)
+        if res.get("success"):
+            clear_user_caches(user_id)
+            return jsonify({
+                "status": "success",
+                "message": "Mutual Fund sale recorded successfully!",
+                "realized_pnl": res.get("realized_pnl")
+            })
+        else:
+            return jsonify({"status": "error", "message": res.get("error", "Failed to record mutual fund sale.")}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/realized-trades', methods=['GET'])
+def get_realized_trades():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    try:
+        from lib.supabase_data import get_user_realized_trades
+        trades = get_user_realized_trades(user_id)
+        total_pnl = sum(float(t.get('realized_pnl') or 0) for t in trades)
+        total_gains = sum(float(t.get('realized_pnl') or 0) for t in trades if float(t.get('realized_pnl') or 0) > 0)
+        total_losses = sum(float(t.get('realized_pnl') or 0) for t in trades if float(t.get('realized_pnl') or 0) < 0)
+        return jsonify({
+            "status": "success",
+            "trades": trades,
+            "summary": {
+                "total_realized_pnl": round(total_pnl, 2),
+                "total_realized_gains": round(total_gains, 2),
+                "total_realized_losses": round(total_losses, 2),
+                "count": len(trades)
+            }
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/realized-trades/delete', methods=['POST'])
+def delete_realized_trade_route():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    data = request.json or {}
+    trade_id = data.get("trade_id") or data.get("id")
+    if not trade_id:
+        return jsonify({"status": "error", "message": "trade_id required"}), 400
+    try:
+        from lib.supabase_data import delete_realized_trade
+        success = delete_realized_trade(user_id, str(trade_id))
+        if success:
+            return jsonify({"status": "success", "message": "Realized trade record deleted."})
+        else:
+            return jsonify({"status": "error", "message": "Failed to delete trade record."}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/api/update-prices', methods=['POST'])
 def update_prices():
@@ -3539,4 +3684,4 @@ def set_profile_pin_by_name():
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
         threading.Thread(target=automatic_price_updater_loop, daemon=True).start()
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, threaded=True)
