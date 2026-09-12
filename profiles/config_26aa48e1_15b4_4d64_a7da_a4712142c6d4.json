@@ -1,9 +1,4 @@
 {
-  "auto_update_prices": true,
-  "custom_alerts": {
-    "high_concentration_pct": 20,
-    "high_loss_pct": 10
-  },
   "display_columns": {
     "mf": [
       "Fund Name",
@@ -32,18 +27,10 @@
       "Tax Flag"
     ]
   },
-  "tax_rules": {
-    "mf_ltcg_days": 365,
-    "stocks_ltcg_days": 365
-  },
-  "theme": "emerald",
+  "message": "Unauthorized",
+  "status": "error",
+  "theme_mode": "dark",
   "widgets": {
-    "asset_allocation": true,
-    "dividend_yield": true,
-    "portfolio_signals": true,
-    "risk_alerts": true,
-    "sector_allocation": true,
-    "top_performers": true
-  },
-  "theme_mode": "dark"
+    "risk_alerts": true
+  }
 }

@@ -1,73 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="icon" type="image/png" sizes="192x192"
+    href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
+  <link rel="icon" type="image/png" sizes="512x512"
+    href="{{ url_for('static', filename='android-chrome-512x512.png') }}">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
   <script>
-  (async function() {
-    try {
-      window.SUPABASE_URL = '{{ supabase_url }}';
-      window.SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
-
-      if (!window.SUPABASE_URL || window.SUPABASE_URL === '') {
-        console.error('Supabase URL missing');
-        window.location.replace('/login');
-        return;
-      }
-
-      window.supabaseClient = window.supabase.createClient(
-        window.SUPABASE_URL,
-        window.SUPABASE_ANON_KEY
-      );
-
-      const { data: { session }, error } = await window.supabaseClient.auth.getSession();
-
-      if (!session) {
-        window.location.replace('/login?redirectTo=/account');
-        return;
-      }
-
-      window.currentUser = session.user;
-      window.currentUserEmail = session.user.email;
-      window.currentUserName =
-        session.user.user_metadata?.full_name || session.user.email;
-      window._authClient = window.supabaseClient;
-
-    } catch(err) {
-      console.error('Auth check failed:', err);
-      window.location.replace('/login');
-    }
-  })();
-
-  async function getAuthHeaders() {
-    if (window.supabaseClient) {
+    (async function () {
       try {
-        const { data: { session } } = await window.supabaseClient.auth.getSession();
-        if (session && session.access_token) {
-          return {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          };
-        }
-      } catch(e) { console.error(e); }
-    }
-    return { 'Content-Type': 'application/json' };
-  }
+        window.SUPABASE_URL = '{{ supabase_url }}';
+        window.SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
 
-  async function signOut() {
-    try {
-      if (window.supabaseClient) {
-        await window.supabaseClient.auth.signOut();
+        if (!window.SUPABASE_URL || window.SUPABASE_URL === '') {
+          console.error('Supabase URL missing');
+          window.location.replace('/login');
+          return;
+        }
+
+        window.supabaseClient = window.supabase.createClient(
+          window.SUPABASE_URL,
+          window.SUPABASE_ANON_KEY
+        );
+
+        const { data: { session }, error } = await window.supabaseClient.auth.getSession();
+
+        if (!session) {
+          window.location.replace('/login?redirectTo=/account');
+          return;
+        }
+
+        window.currentUser = session.user;
+        window.currentUserEmail = session.user.email;
+        window.currentUserName =
+          session.user.user_metadata?.full_name || session.user.email;
+        window._authClient = window.supabaseClient;
+
+      } catch (err) {
+        console.error('Auth check failed:', err);
+        window.location.replace('/login');
       }
-      window.location.href = '/login';
-    } catch(err) {
-      window.location.href = '/login';
+    })();
+
+    async function getAuthHeaders() {
+      if (window.supabaseClient) {
+        try {
+          const { data: { session } } = await window.supabaseClient.auth.getSession();
+          if (session && session.access_token) {
+            return {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json'
+            };
+          }
+        } catch (e) { console.error(e); }
+      }
+      return { 'Content-Type': 'application/json' };
     }
-  }
+
+    async function signOut() {
+      try {
+        if (window.supabaseClient) {
+          await window.supabaseClient.auth.signOut();
+        }
+        window.location.href = '/login';
+      } catch (err) {
+        window.location.href = '/login';
+      }
+    }
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Account Settings — WealthLenz</title>
-  <meta name="description" content="Manage your WealthLenz account — update your profile, subscription plan, security settings and more.">
+  <meta name="description"
+    content="Manage your WealthLenz account — update your profile, subscription plan, security settings and more.">
 
   <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -75,6 +85,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=1.0.1">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
 </head>
+
 <body class="theme-emerald">
 
   <div class="app-container">
@@ -89,14 +100,14 @@
         <div class="header-actions">
           <span id="account-header-name" style="font-size:0.9rem; color:var(--text-secondary);"></span>
           <span id="account-header-badge" class="plan-badge plan-free">FREE</span>
-          <button class="btn btn-secondary btn-sm" id="btn-mode-toggle" title="Toggle Light/Dark Mode" onclick="toggleThemeMode()" style="margin-right: 0.25rem;">
+          <button class="btn btn-secondary btn-sm" id="btn-mode-toggle" title="Toggle Light/Dark Mode"
+            onclick="toggleThemeMode()" style="margin-right: 0.25rem;">
             <i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Light
           </button>
           <a href="/dashboard" class="btn btn-secondary btn-sm">
             <i class="fa-solid fa-grip"></i> Dashboard
           </a>
-          <button onclick="signOut()"
-            style="background:transparent; border:1px solid rgba(255,255,255,0.2);
+          <button onclick="signOut()" style="background:transparent; border:1px solid rgba(255,255,255,0.2);
                    color:inherit; padding:4px 12px; border-radius:6px;
                    cursor:pointer; font-size:13px;">
             <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
@@ -131,8 +142,8 @@
         <div class="form-group">
           <label class="account-field-label">Full Name</label>
           <div class="account-field-row">
-            <input type="text" class="form-control" id="input-full-name"
-                   placeholder="Your full name" autocomplete="name">
+            <input type="text" class="form-control" id="input-full-name" placeholder="Your full name"
+              autocomplete="name">
             <button class="btn btn-sm" id="btn-save-name" onclick="saveName()">
               <i class="fa-solid fa-floppy-disk"></i> Save
             </button>
@@ -159,7 +170,7 @@
           <div class="account-info-row">
             <span class="account-info-key">Account ID</span>
             <span class="account-info-val" id="display-account-id"
-                  style="font-size:0.75rem; font-family:monospace; color:var(--text-secondary);">—</span>
+              style="font-size:0.75rem; font-family:monospace; color:var(--text-secondary);">—</span>
           </div>
         </div>
       </div>
@@ -186,7 +197,8 @@
             <li class="locked">AI Advisor access</li>
             <li class="locked">Tax reports &amp; export</li>
           </ul>
-          <a href="/upgrade" class="btn btn-primary" style="margin-top:0.5rem; display:inline-flex; text-decoration:none;">
+          <a href="/upgrade" class="btn btn-primary"
+            style="margin-top:0.5rem; display:inline-flex; text-decoration:none;">
             <i class="fa-solid fa-rocket"></i> Upgrade to Pro — ₹199/month
           </a>
         </div>
@@ -205,7 +217,8 @@
             <li>Priority support</li>
           </ul>
           <div id="pro-plan-expiry-info" style="display:none; margin-bottom: 0.75rem;"></div>
-          <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="showAlert('Contact support to manage your subscription.', 'success')">
+          <button class="btn btn-secondary" style="margin-top:0.5rem;"
+            onclick="showAlert('Contact support to manage your subscription.', 'success')">
             <i class="fa-solid fa-gear"></i> Manage Subscription
           </button>
         </div>
@@ -263,18 +276,18 @@
       </p>
       <div class="form-group">
         <label style="font-size:0.85rem; color:var(--text-secondary);">
-          Type <code style="background:rgba(239,68,68,0.15); color:#f87171; padding:2px 6px; border-radius:4px; font-size:0.85em;">DELETE</code> to confirm
+          Type <code
+            style="background:rgba(239,68,68,0.15); color:#f87171; padding:2px 6px; border-radius:4px; font-size:0.85em;">DELETE</code>
+          to confirm
         </label>
-        <input type="text" class="form-control" id="delete-confirmation"
-               placeholder="Type DELETE here" autocomplete="off"
-               style="margin-top:0.5rem; border-color:rgba(239,68,68,0.3);"
-               oninput="validateDeleteInput(this)">
+        <input type="text" class="form-control" id="delete-confirmation" placeholder="Type DELETE here"
+          autocomplete="off" style="margin-top:0.5rem; border-color:rgba(239,68,68,0.3);"
+          oninput="validateDeleteInput(this)">
       </div>
       <div style="display:flex; gap:0.75rem; margin-top:1.25rem; justify-content:flex-end;">
         <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-        <button class="btn btn-danger" id="btn-confirm-delete"
-                onclick="deleteAccount()" disabled
-                style="opacity:0.5; transition:opacity 0.2s;">
+        <button class="btn btn-danger" id="btn-confirm-delete" onclick="deleteAccount()" disabled
+          style="opacity:0.5; transition:opacity 0.2s;">
           <i class="fa-solid fa-trash-can"></i> Delete Permanently
         </button>
       </div>
@@ -282,273 +295,274 @@
   </div>
 
   <script>
-  // ─── Utility ─────────────────────────────────────────────
-  function showAlert(message, type = 'success') {
-    const area = document.getElementById('account-alert-area');
-    const icon = type === 'success'
-      ? '<i class="fa-solid fa-circle-check"></i>'
-      : '<i class="fa-solid fa-circle-exclamation"></i>';
-    const div = document.createElement('div');
-    div.className = `account-alert ${type}`;
-    div.innerHTML = `${icon} ${message}`;
-    area.innerHTML = '';
-    area.appendChild(div);
-    setTimeout(() => div.remove(), 6000);
-  }
-
-  function toggleThemeMode() {
-    const currentMode = localStorage.getItem('portfolio_theme_mode') || 'dark';
-    const nextMode = currentMode === 'light' ? 'dark' : 'light';
-    localStorage.setItem('portfolio_theme_mode', nextMode);
-    applyHeaderThemeMode(nextMode);
-  }
-
-  function applyHeaderThemeMode(modeName) {
-    if (modeName === 'light') {
-      document.body.classList.add('light-mode');
-    } else {
-      document.body.classList.remove('light-mode');
+    // ─── Utility ─────────────────────────────────────────────
+    function showAlert(message, type = 'success') {
+      const area = document.getElementById('account-alert-area');
+      const icon = type === 'success'
+        ? '<i class="fa-solid fa-circle-check"></i>'
+        : '<i class="fa-solid fa-circle-exclamation"></i>';
+      const div = document.createElement('div');
+      div.className = `account-alert ${type}`;
+      div.innerHTML = `${icon} ${message}`;
+      area.innerHTML = '';
+      area.appendChild(div);
+      setTimeout(() => div.remove(), 6000);
     }
-    const modeBtn = document.getElementById("btn-mode-toggle");
-    if (modeBtn) {
+
+    function toggleThemeMode() {
+      const currentMode = localStorage.getItem('portfolio_theme_mode') || 'dark';
+      const nextMode = currentMode === 'light' ? 'dark' : 'light';
+      localStorage.setItem('portfolio_theme_mode', nextMode);
+      applyHeaderThemeMode(nextMode);
+    }
+
+    function applyHeaderThemeMode(modeName) {
       if (modeName === 'light') {
-        modeBtn.innerHTML = `<i class="fa-solid fa-moon"></i> Dark`;
-        modeBtn.title = "Switch to Dark Mode";
+        document.body.classList.add('light-mode');
       } else {
-        modeBtn.innerHTML = `<i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Light`;
-        modeBtn.title = "Switch to Light Mode";
+        document.body.classList.remove('light-mode');
+      }
+      const modeBtn = document.getElementById("btn-mode-toggle");
+      if (modeBtn) {
+        if (modeName === 'light') {
+          modeBtn.innerHTML = `<i class="fa-solid fa-moon"></i> Dark`;
+          modeBtn.title = "Switch to Dark Mode";
+        } else {
+          modeBtn.innerHTML = `<i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Light`;
+          modeBtn.title = "Switch to Light Mode";
+        }
       }
     }
-  }
 
-  // ─── Load profile on page ready ──────────────────────────
-  document.addEventListener('DOMContentLoaded', async function() {
-    // Apply saved theme and mode
-    const savedTheme = localStorage.getItem('portfolio_theme') || 'emerald';
-    const savedMode = localStorage.getItem('portfolio_theme_mode') || 'dark';
-    document.body.className = `theme-${savedTheme}`;
-    applyHeaderThemeMode(savedMode);
+    // ─── Load profile on page ready ──────────────────────────
+    document.addEventListener('DOMContentLoaded', async function () {
+      // Apply saved theme and mode
+      const savedTheme = localStorage.getItem('portfolio_theme') || 'emerald';
+      const savedMode = localStorage.getItem('portfolio_theme_mode') || 'dark';
+      document.body.className = `theme-${savedTheme}`;
+      applyHeaderThemeMode(savedMode);
 
-    // Wait a tick for auth to complete
-    await new Promise(r => setTimeout(r, 300));
-    await loadProfile();
-  });
+      // Wait a tick for auth to complete
+      await new Promise(r => setTimeout(r, 300));
+      await loadProfile();
+    });
 
-  async function loadProfile() {
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch('/api/account/profile', { headers });
-      const data = await res.json();
+    async function loadProfile() {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/account/profile', { headers });
+        const data = await res.json();
 
-      if (data.status !== 'success') {
-        showAlert('Failed to load profile: ' + data.message, 'error');
-        return;
-      }
+        if (data.status !== 'success') {
+          showAlert('Failed to load profile: ' + data.message, 'error');
+          return;
+        }
 
-      const p = data.profile;
+        const p = data.profile;
 
-      // Header
-      const headerName = document.getElementById('account-header-name');
-      if (headerName) headerName.textContent = p.full_name || p.email || '';
+        // Header
+        const headerName = document.getElementById('account-header-name');
+        if (headerName) headerName.textContent = p.full_name || p.email || '';
 
-      // Profile fields
-      document.getElementById('input-full-name').value = p.full_name || '';
-      document.getElementById('display-email').textContent = p.email || '—';
-      document.getElementById('display-account-id').textContent = p.id || '—';
+        // Profile fields
+        document.getElementById('input-full-name').value = p.full_name || '';
+        document.getElementById('display-email').textContent = p.email || '—';
+        document.getElementById('display-account-id').textContent = p.id || '—';
 
-      // Member since
-      if (p.created_at) {
-        const d = new Date(p.created_at);
-        document.getElementById('display-member-since').textContent =
-          d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
-      }
+        // Member since
+        if (p.created_at) {
+          const d = new Date(p.created_at);
+          document.getElementById('display-member-since').textContent =
+            d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
 
-      // Plan card
-      const plan = (p.plan || 'free').toLowerCase();
-      document.getElementById('plan-card-loading').style.display = 'none';
+        // Plan card
+        const plan = (p.plan || 'free').toLowerCase();
+        document.getElementById('plan-card-loading').style.display = 'none';
 
-      const headerBadge = document.getElementById('account-header-badge');
-      if (headerBadge) {
-        headerBadge.textContent = plan.toUpperCase();
-        headerBadge.className = `plan-badge plan-${plan}`;
-      }
+        const headerBadge = document.getElementById('account-header-badge');
+        if (headerBadge) {
+          headerBadge.textContent = plan.toUpperCase();
+          headerBadge.className = `plan-badge plan-${plan}`;
+        }
 
-      if (plan === 'pro' || plan === 'wealth') {
-        document.getElementById('plan-card-pro').style.display = 'block';
-        
-        // Show expiry details
-        const expiresAt = p.plan_expires_at;
-        const expiryContainer = document.getElementById('pro-plan-expiry-info');
-        if (expiryContainer && expiresAt) {
-          const expiryDate = new Date(expiresAt);
-          const formattedDate = expiryDate.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
-          
-          const now = new Date();
-          const timeDiff = expiryDate.getTime() - now.getTime();
-          const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-          
-          let warningHtml = '';
-          if (daysDiff >= 0 && daysDiff <= 7) {
-            warningHtml = `
+        if (plan === 'pro' || plan === 'wealth') {
+          document.getElementById('plan-card-pro').style.display = 'block';
+
+          // Show expiry details
+          const expiresAt = p.plan_expires_at;
+          const expiryContainer = document.getElementById('pro-plan-expiry-info');
+          if (expiryContainer && expiresAt) {
+            const expiryDate = new Date(expiresAt);
+            const formattedDate = expiryDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+            const now = new Date();
+            const timeDiff = expiryDate.getTime() - now.getTime();
+            const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+            let warningHtml = '';
+            if (daysDiff >= 0 && daysDiff <= 7) {
+              warningHtml = `
               <div style="margin-top:8px; padding:8px 12px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; color:#f59e0b; font-size:0.8rem; display:flex; align-items:center; gap:8px;">
                 <i class="fa-solid fa-triangle-exclamation"></i>
                 <span>Your subscription expires in ${daysDiff} day(s). Please renew to maintain access.</span>
               </div>`;
-          }
-          
-          expiryContainer.innerHTML = `
+            }
+
+            expiryContainer.innerHTML = `
             <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.75rem;">
               Expires on: <strong style="color:var(--text-primary);">${formattedDate}</strong>
             </div>
             ${warningHtml}
           `;
-          expiryContainer.style.display = 'block';
+            expiryContainer.style.display = 'block';
+          }
+        } else {
+          document.getElementById('plan-card-free').style.display = 'block';
         }
-      } else {
-        document.getElementById('plan-card-free').style.display = 'block';
+
+      } catch (err) {
+        console.error('Profile load error:', err);
+        showAlert('Could not load profile data. Please refresh.', 'error');
+      }
+    }
+
+    // ─── Save Name ───────────────────────────────────────────
+    async function saveName() {
+      const btn = document.getElementById('btn-save-name');
+      const name = document.getElementById('input-full-name').value.trim();
+
+      if (!name) {
+        showAlert('Name cannot be empty.', 'error');
+        return;
       }
 
-    } catch(err) {
-      console.error('Profile load error:', err);
-      showAlert('Could not load profile data. Please refresh.', 'error');
-    }
-  }
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
 
-  // ─── Save Name ───────────────────────────────────────────
-  async function saveName() {
-    const btn = document.getElementById('btn-save-name');
-    const name = document.getElementById('input-full-name').value.trim();
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/account/update-name', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ full_name: name })
+        });
+        const data = await res.json();
 
-    if (!name) {
-      showAlert('Name cannot be empty.', 'error');
-      return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch('/api/account/update-name', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ full_name: name })
-      });
-      const data = await res.json();
-
-      if (data.status === 'success') {
-        showAlert(data.message, 'success');
-        // Update header name
-        const headerName = document.getElementById('account-header-name');
-        if (headerName) headerName.textContent = name;
-      } else {
-        showAlert(data.message || 'Failed to update name.', 'error');
+        if (data.status === 'success') {
+          showAlert(data.message, 'success');
+          // Update header name
+          const headerName = document.getElementById('account-header-name');
+          if (headerName) headerName.textContent = name;
+        } else {
+          showAlert(data.message || 'Failed to update name.', 'error');
+        }
+      } catch (err) {
+        showAlert('Network error. Please try again.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save';
       }
-    } catch(err) {
-      showAlert('Network error. Please try again.', 'error');
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save';
     }
-  }
 
-  // ─── Change Password ─────────────────────────────────────
-  async function changePassword() {
-    const btn = document.getElementById('btn-change-password');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+    // ─── Change Password ─────────────────────────────────────
+    async function changePassword() {
+      const btn = document.getElementById('btn-change-password');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
 
-    const container = document.getElementById('password-alert-container');
-    container.innerHTML = '';
+      const container = document.getElementById('password-alert-container');
+      container.innerHTML = '';
 
-    try {
-      const { error } = await window.supabaseClient.auth.resetPasswordForEmail(
-        window.currentUserEmail,
-        { redirectTo: window.location.origin + '/reset-password' }
-      );
+      try {
+        const { error } = await window.supabaseClient.auth.resetPasswordForEmail(
+          window.currentUserEmail,
+          { redirectTo: window.location.origin + '/reset-password' }
+        );
 
-      if (error) throw error;
+        if (error) throw error;
 
-      container.innerHTML = `
+        container.innerHTML = `
         <div style="padding:10px 16px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);
                     border-radius:8px; color:#10b981; font-size:13px; display:flex; align-items:center; gap:8px;">
           <i class="fa-solid fa-circle-check"></i> Password reset email sent! Check your inbox.
         </div>`;
-      setTimeout(() => { container.innerHTML = ''; }, 5000);
+        setTimeout(() => { container.innerHTML = ''; }, 5000);
 
-    } catch(err) {
-      container.innerHTML = `
+      } catch (err) {
+        container.innerHTML = `
         <div style="padding:10px 16px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);
                     border-radius:8px; color:#f87171; font-size:13px; display:flex; align-items:center; gap:8px;">
           <i class="fa-solid fa-circle-exclamation"></i> Failed to send reset email. Please try again.
         </div>`;
-      setTimeout(() => { container.innerHTML = ''; }, 5000);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-key"></i> Change Password';
-    }
-  }
-
-  // ─── Delete Account Modal ────────────────────────────────
-  function openDeleteModal() {
-    document.getElementById('delete-confirmation').value = '';
-    document.getElementById('btn-confirm-delete').disabled = true;
-    document.getElementById('btn-confirm-delete').style.opacity = '0.5';
-    document.getElementById('modal-delete-account').classList.add('active');
-  }
-
-  function closeDeleteModal() {
-    document.getElementById('modal-delete-account').classList.remove('active');
-  }
-
-  function validateDeleteInput(input) {
-    const btn = document.getElementById('btn-confirm-delete');
-    const valid = input.value === 'DELETE';
-    btn.disabled = !valid;
-    btn.style.opacity = valid ? '1' : '0.5';
-  }
-
-  async function deleteAccount() {
-    const input = document.getElementById('delete-confirmation').value;
-    if (input !== 'DELETE') {
-      showAlert('Please type DELETE to confirm.', 'error');
-      return;
+        setTimeout(() => { container.innerHTML = ''; }, 5000);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-key"></i> Change Password';
+      }
     }
 
-    const btn = document.getElementById('btn-confirm-delete');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
+    // ─── Delete Account Modal ────────────────────────────────
+    function openDeleteModal() {
+      document.getElementById('delete-confirmation').value = '';
+      document.getElementById('btn-confirm-delete').disabled = true;
+      document.getElementById('btn-confirm-delete').style.opacity = '0.5';
+      document.getElementById('modal-delete-account').classList.add('active');
+    }
 
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch('/api/account/delete', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ confirmation: 'DELETE' })
-      });
-      const data = await res.json();
+    function closeDeleteModal() {
+      document.getElementById('modal-delete-account').classList.remove('active');
+    }
 
-      if (data.status === 'success') {
-        await window.supabaseClient.auth.signOut();
-        window.location.href = '/signup?deleted=true';
-      } else {
-        showAlert(data.message || 'Failed to delete account.', 'error');
+    function validateDeleteInput(input) {
+      const btn = document.getElementById('btn-confirm-delete');
+      const valid = input.value === 'DELETE';
+      btn.disabled = !valid;
+      btn.style.opacity = valid ? '1' : '0.5';
+    }
+
+    async function deleteAccount() {
+      const input = document.getElementById('delete-confirmation').value;
+      if (input !== 'DELETE') {
+        showAlert('Please type DELETE to confirm.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-confirm-delete');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
+
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/account/delete', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ confirmation: 'DELETE' })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+          await window.supabaseClient.auth.signOut();
+          window.location.href = '/signup?deleted=true';
+        } else {
+          showAlert(data.message || 'Failed to delete account.', 'error');
+          closeDeleteModal();
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete Permanently';
+        }
+      } catch (err) {
+        showAlert('Failed to delete account. Please try again.', 'error');
         closeDeleteModal();
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete Permanently';
       }
-    } catch(err) {
-      showAlert('Failed to delete account. Please try again.', 'error');
-      closeDeleteModal();
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete Permanently';
     }
-  }
 
-  // Close modal on overlay click
-  document.getElementById('modal-delete-account').addEventListener('click', function(e) {
-    if (e.target === this) closeDeleteModal();
-  });
+    // Close modal on overlay click
+    document.getElementById('modal-delete-account').addEventListener('click', function (e) {
+      if (e.target === this) closeDeleteModal();
+    });
   </script>
 </body>
+
 </html>

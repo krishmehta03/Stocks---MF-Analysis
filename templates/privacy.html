@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="icon" type="image/png" sizes="192x192"
+    href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
+  <link rel="icon" type="image/png" sizes="512x512"
+    href="{{ url_for('static', filename='android-chrome-512x512.png') }}">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy — WealthLenz</title>
@@ -17,6 +26,7 @@
       display: flex;
       flex-direction: column;
     }
+
     .legal-container {
       max-width: 800px;
       margin: 0 auto;
@@ -24,6 +34,7 @@
       flex-grow: 1;
       width: 100%;
     }
+
     header {
       display: flex;
       justify-content: space-between;
@@ -32,6 +43,7 @@
       border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
       margin-bottom: 2rem;
     }
+
     header .logo {
       font-family: 'Outfit', sans-serif;
       font-size: 1.5rem;
@@ -44,11 +56,13 @@
       gap: 0.5rem;
       text-decoration: none;
     }
+
     header .logo i {
       background: var(--accent-gradient, linear-gradient(135deg, #10b981 0%, #059669 100%));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+
     header .back-link {
       color: var(--text-secondary);
       text-decoration: none;
@@ -56,19 +70,23 @@
       font-weight: 500;
       transition: color 0.2s ease;
     }
+
     header .back-link:hover {
       color: var(--accent);
     }
+
     .legal-content {
       color: var(--text-secondary);
       line-height: 1.8;
     }
+
     .legal-content h1 {
       font-size: 28px;
       color: var(--text-primary);
       margin-bottom: 0.5rem;
       font-family: 'Outfit', sans-serif;
     }
+
     .legal-content h2 {
       font-size: 18px;
       color: var(--text-primary);
@@ -78,21 +96,25 @@
       border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
       font-family: 'Outfit', sans-serif;
     }
+
     .legal-content p {
       margin-bottom: 1rem;
       font-size: 14px;
     }
+
     .legal-content ul {
       padding-left: 1.5rem;
       margin-bottom: 1rem;
     }
+
     .legal-content ul li {
       margin-bottom: 0.5rem;
       font-size: 14px;
     }
+
     .warning-box {
-      background: rgba(239,68,68,0.1);
-      border: 1px solid rgba(239,68,68,0.3);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
       border-radius: 8px;
       padding: 1rem 1.5rem;
       margin-bottom: 1.5rem;
@@ -100,12 +122,14 @@
       font-weight: 500;
       font-size: 14px;
     }
+
     footer {
       text-align: center;
       padding: 2rem 0;
       border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
       margin-top: 3rem;
     }
+
     footer a {
       color: var(--text-secondary);
       text-decoration: none;
@@ -113,15 +137,18 @@
       font-size: 0.85rem;
       transition: color 0.2s ease;
     }
+
     footer a:hover {
       color: var(--accent);
     }
+
     footer p {
       margin-top: 1rem;
       font-size: 0.75rem;
       color: var(--text-secondary);
       opacity: 0.6;
     }
+
     .list-header {
       font-weight: 600;
       color: var(--text-primary);
@@ -131,7 +158,7 @@
     }
   </style>
   <script>
-    document.addEventListener("DOMContentLoaded", function() {
+    document.addEventListener("DOMContentLoaded", function () {
       const theme = localStorage.getItem('portfolio_theme') || 'emerald';
       const mode = localStorage.getItem('portfolio_theme_mode') || 'dark';
       document.body.className = `theme-${theme}`;
@@ -141,6 +168,7 @@
     });
   </script>
 </head>
+
 <body>
   <div class="legal-container">
     <header>
@@ -158,14 +186,14 @@
       <p style="opacity: 0.7; margin-bottom: 2rem;">Last updated: July 2026</p>
 
       <h2>1. INFORMATION WE COLLECT</h2>
-      
+
       <div class="list-header">Account Information:</div>
       <ul>
         <li>Full name</li>
         <li>Email address</li>
         <li>Password (encrypted, never stored in plain text)</li>
       </ul>
-      
+
       <div class="list-header">Portfolio Data:</div>
       <ul>
         <li>Stock holdings you add manually</li>
@@ -173,7 +201,7 @@
         <li>Buy prices and quantities</li>
         <li>Buy dates</li>
       </ul>
-      
+
       <div class="list-header">Usage Data:</div>
       <ul>
         <li>Pages visited</li>
@@ -254,4 +282,5 @@
     </footer>
   </div>
 </body>
+
 </html>
