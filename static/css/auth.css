@@ -67,6 +67,17 @@ body.auth-page::before {
   display: flex; align-items: center; gap: 0.5rem;
   margin-bottom: 1.75rem; text-decoration: none;
 }
+.auth-logo-img {
+  height: 48px;
+  width: auto;
+  max-width: 240px;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.2s ease;
+}
+.auth-logo-img:hover {
+  transform: scale(1.03);
+}
 .auth-logo i, .auth-logo span {
   background: var(--auth-accent-gradient);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;

@@ -238,7 +238,9 @@
       <!-- Header -->
       <header>
         <div class="logo-section">
-          <h1><i class="fa-solid fa-chart-line"></i> WealthLenz</h1>
+          <a href="/" class="brand-logo-link" title="WealthLenz">
+            <img src="{{ url_for('static', filename='logo-transparent.png') }}" alt="WealthLenz Logo" class="brand-logo-img">
+          </a>
         </div>
         <div class="header-actions">
           <button class="btn btn-secondary btn-sm" id="btn-mode-toggle" title="Toggle Light/Dark Mode" onclick="toggleThemeMode()" style="margin-right: 0.25rem;">

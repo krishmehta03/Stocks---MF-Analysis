@@ -1524,6 +1524,10 @@ def privacy_page():
 def disclaimer_page():
     return render_template('disclaimer.html')
 
+@app.route('/sitemap.xml')
+def sitemap():
+    return send_from_directory('static', 'sitemap.xml')
+
 @app.route('/api/account/profile', methods=['GET'])
 def get_account_profile():
     user_id = get_current_user_id()
@@ -3681,12 +3685,7 @@ def set_profile_pin_by_name():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/sitemap.xml')
-def sitemap():
-    return send_from_directory('static', 'sitemap.xml')
-
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
         threading.Thread(target=automatic_price_updater_loop, daemon=True).start()
     app.run(debug=True, port=5000, threaded=True)
-    

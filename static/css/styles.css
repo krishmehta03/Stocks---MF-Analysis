@@ -99,6 +99,26 @@ header {
   gap: 0.5rem;
 }
 
+.brand-logo-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.brand-logo-img {
+  height: 42px;
+  width: auto;
+  max-width: 220px;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.brand-logo-img:hover {
+  transform: scale(1.02);
+  opacity: 0.95;
+}
+
 .logo-section p {
   color: var(--text-secondary);
   font-size: 0.85rem;
@@ -2012,6 +2032,10 @@ select option {
   .logo-section h1 {
     font-size: 1.1rem;
     gap: 0.3rem;
+  }
+  .brand-logo-img {
+    height: 32px;
+    max-width: 160px;
   }
   /* Keep logo text visible but compact on mobile */
   .logo-section h1 .logo-text {
