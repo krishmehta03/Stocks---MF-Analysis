@@ -1,5 +1,22 @@
 {
+  "message": "Unauthorized",
+  "status": "error",
   "display_columns": {
+    "stocks": [
+      "Scrip Name",
+      "Exchange",
+      "Sector",
+      "Qty",
+      "Buy Price",
+      "Buy Date",
+      "Holding Period",
+      "Current Price",
+      "Invested Value",
+      "Current Value",
+      "P&L",
+      "Return %",
+      "Tax Flag"
+    ],
     "mf": [
       "Fund Name",
       "Category",
@@ -11,24 +28,8 @@
       "XIRR %",
       "Holding Period",
       "Tax Flag"
-    ],
-    "stocks": [
-      "Scrip Name",
-      "Exchange",
-      "Sector",
-      "Qty",
-      "Buy Price",
-      "Buy Date",
-      "Current Price",
-      "Invested Value",
-      "Current Value",
-      "P&L",
-      "Return %",
-      "Tax Flag"
     ]
   },
-  "message": "Unauthorized",
-  "status": "error",
   "theme_mode": "dark",
   "widgets": {
     "risk_alerts": true
