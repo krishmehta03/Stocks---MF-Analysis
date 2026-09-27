@@ -265,33 +265,8 @@ async function fetchPortfolio() {
 // Populates an optional #profile-select dropdown if one exists in the DOM,
 // but is safe to run even if no such element is present.
 async function fetchProfilesList() {
-  try {
-    const res = await authorizedFetch('/api/profiles');
-    const data = await res.json();
-
-    if (data.status === 'error') {
-      console.error("Error loading profiles:", data.message);
-      return;
-    }
-
-    profilesList = data.profiles || [];
-    activeProfileName = data.active_profile || 'Default Portfolio';
-
-    // If a profile selector exists in the page, keep it in sync.
-    const selectEl = document.getElementById('profile-select');
-    if (selectEl) {
-      selectEl.innerHTML = '';
-      profilesList.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.name;
-        opt.textContent = p.name;
-        if (p.name === activeProfileName) opt.selected = true;
-        selectEl.appendChild(opt);
-      });
-    }
-  } catch (err) {
-    console.error("Error loading profiles list:", err);
-  }
+  profilesList = [];
+  activeProfileName = 'Default Portfolio';
 }
 
 // APPLY VISUAL THEME
