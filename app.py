@@ -8,7 +8,7 @@ import json
 import threading
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import re
 
 import shutil
@@ -132,7 +132,6 @@ def get_user_plan(user_id: str) -> str:
         
         # Check expiry
         if expires_at and plan == 'pro':
-            from datetime import timezone
             expiry = datetime.fromisoformat(
                 expires_at.replace('Z', '+00:00'))
             if datetime.now(timezone.utc) > expiry:
@@ -1667,6 +1666,17 @@ def get_user_plan_api():
     response.headers['Pragma'] = 'no-cache'
     return response
 
+# =====================================================================
+# Payments. Mock mode is intentionally gone: missing keys now fail
+# closed (503) instead of simulating a payment. verify_payment ignores
+# any client-sent flags and re-checks everything against Razorpay and
+# against the order's own stored notes before upgrading anyone.
+# =====================================================================
+
+PRO_PRICE_PAISE = 19900   # Rs 199.00
+PRO_PERIOD_DAYS = 30
+
+
 @app.route('/api/payment/create-order', methods=['POST'])
 def create_payment_order():
     user_id = get_current_user_id()
@@ -1675,49 +1685,42 @@ def create_payment_order():
             "status": "error",
             "message": "Unauthorized"
         }), 401
-    
+
     client, key_id, key_secret = get_razorpay_client()
-    
+
+    # Fail closed: never simulate a payment.
     if not client or not key_id or not key_secret:
-        # Mock mode
+        app.logger.error("create-order called but Razorpay keys are not configured")
         return jsonify({
-            "status": "success",
-            "order_id": f"order_mock_{user_id[:8]}",
-            "amount": 19900,
-            "currency": "INR",
-            "key_id": "rzp_test_mock_key",
-            "is_mock": True
-        })
-    
+            "status": "error",
+            "message": "Payments are temporarily unavailable. Please try again later."
+        }), 503
+
     try:
-        # Create Razorpay order
-        # Amount in paise (₹199 = 19900)
-        order_data = {
-            "amount": 19900,
+        order = client.order.create(data={
+            "amount": PRO_PRICE_PAISE,
             "currency": "INR",
-            "receipt": f"order_{user_id[:8]}",
+            "receipt": f"order_{str(user_id)[:8]}",
             "notes": {
-                "user_id": user_id,
+                "user_id": str(user_id),   # verify_payment checks this
                 "plan": "pro",
                 "duration": "monthly"
             }
-        }
-        
-        order = client.order.create(data=order_data)
-        
+        })
         return jsonify({
             "status": "success",
             "order_id": order['id'],
             "amount": order['amount'],
             "currency": order['currency'],
-            "key_id": key_id,
-            "is_mock": False
+            "key_id": key_id
         })
-    except Exception as e:
+    except Exception:
+        app.logger.exception("Razorpay order creation failed for user %s", user_id)
         return jsonify({
             "status": "error",
-            "message": str(e)
+            "message": "Could not start the payment. Please try again."
         }), 500
+
 
 @app.route('/api/payment/verify', methods=['POST'])
 def verify_payment():
@@ -1727,68 +1730,123 @@ def verify_payment():
             "status": "error",
             "message": "Unauthorized"
         }), 401
-    
-    data = request.json
-    is_mock = data.get('is_mock', False)
-    
-    try:
-        if is_mock:
-            payment_id = data.get('razorpay_payment_id', 'pay_mock_default')
-        else:
-            client, key_id, key_secret = get_razorpay_client()
-            if not client:
-                raise ValueError("Razorpay client is not configured, but a real signature verification was requested.")
-            
-            # Verify payment signature
-            params_dict = {
-                'razorpay_order_id': data.get('razorpay_order_id'),
-                'razorpay_payment_id': data.get('razorpay_payment_id'),
-                'razorpay_signature': data.get('razorpay_signature')
-            }
-            
-            client.utility.verify_payment_signature(params_dict)
-            payment_id = data.get('razorpay_payment_id')
-        
-        # Payment verified — upgrade user using admin client (to bypass RLS)
-        supabase = get_supabase_admin()
-        
-        # Calculate expiry (30 days)
-        from datetime import timedelta
-        expiry = datetime.now() + timedelta(days=30)
-        
-        # Update user plan to pro
-        supabase.table('profiles')\
-            .update({
-                'plan': 'pro',
-                'plan_expires_at': expiry.isoformat()
-            })\
-            .eq('id', user_id)\
-            .execute()
-        
-        # Save subscription record
-        supabase.table('subscriptions')\
-            .insert({
-                'user_id': user_id,
-                'razorpay_payment_id': payment_id,
-                'plan': 'pro',
-                'status': 'active',
-                'started_at': datetime.now().isoformat(),
-                'expires_at': expiry.isoformat()
-            })\
-            .execute()
-        
-        return jsonify({
-            "status": "success",
-            "message": "Payment verified! Welcome to Pro plan.",
-            "plan": "pro",
-            "expires_at": expiry.isoformat()
-        })
-        
-    except Exception as e:
+
+    # Nothing from the request body can switch verification off.
+    data = request.get_json(silent=True) or {}
+    order_id   = data.get('razorpay_order_id')
+    payment_id = data.get('razorpay_payment_id')
+    signature  = data.get('razorpay_signature')
+    if not (order_id and payment_id and signature):
+        return jsonify({"status": "error", "message": "Missing payment details."}), 400
+
+    client, _, _ = get_razorpay_client()
+    if not client:
+        app.logger.error("verify called but Razorpay is not configured")
         return jsonify({
             "status": "error",
-            "message": "Payment verification failed: " + str(e)
+            "message": "Payments are temporarily unavailable."
+        }), 503
+
+    # 1. Signature proves Razorpay issued this payment for this order.
+    #    Then fetch the order and payment from Razorpay itself.
+    try:
+        client.utility.verify_payment_signature({
+            'razorpay_order_id': order_id,
+            'razorpay_payment_id': payment_id,
+            'razorpay_signature': signature,
+        })
+        order = client.order.fetch(order_id)
+        payment = client.payment.fetch(payment_id)
+    except Exception:
+        app.logger.exception("Razorpay verification failed for user %s", user_id)
+        return jsonify({
+            "status": "error",
+            "message": "Payment verification failed. If money was deducted, contact support@wealthlenz.in."
         }), 400
+
+    # 2. The order must be ours, for THIS user, at the right price,
+    #    and the payment must actually be captured.
+    notes = order.get('notes') or {}
+    if (str(notes.get('user_id')) != str(user_id)
+            or order.get('amount') != PRO_PRICE_PAISE
+            or order.get('currency') != 'INR'
+            or payment.get('order_id') != order_id
+            or payment.get('status') != 'captured'):
+        app.logger.warning("Payment/order mismatch: user=%s payment=%s", user_id, payment_id)
+        return jsonify({
+            "status": "error",
+            "message": "Payment could not be matched to your account."
+        }), 400
+
+    supabase = get_supabase_admin()
+    now = datetime.now(timezone.utc)
+
+    # 3. If the user is already Pro, extend from the current expiry
+    #    instead of throwing away the days they already paid for.
+    start = now
+    try:
+        rows = (supabase.table('profiles')
+                .select('plan, plan_expires_at')
+                .eq('id', user_id)
+                .limit(1)
+                .execute().data)
+        if rows and rows[0].get('plan') == 'pro' and rows[0].get('plan_expires_at'):
+            cur = datetime.fromisoformat(rows[0]['plan_expires_at'].replace('Z', '+00:00'))
+            if cur.tzinfo is None:
+                cur = cur.replace(tzinfo=timezone.utc)
+            if cur > now:
+                start = cur
+    except Exception:
+        app.logger.exception("Could not read current plan for %s", user_id)
+    expiry = start + timedelta(days=PRO_PERIOD_DAYS)
+
+    # 4. Claim the payment FIRST. The unique index on razorpay_payment_id
+    #    makes a replay fail right here, so it cannot extend the plan twice.
+    try:
+        supabase.table('subscriptions').insert({
+            'user_id': user_id,
+            'razorpay_payment_id': payment_id,
+            'plan': 'pro',
+            'status': 'active',
+            'started_at': now.isoformat(),
+            'expires_at': expiry.isoformat()
+        }).execute()
+    except Exception as e:
+        if 'duplicate' in str(e).lower() or '23505' in str(e):
+            return jsonify({
+                "status": "success",
+                "message": "This payment was already applied.",
+                "plan": "pro"
+            })
+        app.logger.exception("Could not record subscription for payment %s", payment_id)
+        return jsonify({
+            "status": "error",
+            "message": "Could not record your payment. Contact support@wealthlenz.in."
+        }), 500
+
+    # 5. Upgrade the profile. If this fails, release the claim so a retry works.
+    try:
+        supabase.table('profiles').update({
+            'plan': 'pro',
+            'plan_expires_at': expiry.isoformat()
+        }).eq('id', user_id).execute()
+    except Exception:
+        app.logger.exception("Plan update failed after payment %s", payment_id)
+        try:
+            supabase.table('subscriptions').delete().eq('razorpay_payment_id', payment_id).execute()
+        except Exception:
+            pass
+        return jsonify({
+            "status": "error",
+            "message": "Payment received but upgrade failed. Contact support@wealthlenz.in."
+        }), 500
+
+    return jsonify({
+        "status": "success",
+        "message": "Payment verified! Welcome to Pro plan.",
+        "plan": "pro",
+        "expires_at": expiry.isoformat()
+    })
 
 @app.route('/api/payment/status', methods=['GET'])
 def payment_status():
@@ -1821,7 +1879,6 @@ def payment_status():
         
         # Check if plan has expired
         if expires_at and plan == 'pro':
-            from datetime import timezone
             expiry = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
             if datetime.now(timezone.utc) > expiry:
                 # Downgrade to free
@@ -1850,47 +1907,6 @@ def upgrade_page():
         razorpay_key_id=key_id,
         **_auth_context()
     )
-
-
-@app.route('/api/admin/update-plan', methods=['POST'])
-def admin_update_plan():
-    # Simple admin endpoint to manually
-    # upgrade users during testing
-    # (will be replaced by Razorpay 
-    #  webhook in production)
-    
-    admin_key = request.headers.get(
-        'X-Admin-Key', '')
-    if admin_key != os.environ.get(
-        'ADMIN_SECRET_KEY', 'changeme'):
-        return jsonify({
-            "status": "error",
-            "message": "Unauthorized"
-        }), 401
-    
-    data = request.json
-    user_email = data.get('email')
-    new_plan = data.get('plan', 'pro')
-    
-    try:
-        supabase = get_supabase()
-        
-        # Get user id from email
-        result = supabase.table('profiles')\
-            .update({'plan': new_plan})\
-            .eq('email', user_email)\
-            .execute()
-        
-        return jsonify({
-            "status": "success",
-            "message": f"Plan updated to {new_plan} for {user_email}"
-        })
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
-
 
 
 # Simple TTL cache for performance and sector contribution data
