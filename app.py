@@ -1525,7 +1525,23 @@ def disclaimer_page():
 
 @app.route('/sitemap.xml')
 def sitemap():
-    return send_from_directory('static', 'sitemap.xml')
+    return send_from_directory(os.path.join(app.root_path, 'static'), 'sitemap.xml')
+
+@app.route('/favicon.png')
+def favicon():
+    return send_from_directory(
+        app.static_folder,
+        'favicon.png',
+        mimetype='image/png'
+    )
+
+@app.route('/favicon.ico')
+def favicon_ico():
+    return send_from_directory(
+        app.static_folder,
+        'favicon.ico',
+        mimetype='image/vnd.microsoft.icon'
+    )
 
 @app.route('/api/account/profile', methods=['GET'])
 def get_account_profile():
