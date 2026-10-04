@@ -235,32 +235,6 @@
 
 <body class="theme-emerald">
 
-  <!-- Mock Payment Modal -->
-  <div id="mock-payment-modal" class="modal-overlay">
-    <div class="modal-content" style="text-align: center;">
-      <div class="modal-header">
-        <h3 style="color: var(--accent);"><i class="fa-solid fa-flask"></i> Mock Payment Mode</h3>
-      </div>
-      <p style="color: var(--text-secondary); margin: 1.5rem 0; line-height: 1.6;">
-        You are in mock payment mode since Razorpay API keys are not configured. Choose how to simulate this payment:
-      </p>
-      <div style="display: flex; flex-direction: column; gap: 12px;">
-        <button id="btn-mock-success" onclick="handleMockPayment(true)" class="btn"
-          style="justify-content: center; width: 100%; padding: 0.8rem;">
-          <i class="fa-solid fa-circle-check"></i> Simulate Successful Payment
-        </button>
-        <button id="btn-mock-fail" onclick="handleMockPayment(false)" class="btn btn-danger"
-          style="justify-content: center; width: 100%; padding: 0.8rem;">
-          <i class="fa-solid fa-circle-xmark"></i> Simulate Failed Payment
-        </button>
-        <button id="btn-mock-cancel" onclick="closeMockModal()" class="btn btn-secondary"
-          style="justify-content: center; width: 100%; padding: 0.8rem;">
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-
   <div class="app-container">
     <!-- Sticky Top Section -->
     <div class="sticky-header-wrapper">
@@ -315,7 +289,7 @@
             </tr>
             <tr>
               <td class="feature-name">Mutual Funds</td>
-              <td class="center-align"><i class="fa-solid fa-xmark cross-icon"></i></td>
+              <td class="center-align">3</td>
               <td class="center-align" style="font-weight: 700; color: var(--accent);">Unlimited</td>
             </tr>
             <tr>
@@ -436,7 +410,6 @@
       applyHeaderThemeMode(savedMode);
     });
 
-    let activeMockOrder = null;
     async function initiatePayment() {
       const btn = document.getElementById('btn-upgrade');
       btn.disabled = true;
@@ -453,12 +426,6 @@
 
         if (orderData.status !== 'success') {
           throw new Error(orderData.message);
-        }
-
-        if (orderData.is_mock) {
-          activeMockOrder = orderData;
-          document.getElementById('mock-payment-modal').classList.add('active');
-          return;
         }
 
         // Open Razorpay checkout
@@ -522,55 +489,6 @@
 
       } catch (err) {
         showError(err.message || 'Something went wrong');
-        btn.disabled = false;
-        btn.textContent = 'Upgrade Now';
-      }
-    }
-
-    function closeMockModal() {
-      document.getElementById('mock-payment-modal').classList.remove('active');
-      const btn = document.getElementById('btn-upgrade');
-      btn.disabled = false;
-      btn.textContent = 'Upgrade Now';
-    }
-
-    async function handleMockPayment(success) {
-      document.getElementById('mock-payment-modal').classList.remove('active');
-      const btn = document.getElementById('btn-upgrade');
-
-      if (!success) {
-        showError('Mock payment failed.');
-        btn.disabled = false;
-        btn.textContent = 'Upgrade Now';
-        return;
-      }
-
-      btn.textContent = 'Verifying...';
-      try {
-        const verifyRes = await fetch('/api/payment/verify', {
-          method: 'POST',
-          headers: await getAuthHeaders(),
-          body: JSON.stringify({
-            razorpay_order_id: activeMockOrder.order_id,
-            razorpay_payment_id: "pay_mock_" + Math.random().toString(36).substring(7),
-            razorpay_signature: "sig_mock_" + Math.random().toString(36).substring(7),
-            is_mock: true
-          })
-        });
-
-        const verifyData = await verifyRes.json();
-        if (verifyData.status === 'success') {
-          showSuccess();
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 2000);
-        } else {
-          showError('Mock verification failed: ' + verifyData.message);
-          btn.disabled = false;
-          btn.textContent = 'Upgrade Now';
-        }
-      } catch (vErr) {
-        showError('Mock verification call failed.');
         btn.disabled = false;
         btn.textContent = 'Upgrade Now';
       }
