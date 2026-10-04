@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,6 +18,7 @@
       display: flex;
       flex-direction: column;
     }
+
     .legal-container {
       max-width: 800px;
       margin: 0 auto;
@@ -24,6 +26,7 @@
       flex-grow: 1;
       width: 100%;
     }
+
     header {
       display: flex;
       justify-content: space-between;
@@ -32,6 +35,7 @@
       border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
       margin-bottom: 2rem;
     }
+
     header .logo {
       font-family: 'Outfit', sans-serif;
       font-size: 1.5rem;
@@ -44,11 +48,13 @@
       gap: 0.5rem;
       text-decoration: none;
     }
+
     header .logo i {
       background: var(--accent-gradient, linear-gradient(135deg, #10b981 0%, #059669 100%));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+
     header .back-link {
       color: var(--text-secondary);
       text-decoration: none;
@@ -56,19 +62,23 @@
       font-weight: 500;
       transition: color 0.2s ease;
     }
+
     header .back-link:hover {
       color: var(--accent);
     }
+
     .legal-content {
       color: var(--text-secondary);
       line-height: 1.8;
     }
+
     .legal-content h1 {
       font-size: 28px;
       color: var(--text-primary);
       margin-bottom: 0.5rem;
       font-family: 'Outfit', sans-serif;
     }
+
     .legal-content h2 {
       font-size: 18px;
       color: var(--text-primary);
@@ -78,21 +88,25 @@
       border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
       font-family: 'Outfit', sans-serif;
     }
+
     .legal-content p {
       margin-bottom: 1rem;
       font-size: 14px;
     }
+
     .legal-content ul {
       padding-left: 1.5rem;
       margin-bottom: 1rem;
     }
+
     .legal-content ul li {
       margin-bottom: 0.5rem;
       font-size: 14px;
     }
+
     .warning-box {
-      background: rgba(239,68,68,0.1);
-      border: 1px solid rgba(239,68,68,0.3);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
       border-radius: 8px;
       padding: 1rem 1.5rem;
       margin-bottom: 1.5rem;
@@ -100,12 +114,14 @@
       font-weight: 500;
       font-size: 14px;
     }
+
     footer {
       text-align: center;
       padding: 2rem 0;
       border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
       margin-top: 3rem;
     }
+
     footer a {
       color: var(--text-secondary);
       text-decoration: none;
@@ -113,9 +129,11 @@
       font-size: 0.85rem;
       transition: color 0.2s ease;
     }
+
     footer a:hover {
       color: var(--accent);
     }
+
     footer p {
       margin-top: 1rem;
       font-size: 0.75rem;
@@ -124,7 +142,7 @@
     }
   </style>
   <script>
-    document.addEventListener("DOMContentLoaded", function() {
+    document.addEventListener("DOMContentLoaded", function () {
       const theme = localStorage.getItem('portfolio_theme') || 'emerald';
       const mode = localStorage.getItem('portfolio_theme_mode') || 'dark';
       document.body.className = `theme-${theme}`;
@@ -134,11 +152,13 @@
     });
   </script>
 </head>
+
 <body>
   <div class="legal-container">
     <header>
       <a href="/" class="logo" title="WealthLenz">
-        <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz" class="brand-logo-img" style="height: 38px; width: auto;">
+        <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz"
+          class="brand-logo-img" style="height: 38px; width: auto;">
       </a>
       <a href="/dashboard" class="back-link">
         ← Back to Dashboard
@@ -150,7 +170,8 @@
       <p style="opacity: 0.7; margin-bottom: 2rem;">Last updated: July 2026</p>
 
       <h2>1. ACCEPTANCE OF TERMS</h2>
-      <p>By accessing and using WealthLenz ("the Service"), you accept and agree to be bound by these Terms of Service.</p>
+      <p>By accessing and using WealthLenz ("the Service"), you accept and agree to be bound by these Terms of Service.
+      </p>
 
       <h2>2. DESCRIPTION OF SERVICE</h2>
       <p>WealthLenz is a portfolio tracking and analytics platform that allows users to:</p>
@@ -163,7 +184,8 @@
 
       <h2>3. NOT FINANCIAL ADVICE</h2>
       <div class="warning-box">
-        IMPORTANT: WealthLenz is NOT a SEBI registered Investment Advisor. All information, analysis, and AI recommendations provided by this platform are for EDUCATIONAL AND INFORMATIONAL PURPOSES ONLY.
+        IMPORTANT: WealthLenz is NOT a SEBI registered Investment Advisor. All information, analysis, and AI
+        recommendations provided by this platform are for EDUCATIONAL AND INFORMATIONAL PURPOSES ONLY.
       </div>
       <p>Nothing on this platform constitutes:</p>
       <ul>
@@ -185,10 +207,11 @@
       <h2>5. SUBSCRIPTION AND PAYMENTS</h2>
       <ul>
         <li>Free plan is available with limited features</li>
-        <li>Pro plan is available at ₹199/month or ₹1,799/year</li>
+        <li>Pro plan is available at ₹199/month</li>
         <li>Payments are processed securely through Razorpay</li>
-        <li>Subscriptions auto-renew unless cancelled</li>
-        <li>Refund policy: 7-day refund for annual plans, no refund for monthly plans after 48 hours</li>
+        <li>Pro plan access lasts 30 days from payment and does not auto-renew; you can upgrade again any time to extend
+          access</li>
+        <li>Refund policy: no refund for monthly plans after 48 hours</li>
       </ul>
 
       <h2>6. DATA AND PRIVACY</h2>
@@ -212,10 +235,12 @@
       <p>We reserve the right to terminate or suspend your account at any time for violation of these terms.</p>
 
       <h2>9. LIMITATION OF LIABILITY</h2>
-      <p>WealthLenz shall not be liable for any investment losses incurred based on information provided by this platform.</p>
+      <p>WealthLenz shall not be liable for any investment losses incurred based on information provided by this
+        platform.</p>
 
       <h2>10. CHANGES TO TERMS</h2>
-      <p>We reserve the right to modify these terms at any time. Continued use of the service constitutes acceptance of updated terms.</p>
+      <p>We reserve the right to modify these terms at any time. Continued use of the service constitutes acceptance of
+        updated terms.</p>
 
       <h2>11. CONTACT</h2>
       <p>For questions about these terms: support@wealthlenz.in</p>
@@ -229,4 +254,5 @@
     </footer>
   </div>
 </body>
+
 </html>
