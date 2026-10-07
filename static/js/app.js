@@ -512,12 +512,12 @@ function toggleWidgetsVisibility() {
 
   document.getElementById("widget-sector-chart-box").style.display = w.sector_allocation ? 'block' : 'none';
   document.getElementById("widget-asset-chart-box").style.display = w.asset_allocation ? 'block' : 'none';
-  document.getElementById("widget-leaders-box").style.display = w.top_performers ? 'block' : 'none';
+  document.getElementById("widget-leaders-box").style.display = (w.top_performers !== false) ? 'block' : 'none';
   document.getElementById("widget-underperformers-box").style.display = (w.top_underperformers !== false) ? 'block' : 'none';
 
   // Recalculate Dashboard details grid layout based on what widgets are visible
   const detGrid = document.querySelector(".dashboard-details");
-  const rightColHasContent = w.asset_allocation || w.top_performers || (w.top_underperformers !== false);
+  const rightColHasContent = w.asset_allocation || (w.top_performers !== false) || (w.top_underperformers !== false);
   if (!w.sector_allocation && !rightColHasContent) {
     detGrid.style.display = 'none';
   } else if (!w.sector_allocation) {
