@@ -3733,7 +3733,7 @@ async function submitAdvisorMessage() {
         <i class="fa-solid fa-user-tie"></i>
       </div>
       <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.03); border-radius: 0 16px 16px 16px; padding: 1rem; color: var(--text-primary); font-size: 0.9rem; line-height: 1.6;">
-        <span style="font-weight: 700; display: block; margin-bottom: 0.4rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent);">CFA Senior Advisor</span>
+        <span style="font-weight: 700; display: block; margin-bottom: 0.4rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent);">AI Portfolio Assistant</span>
         ${data.response}
       </div>
     `;
