@@ -245,7 +245,8 @@
       <header>
         <div class="logo-section">
           <a href="/" class="brand-logo-link" title="WealthLenz">
-            <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz" class="brand-logo-img" style="height: 38px; width: auto;">
+            <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz"
+              class="brand-logo-img" style="height: 38px; width: auto;">
           </a>
         </div>
         <div class="header-actions">
@@ -1012,9 +1013,10 @@
             <i class="fa-solid fa-brain-circuit"></i>
           </div>
           <div>
-            <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary);">💬 AI Portfolio Specialist</h2>
-            <p style="font-size: 0.85rem; color: var(--text-secondary);">Direct macro wealth analysis, asset
-              concentration diagnostics, stress testing & tax-rebalancing advice.</p>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary);">💬 AI Portfolio Insights</h2>
+            <p style="font-size: 0.85rem; color: var(--text-secondary);">Automated analysis of your holdings —
+              concentration diagnostics, stress scenarios & tax-aware rebalancing ideas. Educational information
+              only, not personalized investment advice.</p>
           </div>
         </div>
 
@@ -1036,13 +1038,18 @@
               <div
                 style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.03); border-radius: 0 16px 16px 16px; padding: 1rem; color: var(--text-primary); font-size: 0.9rem; line-height: 1.5;">
                 <span
-                  style="font-weight: 700; display: block; margin-bottom: 0.25rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent);">CFA
-                  Senior Advisor</span>
-                Greetings! I am your institutional-grade **Senior Wealth Analyst & CFA Portfolio Specialist**. I have
-                analyzed your live portfolio values, average buys, and concentration sectors.
+                  style="font-weight: 700; display: block; margin-bottom: 0.25rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent);">AI
+                  Portfolio Assistant</span>
+                Hi! I'm an automated assistant that analyzes your live portfolio data — holdings, average buy
+                prices, and sector concentration — to surface patterns and educational insights.
                 <br><br>
-                How may I assist you with your capital allocation today? Click one of the quick diagnostics below or
-                type your investment query!
+                I'm not a registered investment adviser and this isn't personalized investment advice. Click one of
+                the quick diagnostics below, or ask a question about your portfolio's data.
+                <br><br>
+                <span style="font-size: 0.78rem; color: var(--text-secondary); display: block; margin-top: 0.5rem;">
+                  ⚠️ For educational and informational purposes only. Not a recommendation to buy, sell, or hold any
+                  security. Please consult a SEBI-registered investment adviser before making investment decisions.
+                </span>
               </div>
             </div>
 
@@ -1069,7 +1076,7 @@
           <div
             style="display: flex; gap: 0.5rem; padding: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.03); background: rgba(0, 0, 0, 0.3);">
             <input type="text" id="advisor-user-input" class="form-control"
-              placeholder="Ask your portfolio specialist (e.g. 'Should I sell Vodafone Idea?')"
+              placeholder="Ask about your portfolio data (e.g. 'What's my sector concentration?')"
               onkeypress="handleAdvisorKeyPress(event)" style="border-radius: 20px; padding: 0.65rem 1.25rem;">
             <button class="btn" onclick="submitAdvisorMessage()"
               style="border-radius: 50%; width: 42px; height: 42px; padding: 0; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">

@@ -3133,15 +3133,23 @@ def advisor_chat():
             <div style='text-align:center;padding:2rem;'>
               <i class='fa-solid fa-lock' style='font-size:2rem;color:var(--accent);margin-bottom:1rem;display:block;'></i>
               <strong>AI Advisor is a Pro feature</strong>
-              <p style='color:var(--text-secondary);margin-top:0.5rem;'>Upgrade to Pro to get personalised AI-powered investment advice.</p>
+              <p style='color:var(--text-secondary);margin-top:0.5rem;'>Upgrade to Pro to unlock AI-powered portfolio analytics.</p>
               <a href='/account' style='display:inline-block;margin-top:1rem;padding:8px 20px;background:var(--accent);color:white;border-radius:6px;text-decoration:none;'>Upgrade to Pro</a>
             </div>"""})
+
+    DISCLAIMER_LINE = (
+        '<br><span style="font-size:0.75rem;color:var(--text-secondary);display:block;margin-top:0.75rem;'
+        'border-top:1px solid rgba(255,255,255,0.05);padding-top:0.5rem;">'
+        '⚠️ Educational information based on your own portfolio data, not personalized investment advice. '
+        'Not a recommendation to buy, sell, or hold any security. Consult a SEBI-registered investment adviser '
+        'before making investment decisions.</span>'
+    )
 
     try:
         data   = request.json or {}
         prompt = data.get("prompt", "").strip().lower()
         if not prompt:
-            return jsonify({"response": "I didn't receive any investment query. Please write what's on your mind!"})
+            return jsonify({"response": "I didn't receive any question about your portfolio. Please write what's on your mind!"})
 
         # ── Pull live data directly from Supabase ─────────────────────────────
         from lib.supabase_data import get_user_stock_holdings, get_user_mf_holdings
@@ -3227,9 +3235,11 @@ def advisor_chat():
 <span style="font-weight:700;color:var(--danger);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Portfolio Concentration Risk Audit</span>
 Our diagnostic scan reviewed your <strong>{active_stocks} holdings</strong> (₹{total_val:,.2f} AUM):
 <ul>{rows}</ul>
-{gap_note}<span style="color:var(--accent);font-weight:600;">Advisory Opinion:</span>
-If any single position exceeds 15% of your portfolio, consider trimming and redistributing into under-represented sectors.
-A portfolio beta of ~1.0 (yours: {portfolio_beta}) with diversified sector coverage reduces drawdown risk significantly.
+{gap_note}<span style="color:var(--accent);font-weight:600;">Observation:</span>
+Positions above 15% of a portfolio are generally considered concentrated. Diversifying into under-represented sectors
+is one common way investors reduce single-stock risk. A portfolio beta near 1.0 (yours: {portfolio_beta}) combined with
+broader sector coverage is associated with lower drawdown volatility.
+{DISCLAIMER_LINE}
 """
 
         elif "stress" in prompt or "scenario" in prompt or "crisis" in prompt or "correction" in prompt:
@@ -3243,31 +3253,32 @@ Stress-testing your <strong>{active_stocks}-stock + {active_mfs}-MF</strong> por
   <li><strong>Systemic Crisis (-40%):</strong><br>Expected: <span style="color:var(--danger);font-weight:700;">{-40*portfolio_beta:.1f}% → -₹{total_val*0.40*portfolio_beta:,.2f}</span>. Speculative small-caps face severe erosion.</li>
 </ol>
 <span style="color:var(--text-secondary);font-size:0.85rem;">*Returns scaled by estimated portfolio beta ({portfolio_beta}). Actual outcomes depend on individual stock fundamentals.*</span>
+{DISCLAIMER_LINE}
 """
 
         elif "rebalance" in prompt or "plan" in prompt or "recommendation" in prompt:
             overweight  = [s for s in stocks if total_val > 0 and (s["Current Value"] / total_val * 100) > 15]
             deep_losers = [s for s in stocks if s["Return %"] < -20]
             ow_lines = "".join(
-                f"&bull; Trim <strong>{s['Scrip Name']}</strong> ({s['Current Value']/total_val*100:.1f}% → ~10%)"
-                f" — frees ≈ ₹{(s['Current Value'] - total_val*0.10):,.0f}.<br>"
+                f"&bull; <strong>{s['Scrip Name']}</strong> is {s['Current Value']/total_val*100:.1f}% of your"
+                f" portfolio — above the 15% concentration threshold.<br>"
                 for s in overweight
             ) or "&bull; No single position exceeds 15% — allocation looks balanced.<br>"
             loser_lines = "".join(
-                f"&bull; Consider exiting <strong>{s['Scrip Name']}</strong> ({s['Return %']:.1f}%) — tax-loss harvest &amp; recycle capital.<br>"
+                f"&bull; <strong>{s['Scrip Name']}</strong> is down {s['Return %']:.1f}% from your buy price.<br>"
                 for s in deep_losers
-            ) or "&bull; No deep losers (&gt;-20%) detected — good job managing downside.<br>"
+            ) or "&bull; No holdings are down more than 20% — no deep losers detected.<br>"
             response = f"""
-<span style="font-weight:700;color:var(--accent);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-arrows-spin"></i> Actionable Rebalancing &amp; Capital Recycling Plan</span>
+<span style="font-weight:700;color:var(--accent);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-arrows-spin"></i> Portfolio Balance Diagnostic</span>
 Based on your <strong>{active_stocks} stocks + {active_mfs} MFs</strong> (₹{total_val:,.2f} total):
 <br><br>
-<strong>Step 1 — Trim Overweight Positions:</strong><br>{ow_lines}
-<br><strong>Step 2 — Exit Deep Underperformers:</strong><br>{loser_lines}
-<br><strong>Step 3 — Deploy Freed Capital:</strong><br>
-&bull; <strong>Quality Financials:</strong> HDFC Bank, ICICI Bank for stable compounding.<br>
-&bull; <strong>IT / Technology:</strong> TCS or Infosys for a structural growth moat.<br>
-&bull; <strong>Defensives / FMCG:</strong> ITC, Sun Pharma, or HUL to reduce portfolio beta.<br>
-&bull; <strong>Index ETFs:</strong> NiftyBees / MON100 to anchor broad market exposure.
+<strong>Positions above 15% of your portfolio:</strong><br>{ow_lines}
+<br><strong>Holdings down more than 20%:</strong><br>{loser_lines}
+<br><strong>General educational note:</strong><br>
+Investors sometimes address concentration by reducing oversized positions and reallocating toward sectors they're
+underexposed to, or toward broad-market index funds. This tool does not recommend specific securities — please
+research independently or consult a SEBI-registered investment adviser before acting.
+{DISCLAIMER_LINE}
 """
 
         elif "worst" in prompt or "perform" in prompt or "loss" in prompt or "poor" in prompt:
@@ -3279,9 +3290,11 @@ Based on your <strong>{active_stocks} stocks + {active_mfs} MFs</strong> (₹{to
 <span style="font-weight:700;color:var(--danger);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-circle-down"></i> Underperforming Assets Diagnostic</span>
 Your 3 worst-performing holdings:
 <ol>{rows}</ol>
-<strong>Advisory Verdict:</strong><br>
-For holdings down &gt;30%, evaluate if the fundamental thesis has broken. If yes, tax-loss harvest and recycle into quality compounders.
-For 10–30% drawdowns, hold if conviction remains — average-down only for high-quality names with strong balance sheets.
+<strong>Educational Note:</strong><br>
+Large drawdowns (over 30%) are often a prompt for investors to re-examine the original reasons they bought a stock.
+Smaller drawdowns (10–30%) are more commonly weathered if the investment thesis hasn't changed. This is general
+information, not guidance on what to do with these specific holdings.
+{DISCLAIMER_LINE}
 """
 
         elif "best" in prompt or "top" in prompt or "winner" in prompt or "gain" in prompt:
@@ -3292,32 +3305,35 @@ For 10–30% drawdowns, hold if conviction remains — average-down only for hig
 <span style="font-weight:700;color:var(--success);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-circle-up"></i> Top Performing Holdings</span>
 Your 3 best-performing holdings:
 <ol>{rows}</ol>
-<strong>Advisory Verdict:</strong><br>
-For holdings up &gt;50%, consider booking partial profits (25–30% of position) to lock in gains and reduce concentration risk.
-Let the remaining position run with a trailing stop-loss strategy.
+<strong>Educational Note:</strong><br>
+Large unrealized gains (over 50%) naturally increase a position's weight in a portfolio, which raises concentration
+risk even without any new buying. This is general information about how gains affect allocation, not guidance on
+what to do with these specific holdings.
+{DISCLAIMER_LINE}
 """
 
         else:
             response = f"""
-<span style="font-weight:700;color:var(--accent);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-user-doctor"></i> CFA Custom Wealth Consultation</span>
-I have analysed your query: "<em>{data.get('prompt')}</em>"
+<span style="font-weight:700;color:var(--accent);font-size:1rem;display:block;margin-bottom:0.5rem;"><i class="fa-solid fa-chart-line"></i> Portfolio Data Summary</span>
+I looked at your query: "<em>{data.get('prompt')}</em>" — here's what I can show from your data:
 <br><br>
 <strong>Portfolio Snapshot:</strong> {active_stocks} stocks + {active_mfs} MFs &nbsp;|&nbsp; ₹{total_val:,.2f} total value &nbsp;|&nbsp; P&amp;L: ₹{total_pnl:,.2f} ({'+' if total_ret >= 0 else ''}{total_ret:.2f}%)
 <br><br>
 Top performers: {best_str}<br>
 Underperformers: {worst_str}
 <br><br>
-<strong>Advisor's Recommendation:</strong><br>
-&bull; Type <strong>"Concentration Audit"</strong> — review position sizing &amp; sector risk.<br>
-&bull; Type <strong>"Stress Test"</strong> — simulate portfolio under market crashes.<br>
-&bull; Type <strong>"Rebalancing Plan"</strong> — get concrete buy/sell/trim steps.<br>
-&bull; Type <strong>"Worst Performers"</strong> — triage your biggest losers.<br>
-&bull; Type <strong>"Best Performers"</strong> — review top gainers &amp; profit-booking strategy.
+<strong>Try asking:</strong><br>
+&bull; Type <strong>"Concentration Audit"</strong> — see position sizing &amp; sector risk data.<br>
+&bull; Type <strong>"Stress Test"</strong> — see simulated portfolio moves under market scenarios.<br>
+&bull; Type <strong>"Rebalancing Plan"</strong> — see which positions are concentrated or underwater.<br>
+&bull; Type <strong>"Worst Performers"</strong> — see your biggest laggards.<br>
+&bull; Type <strong>"Best Performers"</strong> — see your top gainers.
+{DISCLAIMER_LINE}
 """
 
         return jsonify({"response": response})
     except Exception as e:
-        return jsonify({"response": f"Wealth Advisor API error: {str(e)}"}), 500
+        return jsonify({"response": f"Portfolio Insights error: {str(e)}"}), 500
 
 
 
