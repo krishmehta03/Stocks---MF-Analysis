@@ -1600,10 +1600,23 @@ def delete_account():
         return jsonify({"status": "error", "message": "Please type DELETE to confirm"}), 400
     try:
         supabase = get_supabase_admin()
+        # Delete all per-user data across every table that references this user.
         supabase.table('stock_holdings').delete().eq('user_id', user_id).execute()
         supabase.table('mf_holdings').delete().eq('user_id', user_id).execute()
         supabase.table('subscriptions').delete().eq('user_id', user_id).execute()
+        supabase.table('transactions').delete().eq('user_id', user_id).execute()
+        supabase.table('realized_trades').delete().eq('user_id', user_id).execute()
         supabase.table('profiles').delete().eq('id', user_id).execute()
+
+        # Delete the actual login/auth record — without this, the email + password
+        # hash remain in Supabase Auth even after "account deletion."
+        try:
+            supabase.auth.admin.delete_user(user_id)
+        except Exception as auth_err:
+            # Data is already gone; surface the auth-deletion failure distinctly so
+            # it doesn't get silently lost, but don't block the response on it.
+            print(f"[delete_account] Warning: failed to delete auth user {user_id}: {auth_err}")
+
         return jsonify({"status": "success", "message": "Account deleted"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
