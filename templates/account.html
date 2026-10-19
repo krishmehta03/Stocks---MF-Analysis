@@ -63,6 +63,46 @@
       return { 'Content-Type': 'application/json' };
     }
 
+    // ─── Usage tracking (page views, login) ──────────────────────
+    // Logs directly to Supabase via the user's own session (RLS restricts
+    // inserts to the user's own user_id). Never throws.
+    async function trackEvent(eventType, eventName, metadata) {
+      try {
+        if (!window._authClient) return;
+        const { data: { session } } = await window._authClient.auth.getSession();
+        if (!session || !session.user) return;
+        const userId = session.user.id;
+
+        await window._authClient.from('usage_events').insert({
+          user_id: userId,
+          event_type: eventType,
+          event_name: eventName,
+          metadata: metadata || null
+        });
+
+        if (eventType === 'login' || eventType === 'page_view') {
+          await window._authClient
+            .from('profiles')
+            .update({ last_login_at: new Date().toISOString() })
+            .eq('id', userId);
+        }
+      } catch (err) {
+        console.warn('trackEvent failed (non-blocking):', err);
+      }
+    }
+
+    async function trackPageView(pageName) {
+      try {
+        if (!sessionStorage.getItem('wl_session_tracked')) {
+          sessionStorage.setItem('wl_session_tracked', '1');
+          await trackEvent('login', 'session_start');
+        }
+        await trackEvent('page_view', pageName);
+      } catch (err) {
+        console.warn('trackPageView failed (non-blocking):', err);
+      }
+    }
+
     async function signOut() {
       try {
         if (window.supabaseClient) {
@@ -97,8 +137,7 @@
       <header>
         <div class="logo-section">
           <a href="/" class="brand-logo-link" title="WealthLenz">
-            <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz"
-              class="brand-logo-img" style="height: 38px; width: auto;">
+            <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz" class="brand-logo-img" style="height: 38px; width: auto;">
           </a>
         </div>
         <div class="header-actions">
@@ -354,6 +393,7 @@
       // Wait a tick for auth to complete
       await new Promise(r => setTimeout(r, 300));
       await loadProfile();
+      trackPageView('account');
     });
 
     async function loadProfile() {
