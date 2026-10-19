@@ -27,6 +27,50 @@ async function debugAuth() {
 }
 debugAuth();
 
+// ─── Usage tracking (page views, feature use, login) ──────────────────────
+// Logs directly to Supabase's usage_events table via the user's own session
+// (RLS restricts inserts to the user's own user_id). Never throws — a
+// tracking failure must never interrupt the actual feature being used.
+async function trackEvent(eventType, eventName, metadata) {
+  try {
+    if (!window._authClient) return;
+    const { data: { session } } = await window._authClient.auth.getSession();
+    if (!session || !session.user) return;
+    const userId = session.user.id;
+
+    await window._authClient.from('usage_events').insert({
+      user_id: userId,
+      event_type: eventType,
+      event_name: eventName,
+      metadata: metadata || null
+    });
+
+    // Keep profiles.last_login_at fresh on any login/page-view signal
+    if (eventType === 'login' || eventType === 'page_view') {
+      await window._authClient
+        .from('profiles')
+        .update({ last_login_at: new Date().toISOString() })
+        .eq('id', userId);
+    }
+  } catch (err) {
+    console.warn('trackEvent failed (non-blocking):', err);
+  }
+}
+
+// Call once per page. Logs a 'login' event the first time this browser
+// tab sees a session this visit, then a 'page_view' every time the page loads.
+async function trackPageView(pageName) {
+  try {
+    if (!sessionStorage.getItem('wl_session_tracked')) {
+      sessionStorage.setItem('wl_session_tracked', '1');
+      await trackEvent('login', 'session_start');
+    }
+    await trackEvent('page_view', pageName);
+  } catch (err) {
+    console.warn('trackPageView failed (non-blocking):', err);
+  }
+}
+
 // Global Application State
 let portfolioData = null;
 let appConfig = null;
@@ -97,6 +141,11 @@ async function initializeApp() {
     checkScraperRunningOnStartup();
   } catch (err) {
     console.error("initializeApp: checkScraperRunningOnStartup failed:", err);
+  }
+  try {
+    trackPageView('dashboard');
+  } catch (err) {
+    console.error("initializeApp: trackPageView failed:", err);
   }
 }
 
@@ -213,6 +262,8 @@ function switchTab(tabId) {
   } else if (tabId === 'realized') {
     fetchRealizedTrades();
   }
+
+  trackEvent('feature_use', `tab_${tabId}`);
 }
 
 
@@ -3667,6 +3718,9 @@ async function submitAdvisorMessage() {
 
   // Clear input
   inputEl.value = "";
+
+  // Note: we log that the feature was used, not the message text itself
+  trackEvent('feature_use', 'ai_advisor_message');
 
   const chatBox = document.getElementById("advisor-chat-box");
 
