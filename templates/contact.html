@@ -157,6 +157,37 @@
       text-decoration: underline;
     }
 
+    .email-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.9rem;
+      height: 1.9rem;
+      border-radius: 6px;
+      border: 1px solid var(--lp-border);
+      background: transparent;
+      color: var(--lp-text-secondary);
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .copy-btn:hover {
+      color: var(--lp-text);
+      border-color: var(--lp-text-secondary);
+    }
+
+    .copy-btn.copied {
+      color: #059669;
+      border-color: #059669;
+    }
+
     .note-box {
       background: var(--lp-card-bg);
       border: 1px solid var(--lp-border);
@@ -228,17 +259,27 @@
           <div class="cc-icon"><i class="fa-solid fa-headset"></i></div>
           <h2>General support</h2>
           <p>Account issues, billing questions, bugs, or anything else about using WealthLenz.</p>
-          <a class="email-link" href="mailto:support@wealthlenz.in">
-            support@wealthlenz.in <i class="fa-solid fa-arrow-right" style="font-size:0.75rem;"></i>
-          </a>
+          <div class="email-row">
+            <a class="email-link" href="https://mail.google.com/mail/?view=cm&fs=1&to=support@wealthlenz.in" target="_blank" rel="noopener">
+              support@wealthlenz.in <i class="fa-solid fa-arrow-right" style="font-size:0.75rem;"></i>
+            </a>
+            <button type="button" class="copy-btn" data-email="support@wealthlenz.in" aria-label="Copy email address">
+              <i class="fa-regular fa-copy"></i>
+            </button>
+          </div>
         </div>
         <div class="contact-card">
           <div class="cc-icon"><i class="fa-solid fa-shield-halved"></i></div>
           <h2>Privacy questions</h2>
           <p>Requests about your data — access, correction, export, or deletion.</p>
-          <a class="email-link" href="mailto:privacy@wealthlenz.in">
-            privacy@wealthlenz.in <i class="fa-solid fa-arrow-right" style="font-size:0.75rem;"></i>
-          </a>
+          <div class="email-row">
+            <a class="email-link" href="https://mail.google.com/mail/?view=cm&fs=1&to=privacy@wealthlenz.in" target="_blank" rel="noopener">
+              privacy@wealthlenz.in <i class="fa-solid fa-arrow-right" style="font-size:0.75rem;"></i>
+            </a>
+            <button type="button" class="copy-btn" data-email="privacy@wealthlenz.in" aria-label="Copy email address">
+              <i class="fa-regular fa-copy"></i>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -257,6 +298,32 @@
       <p>© 2026 WealthLenz. All rights reserved.</p>
     </footer>
   </div>
+
+  <script>
+    document.querySelectorAll('.copy-btn').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const email = btn.getAttribute('data-email');
+        try {
+          await navigator.clipboard.writeText(email);
+        } catch (err) {
+          // Fallback for browsers without clipboard API access
+          const temp = document.createElement('textarea');
+          temp.value = email;
+          document.body.appendChild(temp);
+          temp.select();
+          document.execCommand('copy');
+          document.body.removeChild(temp);
+        }
+        const icon = btn.querySelector('i');
+        icon.className = 'fa-solid fa-check';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          icon.className = 'fa-regular fa-copy';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+  </script>
 </body>
 
 </html>
