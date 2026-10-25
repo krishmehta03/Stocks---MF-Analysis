@@ -1523,6 +1523,10 @@ def privacy_page():
 def disclaimer_page():
     return render_template('disclaimer.html')
 
+@app.route('/contact')
+def contact_page():
+    return render_template('contact.html')
+
 @app.route('/sitemap.xml')
 def sitemap():
     return send_from_directory(os.path.join(app.root_path, 'static'), 'sitemap.xml')
