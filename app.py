@@ -1477,7 +1477,7 @@ init_background_updater()
 
 @app.route('/')
 def home():
-    return render_template('index.html', **_auth_context())
+    return render_template('landing.html', **_auth_context())
 
 # ─── Authentication Pages ──────────────────────────────────────────────────────
 def _auth_context():
@@ -1606,6 +1606,7 @@ def delete_account():
         supabase.table('subscriptions').delete().eq('user_id', user_id).execute()
         supabase.table('transactions').delete().eq('user_id', user_id).execute()
         supabase.table('realized_trades').delete().eq('user_id', user_id).execute()
+        supabase.table('usage_events').delete().eq('user_id', user_id).execute()
         supabase.table('profiles').delete().eq('id', user_id).execute()
 
         # Delete the actual login/auth record — without this, the email + password
@@ -1620,6 +1621,49 @@ def delete_account():
         return jsonify({"status": "success", "message": "Account deleted"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# Event types + names we accept, so arbitrary/unbounded strings can't be written
+# into the log by a crafted request.
+_ALLOWED_EVENT_TYPES = {"login", "page_view", "feature_use"}
+_ALLOWED_EVENT_NAMES = {
+    "dashboard", "stocks", "mfs", "realized", "risk_signals", "ai_advisor",
+    "visual_settings", "account", "upgrade",
+    "login",
+    "add_stock", "add_mf", "delete_stock", "delete_mf",
+    "ai_advisor_query", "upgrade_click",
+}
+
+@app.route('/api/track-event', methods=['POST'])
+def track_event():
+    """Logs a lightweight usage event (login / page view / feature use) for the
+    current user, matching what the privacy policy discloses. Never trusts a
+    client-supplied user_id — always uses the authenticated session's own id."""
+    user_id = get_current_user_id()
+    if not user_id:
+        # Don't error loudly for an unauthenticated tracking ping — just no-op.
+        return jsonify({"status": "skipped"}), 200
+
+    data = request.json or {}
+    event_type = data.get("event_type", "")
+    event_name = data.get("event_name", "")
+
+    if event_type not in _ALLOWED_EVENT_TYPES or event_name not in _ALLOWED_EVENT_NAMES:
+        return jsonify({"status": "error", "message": "Invalid event"}), 400
+
+    try:
+        supabase = get_supabase_admin()
+        supabase.table('usage_events').insert({
+            "user_id": user_id,
+            "event_type": event_type,
+            "event_name": event_name,
+        }).execute()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        # Tracking failures should never break the user's actual action.
+        print(f"[track_event] Warning: failed to log event: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/api/update-prices', methods=['POST'])
 def trigger_price_update():
