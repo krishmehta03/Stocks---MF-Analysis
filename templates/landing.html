@@ -32,9 +32,20 @@
   <style>
     * { box-sizing: border-box; }
 
+    :root {
+      --lp-bg: #ffffff;
+      --lp-card-bg: #f7f9fb;
+      --lp-text: #0f172a;
+      --lp-text-secondary: #5b6472;
+      --lp-border: rgba(15, 23, 42, 0.1);
+    }
+
+    html, body {
+      background-color: var(--lp-bg) !important;
+    }
+
     body {
-      background-color: var(--bg-primary);
-      color: var(--text-primary);
+      color: var(--lp-text);
       font-family: 'Plus Jakarta Sans', sans-serif;
       margin: 0;
       padding: 0;
@@ -81,11 +92,11 @@
     }
 
     .nav-login {
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
     }
 
     .nav-login:hover {
-      color: var(--text-primary);
+      color: var(--lp-text);
     }
 
     .btn {
@@ -117,12 +128,12 @@
     }
 
     .btn-ghost {
-      border-color: var(--border, rgba(255, 255, 255, 0.14));
-      color: var(--text-primary);
+      border-color: var(--lp-border);
+      color: var(--lp-text);
     }
 
     .btn-ghost:hover {
-      border-color: var(--text-secondary);
+      border-color: var(--lp-text-secondary);
     }
 
     .btn-large {
@@ -152,7 +163,7 @@
     .hero .lede {
       font-size: 1.05rem;
       line-height: 1.65;
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
       max-width: 44ch;
       margin: 0 0 1.75rem;
     }
@@ -166,21 +177,21 @@
 
     .hero .fineprint {
       font-size: 0.82rem;
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
       opacity: 0.75;
     }
 
     /* ---------- Mock portfolio card ---------- */
     .mock-card {
-      background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
-      border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+      background: var(--lp-card-bg);
+      border: 1px solid var(--lp-border);
       border-radius: 14px;
       padding: 1.5rem;
     }
 
     .mock-card .mc-label {
       font-size: 0.78rem;
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
       margin-bottom: 0.3rem;
     }
 
@@ -196,12 +207,12 @@
       gap: 1.5rem;
       margin-bottom: 1.4rem;
       padding-bottom: 1.4rem;
-      border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+      border-bottom: 1px solid var(--lp-border);
     }
 
     .mc-delta .mc-delta-label {
       font-size: 0.75rem;
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
       margin-bottom: 0.2rem;
     }
 
@@ -222,7 +233,7 @@
     }
 
     .mc-row + .mc-row {
-      border-top: 1px solid var(--border, rgba(255, 255, 255, 0.06));
+      border-top: 1px solid var(--lp-border);
     }
 
     .mc-row .mc-name {
@@ -232,7 +243,7 @@
 
     .mc-row .mc-sub {
       font-size: 0.75rem;
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
     }
 
     .mc-row .mc-pct {
@@ -244,7 +255,7 @@
     /* ---------- Section shell ---------- */
     section {
       padding: 3.5rem 0;
-      border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      border-top: 1px solid var(--lp-border);
     }
 
     .section-head {
@@ -261,7 +272,7 @@
     }
 
     .section-head p {
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
       font-size: 0.98rem;
       line-height: 1.6;
       margin: 0;
@@ -272,12 +283,12 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0;
-      border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      border-top: 1px solid var(--lp-border);
     }
 
     .feature-item {
       padding: 1.6rem 1.75rem 1.6rem 0;
-      border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      border-bottom: 1px solid var(--lp-border);
       display: flex;
       gap: 1rem;
     }
@@ -285,7 +296,7 @@
     .feature-item:nth-child(odd) {
       padding-left: 0;
       padding-right: 1.75rem;
-      border-right: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      border-right: 1px solid var(--lp-border);
     }
 
     .feature-item:nth-child(even) {
@@ -313,7 +324,7 @@
     }
 
     .feature-item p {
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
       font-size: 0.9rem;
       line-height: 1.55;
       margin: 0;
@@ -327,7 +338,7 @@
     }
 
     .price-card {
-      border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+      border: 1px solid var(--lp-border);
       border-radius: 14px;
       padding: 1.75rem;
     }
@@ -354,7 +365,7 @@
     .price-card .plan-price span {
       font-size: 0.95rem;
       font-weight: 500;
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
     }
 
     .price-card ul {
@@ -368,7 +379,7 @@
       align-items: flex-start;
       gap: 0.55rem;
       font-size: 0.88rem;
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
       padding: 0.4rem 0;
     }
 
@@ -396,7 +407,7 @@
     }
 
     .final-cta p {
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
       margin: 0 0 1.75rem;
     }
 
@@ -410,11 +421,11 @@
     footer {
       text-align: center;
       padding: 2rem 0;
-      border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      border-top: 1px solid var(--lp-border);
     }
 
     footer a {
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
       text-decoration: none;
       margin: 0 0.75rem;
       font-size: 0.85rem;
@@ -422,13 +433,13 @@
     }
 
     footer a:hover {
-      color: var(--accent);
+      color: #059669;
     }
 
     footer p {
       margin-top: 1rem;
       font-size: 0.75rem;
-      color: var(--text-secondary);
+      color: var(--lp-text-secondary);
       opacity: 0.6;
     }
 
@@ -469,16 +480,8 @@
       * { transition: none !important; }
     }
   </style>
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const theme = localStorage.getItem('portfolio_theme') || 'emerald';
-      const mode = localStorage.getItem('portfolio_theme_mode') || 'dark';
-      document.body.className = `theme-${theme}`;
-      if (mode === 'light') {
-        document.body.classList.add('light-mode');
-      }
-    });
-  </script>
+  <!-- This page intentionally doesn't follow the signed-in app's saved
+       dark/light theme — it's a public page and always renders light. -->
 </head>
 
 <body>
