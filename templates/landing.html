@@ -488,7 +488,7 @@
         <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz">
       </a>
       <div class="header-actions">
-        <a href="/login" class="nav-login">Log in</a>
+        <a href="/login" class="nav-login js-login-link">Log in</a>
         <a href="/signup" class="btn btn-primary">Get started free</a>
       </div>
     </header>
@@ -502,7 +502,7 @@
         </p>
         <div class="cta-row">
           <a href="/signup" class="btn btn-primary btn-large">Get started free</a>
-          <a href="/login" class="btn btn-ghost btn-large">Log in</a>
+          <a href="/login" class="btn btn-ghost btn-large js-login-link">Log in</a>
         </div>
         <p class="fineprint">Free for up to 10 stocks and 3 mutual funds. No card required.</p>
       </div>
@@ -654,13 +654,15 @@
         const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const { data: { session } } = await client.auth.getSession();
         if (session && session.user) {
-          document.querySelectorAll('a[href="/signup"], a[href="/login"]').forEach(function (el) {
+          // Hide the separate "Log in" links entirely — a signed-in visitor
+          // doesn't need both a login and a signup button side by side.
+          document.querySelectorAll('.js-login-link').forEach(function (el) {
+            el.style.display = 'none';
+          });
+          // Point the remaining primary buttons straight at the dashboard.
+          document.querySelectorAll('a[href="/signup"]').forEach(function (el) {
             el.setAttribute('href', '/dashboard');
-            if (el.textContent.trim() === 'Get started free' || el.textContent.trim() === 'Start with Pro') {
-              el.textContent = 'Go to dashboard';
-            } else if (el.textContent.trim() === 'Log in') {
-              el.textContent = 'Go to dashboard';
-            }
+            el.textContent = 'Go to dashboard';
           });
         }
       } catch (err) {
