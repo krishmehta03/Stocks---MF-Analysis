@@ -2036,7 +2036,7 @@ def portfolio_performance():
         'nifty50':       ('^NSEI',      'Nifty 50'),
         'sensex':        ('^BSESN',     'BSE Sensex'),
         'bse500':        ('BSE-500.BO', 'BSE 500'),
-        'crisil_hybrid': ('^NSEI',      'CRISIL Hybrid Index'),
+        'crisil_hybrid': ('^NSEI',      'Hybrid 65/35 (65% Nifty 50 + 35% debt at 6.5%, illustrative)'),
     }
     bench_sym, bench_name = BENCH_MAP.get(benchmark, ('^NSEI', 'Nifty 50'))
 
@@ -2141,7 +2141,7 @@ def portfolio_performance():
     stock_norm  = normalize(stock_series)
     bench_norm = normalize(bench_series)
 
-    # Post-process for CRISIL Hybrid Index
+    # Post-process for the illustrative 65/35 hybrid benchmark (not the real CRISIL index)
     if benchmark == 'crisil_hybrid':
         first_bench = bench_series.dropna().iloc[0] if not bench_series.dropna().empty else 1.0
         nifty_norm = ((bench_series / first_bench) * 100)
