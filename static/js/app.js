@@ -1076,11 +1076,11 @@ function renderPerformanceChart(data) {
   const textPrimary = cssVars.getPropertyValue('--text-primary').trim() || '#f8fafc';
   const textSecondary = cssVars.getPropertyValue('--text-secondary').trim() || '#94a3b8';
   const combinedColor = activeThemeMode === 'light' ? '#3b82f6' : '#38bdf8';
-  const stocksColor   = '#ec4899';
-  const mfColor       = '#a855f7';
+  const stocksColor = '#ec4899';
+  const mfColor = '#a855f7';
 
   const hasCombined = !!(data.combined && data.combined.length > 0);
-  const hasMF       = !!(data.mf && data.mf.length > 0);
+  const hasMF = !!(data.mf && data.mf.length > 0);
 
   // Show/hide MF & All mode buttons if user does not have mutual funds
   const mfModeBtn = document.getElementById("perf-mode-btn-mf");
@@ -1095,25 +1095,25 @@ function renderPerformanceChart(data) {
 
   // Pick target series for metrics
   let primarySeries = data.portfolio;
-  let primaryName   = "Your Portfolio";
+  let primaryName = "Your Portfolio";
 
   if (targetMode === 'combined' && hasCombined) {
     primarySeries = data.combined;
-    primaryName   = "Combined Portfolio";
+    primaryName = "Combined Portfolio";
   } else if (targetMode === 'mf' && hasMF) {
     primarySeries = data.mf;
-    primaryName   = "Mutual Funds Portfolio";
+    primaryName = "Mutual Funds Portfolio";
   } else if (targetMode === 'stocks') {
     primarySeries = data.portfolio;
-    primaryName   = "Stocks Portfolio";
+    primaryName = "Stocks Portfolio";
   } else if (targetMode === 'all' && hasCombined) {
     primarySeries = data.combined;
-    primaryName   = "Combined Portfolio";
+    primaryName = "Combined Portfolio";
   }
 
-  const lastPortVal  = primarySeries && primarySeries.length > 0 ? primarySeries[primarySeries.length - 1] : 100;
+  const lastPortVal = primarySeries && primarySeries.length > 0 ? primarySeries[primarySeries.length - 1] : 100;
   const lastBenchVal = data.benchmark && data.benchmark.length > 0 ? data.benchmark[data.benchmark.length - 1] : 100;
-  const diff         = lastPortVal - lastBenchVal;
+  const diff = lastPortVal - lastBenchVal;
 
   // Update dynamic Outperformance Badge
   const badge = document.getElementById("perf-outperf-badge");
@@ -1144,16 +1144,16 @@ function renderPerformanceChart(data) {
   }
 
   // Update Portfolio Context Strip
-  const stripPeriodEl     = document.getElementById("strip-period");
-  const stripPortRetEl    = document.getElementById("strip-portfolio-return");
+  const stripPeriodEl = document.getElementById("strip-period");
+  const stripPortRetEl = document.getElementById("strip-portfolio-return");
   const stripBenchLabelEl = document.getElementById("strip-bench-label");
-  const stripBenchRetEl   = document.getElementById("strip-bench-return");
-  const stripAlphaEl      = document.getElementById("strip-alpha");
-  const stripAsOfEl       = document.getElementById("strip-as-of");
+  const stripBenchRetEl = document.getElementById("strip-bench-return");
+  const stripAlphaEl = document.getElementById("strip-alpha");
+  const stripAsOfEl = document.getElementById("strip-as-of");
 
-  const portRet  = lastPortVal - 100;
+  const portRet = lastPortVal - 100;
   const benchRet = lastBenchVal - 100;
-  const alpha    = diff;
+  const alpha = diff;
 
   if (stripPeriodEl) stripPeriodEl.innerText = data.period || activePeriod;
 
@@ -1419,11 +1419,11 @@ function renderPerformanceChart(data) {
             },
             footer: function (context) {
               if (context.length >= 2) {
-                const benchIdx    = context.length - 1;
-                const portVal     = context[0].parsed.y;
-                const benchVal    = context[benchIdx].parsed.y;
-                const gap         = portVal - benchVal;
-                const sign        = gap >= 0 ? '+' : '';
+                const benchIdx = context.length - 1;
+                const portVal = context[0].parsed.y;
+                const benchVal = context[benchIdx].parsed.y;
+                const gap = portVal - benchVal;
+                const sign = gap >= 0 ? '+' : '';
                 return `Gap vs ${data.benchmark_name}: ${sign}${gap.toFixed(2)}%`;
               }
               return '';
@@ -1432,7 +1432,7 @@ function renderPerformanceChart(data) {
           footerColor: function (context) {
             if (context.length >= 2) {
               const benchIdx = context.length - 1;
-              const portVal  = context[0].parsed.y;
+              const portVal = context[0].parsed.y;
               const benchVal = context[benchIdx].parsed.y;
               return (portVal - benchVal >= 0) ? '#10b981' : '#ef4444';
             }
@@ -2822,67 +2822,118 @@ function evaluateRiskAlerts() {
   if (alerts.length === 0) {
     // No alerts — container stays empty
     container.innerHTML = '';
+    container.style.marginBottom = '0';
     return;
   }
 
   // Sort: Critical(5/4) → Warning(3) → Low(2)
   alerts.sort((a, b) => b.severityScore - a.severityScore);
 
-  const criticalAlerts = alerts.filter(a => a.isCritical);
-  const otherAlerts = alerts.filter(a => !a.isCritical);
+  const criticalCount = alerts.filter(a => a.isCritical).length;
   const warnCount = alerts.filter(a => a.severity === 'warning').length;
   const lowCount = alerts.filter(a => a.severity === 'low').length;
+  const hasCrit = criticalCount > 0;
+  const accent = hasCrit ? '#ef4444' : (warnCount > 0 ? '#f97316' : '#eab308');
 
-  // Build the collapsed summary bar
-  const summaryBar = document.createElement("div");
-  summaryBar.id = "alerts-summary-bar";
-  const hasCrit = criticalAlerts.length > 0;
-  summaryBar.style.cssText = `
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600;
-    margin-bottom: 0.5rem; cursor: pointer; user-select: none;
-    background: ${hasCrit ? 'rgba(239,68,68,0.15)' : 'rgba(249,115,22,0.1)'};
-    border: 1px solid ${hasCrit ? 'rgba(239,68,68,0.35)' : 'rgba(249,115,22,0.3)'};
-    color: ${hasCrit ? '#f87171' : '#fb923c'};
+  // Compact notification bell (right-aligned). The full list opens on click.
+  container.style.cssText = 'display:flex; justify-content:flex-end; position:relative; margin-bottom:0.75rem;';
+
+  const bell = document.createElement("button");
+  bell.id = "alerts-bell-btn";
+  bell.type = "button";
+  bell.setAttribute("aria-haspopup", "true");
+  bell.setAttribute("aria-expanded", alertsExpanded ? "true" : "false");
+  bell.style.cssText = `
+    display:inline-flex; align-items:center; gap:0.55rem; cursor:pointer;
+    padding:0.45rem 0.9rem; border-radius:999px; font-size:0.85rem; font-weight:600;
+    background:${accent}1f; border:1px solid ${accent}59; color:${accent};
   `;
+  bell.innerHTML = `
+    <i class="fa-solid fa-bell"></i>
+    <span>Alerts</span>
+    <span style="min-width:1.35rem; padding:0 0.4rem; border-radius:999px; background:${accent}; color:#fff; font-size:0.75rem; line-height:1.35rem; text-align:center;">${alerts.length}</span>
+  `;
+  container.appendChild(bell);
+
+  // Dropdown panel with the full alert list
+  const panel = document.createElement("div");
+  panel.id = "alerts-panel";
+  panel.className = "card";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-label", "Portfolio alerts");
+  panel.style.cssText = `
+    display:${alertsExpanded ? 'block' : 'none'}; position:absolute; top:calc(100% + 0.4rem); right:0;
+    z-index:500; width:min(620px, 92vw); max-height:70vh; overflow-y:auto; padding:1rem;
+    box-shadow:0 12px 32px rgba(0,0,0,0.35);
+  `;
+
   const parts = [];
-  if (criticalAlerts.length > 0) parts.push(`🔴 ${criticalAlerts.length} Critical`);
-  if (warnCount > 0) parts.push(`⚠ ${warnCount} Warning`);
-  if (lowCount > 0) parts.push(`🟡 ${lowCount} Low Severity`);
-  summaryBar.innerHTML = `
-    <span>${parts.join('&nbsp;&nbsp;•&nbsp;&nbsp;')}</span>
-    <span id="alerts-toggle-icon" style="font-size:0.8rem;">${alertsExpanded ? '▲ Collapse' : '▼ Show all'}</span>
+  if (criticalCount > 0) parts.push(`${criticalCount} Critical`);
+  if (warnCount > 0) parts.push(`${warnCount} Warning`);
+  if (lowCount > 0) parts.push(`${lowCount} Low severity`);
+
+  const head = document.createElement("div");
+  head.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;";
+  head.innerHTML = `
+    <div>
+      <div style="font-weight:700; font-size:0.95rem;">Portfolio alerts</div>
+      <div style="font-size:0.78rem; color:var(--text-secondary);">${parts.join(' &bull; ')}</div>
+    </div>
+    <button type="button" id="alerts-panel-close" aria-label="Close alerts"
+      style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; font-size:1rem;">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
   `;
-  summaryBar.addEventListener('click', () => {
-    alertsExpanded = !alertsExpanded;
-    document.getElementById("alerts-toggle-icon").innerText = alertsExpanded ? '▲ Collapse' : '▼ Show all';
-    const collapsible = document.getElementById("alerts-collapsible");
-    if (collapsible) collapsible.style.display = alertsExpanded ? 'block' : 'none';
-  });
-  container.appendChild(summaryBar);
+  panel.appendChild(head);
 
-  // Critical alerts always rendered (always visible)
-  criticalAlerts.forEach(alert => {
+  alerts.forEach(alert => {
     const div = document.createElement("div");
-    div.className = `alert-banner-critical`;
+    div.className = `alert-banner-${alert.severity}`;
+    div.style.marginBottom = "0.5rem";
     div.innerHTML = alert.html;
-    container.appendChild(div);
+    panel.appendChild(div);
   });
+  container.appendChild(panel);
 
-  // Non-critical alerts go in collapsible section
-  if (otherAlerts.length > 0) {
-    const collapsible = document.createElement("div");
-    collapsible.id = "alerts-collapsible";
-    collapsible.style.display = alertsExpanded ? 'block' : 'none';
+  const setOpen = (open) => {
+    alertsExpanded = open;
+    panel.style.display = open ? 'block' : 'none';
+    bell.setAttribute("aria-expanded", open ? "true" : "false");
+  };
 
-    otherAlerts.forEach(alert => {
-      const div = document.createElement("div");
-      div.className = `alert-banner-${alert.severity}`;
-      div.innerHTML = alert.html;
-      collapsible.appendChild(div);
+  bell.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setOpen(!alertsExpanded);
+  });
+  panel.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Jumping to a holding should also dismiss the panel
+    if (e.target.closest('.alert-review-btn')) setOpen(false);
+  });
+  head.querySelector('#alerts-panel-close').addEventListener('click', () => setOpen(false));
+
+  // Close on outside click or Escape (bound once, works across re-renders)
+  if (!window._alertsPanelBound) {
+    window._alertsPanelBound = true;
+    document.addEventListener('click', () => {
+      const p = document.getElementById('alerts-panel');
+      if (p && p.style.display !== 'none') {
+        alertsExpanded = false;
+        p.style.display = 'none';
+        const b = document.getElementById('alerts-bell-btn');
+        if (b) b.setAttribute('aria-expanded', 'false');
+      }
     });
-
-    container.appendChild(collapsible);
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const p = document.getElementById('alerts-panel');
+      if (p && p.style.display !== 'none') {
+        alertsExpanded = false;
+        p.style.display = 'none';
+        const b = document.getElementById('alerts-bell-btn');
+        if (b) b.setAttribute('aria-expanded', 'false');
+      }
+    });
   }
 }
 
