@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template, send_from_directory
+from flask import Flask, jsonify, request, render_template, send_from_directory, Response
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 import requests
@@ -1526,6 +1526,31 @@ def disclaimer_page():
 @app.route('/contact')
 def contact_page():
     return render_template('contact.html')
+
+@app.route('/robots.txt')
+def robots_txt():
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /dashboard\n"
+        "Disallow: /account\n"
+        "Disallow: /verify-email\n"
+        "Disallow: /reset-password\n"
+        "Disallow: /upgrade\n"
+        "Disallow: /api/\n"
+        "\n"
+        "Sitemap: https://wealthlenz.in/sitemap.xml\n"
+    )
+    return Response(body, mimetype='text/plain')
+
+# Keep private/app pages out of search results (belt-and-braces with robots.txt).
+_NOINDEX_PREFIXES = ('/dashboard', '/account', '/verify-email', '/reset-password', '/upgrade', '/api/')
+
+@app.after_request
+def add_seo_headers(response):
+    if request.path.startswith(_NOINDEX_PREFIXES):
+        response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    return response
 
 @app.route('/sitemap.xml')
 def sitemap():

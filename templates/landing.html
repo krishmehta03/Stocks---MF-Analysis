@@ -11,6 +11,79 @@
   "logo": "https://wealthlenz.in/static/android-chrome-512x512.png"
 }
 </script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "WealthLenz",
+  "url": "https://wealthlenz.in/"
+}
+</script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "WealthLenz",
+  "applicationCategory": "FinanceApplication",
+  "operatingSystem": "Web",
+  "url": "https://wealthlenz.in/",
+  "description": "Stock and mutual fund portfolio tracker for Indian investors.",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "Free",
+      "price": "0",
+      "priceCurrency": "INR"
+    },
+    {
+      "@type": "Offer",
+      "name": "Pro",
+      "price": "199",
+      "priceCurrency": "INR"
+    }
+  ]
+}
+</script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is WealthLenz?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "WealthLenz is a portfolio tracker for Indian investors. You add your stocks and mutual funds once and see live valuations, gains and losses, XIRR and CAGR, and sector and asset allocation in one dashboard."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is WealthLenz free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. The Free plan covers up to 10 stocks and 3 mutual funds with no card required. The Pro plan costs Rs 199 per month and removes those limits."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does WealthLenz give investment advice?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. WealthLenz is a tracking and analytics tool. It shows data about your own holdings and does not recommend that you buy or sell any security. Please read our Disclaimer for details."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my portfolio data private?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Your holdings are stored in a database with row-level security, so only your account can read them. We do not sell your data or use it for advertising. See our Privacy Policy for details."
+      }
+    }
+  ]
+}
+</script>
   <link rel="icon" type="image/png" href="/favicon.png?v=3">
   <link rel="apple-touch-icon" href="/favicon.png?v=3">
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
@@ -22,15 +95,39 @@
     href="{{ url_for('static', filename='android-chrome-512x512.png') }}">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Track every stock and mutual fund you own in one place. Real gains, real allocation, no spreadsheets.">
-  <title>WealthLenz — Track your stocks and mutual funds in one place</title>
+  <meta name="description"
+    content="Free stock and mutual fund portfolio tracker for Indian investors. See live valuations, gains and losses, XIRR and sector allocation for all your holdings in one place.">
+  <title>WealthLenz | Stock &amp; Mutual Fund Portfolio Tracker for India</title>
+  <link rel="canonical" href="https://wealthlenz.in/">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="theme-color" content="#10b981">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="WealthLenz">
+  <meta property="og:locale" content="en_IN">
+  <meta property="og:url" content="https://wealthlenz.in/">
+  <meta property="og:title" content="WealthLenz | Stock &amp; Mutual Fund Portfolio Tracker for India">
+  <meta property="og:description"
+    content="Track every stock and mutual fund you own in one place. Live valuations, real gains and losses, XIRR and sector allocation. Free for up to 10 stocks and 3 mutual funds.">
+  <meta property="og:image" content="https://wealthlenz.in/static/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="WealthLenz: all your stocks and mutual funds in one portfolio">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="WealthLenz | Stock &amp; Mutual Fund Portfolio Tracker for India">
+  <meta name="twitter:description"
+    content="Live valuations, real gains and losses, XIRR and sector allocation for all your stocks and mutual funds.">
+  <meta name="twitter:image" content="https://wealthlenz.in/static/og-image.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     :root {
       --lp-bg: #ffffff;
@@ -40,7 +137,8 @@
       --lp-border: rgba(15, 23, 42, 0.1);
     }
 
-    html, body {
+    html,
+    body {
       background-color: var(--lp-bg) !important;
     }
 
@@ -52,7 +150,9 @@
       min-height: 100vh;
     }
 
-    a { color: inherit; }
+    a {
+      color: inherit;
+    }
 
     .wrap {
       max-width: 1120px;
@@ -222,8 +322,13 @@
       font-size: 1.05rem;
     }
 
-    .up { color: #10b981; }
-    .down { color: #ef4444; }
+    .up {
+      color: #10b981;
+    }
+
+    .down {
+      color: #ef4444;
+    }
 
     .mc-row {
       display: flex;
@@ -232,7 +337,7 @@
       padding: 0.55rem 0;
     }
 
-    .mc-row + .mc-row {
+    .mc-row+.mc-row {
       border-top: 1px solid var(--lp-border);
     }
 
@@ -393,6 +498,56 @@
       width: 100%;
     }
 
+    /* ---------- FAQ ---------- */
+    .faq-list {
+      max-width: 760px;
+      border-top: 1px solid var(--lp-border);
+    }
+
+    .faq-list details {
+      border-bottom: 1px solid var(--lp-border);
+      padding: 1.1rem 0;
+    }
+
+    .faq-list summary {
+      cursor: pointer;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 1.02rem;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .faq-list summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .faq-list summary::after {
+      content: "+";
+      font-size: 1.3rem;
+      color: var(--lp-text-secondary);
+      flex-shrink: 0;
+    }
+
+    .faq-list details[open] summary::after {
+      content: "\2212";
+    }
+
+    .faq-list details p {
+      color: var(--lp-text-secondary);
+      font-size: 0.93rem;
+      line-height: 1.65;
+      margin: 0.75rem 0 0;
+      max-width: 62ch;
+    }
+
+    .faq-list details p a {
+      color: #059669;
+    }
+
     /* ---------- Final CTA ---------- */
     .final-cta {
       text-align: center;
@@ -477,7 +632,9 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      * { transition: none !important; }
+      * {
+        transition: none !important;
+      }
     }
   </style>
   <!-- This page intentionally doesn't follow the signed-in app's saved
@@ -557,42 +714,48 @@
           <div class="feature-icon"><i class="fa-solid fa-layer-group"></i></div>
           <div>
             <h3>Stocks and mutual funds together</h3>
-            <p>Add your holdings once and see them side by side, instead of checking a broker app and a fund app separately.</p>
+            <p>Add your holdings once and see them side by side, instead of checking a broker app and a fund app
+              separately.</p>
           </div>
         </div>
         <div class="feature-item">
           <div class="feature-icon"><i class="fa-solid fa-chart-line"></i></div>
           <div>
             <h3>Live valuations</h3>
-            <p>Prices and NAVs update automatically, so the gain or loss you see is current, not from the last time you opened a spreadsheet.</p>
+            <p>Prices and NAVs update automatically, so the gain or loss you see is current, not from the last time you
+              opened a spreadsheet.</p>
           </div>
         </div>
         <div class="feature-item">
           <div class="feature-icon"><i class="fa-solid fa-chart-pie"></i></div>
           <div>
             <h3>Asset allocation at a glance</h3>
-            <p>See how your money is split across equity and funds, and across sectors, without building the chart yourself.</p>
+            <p>See how your money is split across equity and funds, and across sectors, without building the chart
+              yourself.</p>
           </div>
         </div>
         <div class="feature-item">
           <div class="feature-icon"><i class="fa-solid fa-calculator"></i></div>
           <div>
             <h3>Returns that account for timing</h3>
-            <p>XIRR and CAGR calculated from your actual buy dates, not a simple percentage that ignores when you invested.</p>
+            <p>XIRR and CAGR calculated from your actual buy dates, not a simple percentage that ignores when you
+              invested.</p>
           </div>
         </div>
         <div class="feature-item">
           <div class="feature-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
           <div>
             <h3>AI portfolio diagnostics</h3>
-            <p>Ask plain-language questions about your own holdings and get back factual, data-grounded answers — not personalized buy or sell advice.</p>
+            <p>Ask plain-language questions about your own holdings and get back factual, data-grounded answers — not
+              personalized buy or sell advice.</p>
           </div>
         </div>
         <div class="feature-item">
           <div class="feature-icon"><i class="fa-solid fa-lock"></i></div>
           <div>
             <h3>Your data stays yours</h3>
-            <p>Row-level security means only you can read your holdings. We don't sell data or use it for advertising.</p>
+            <p>Row-level security means only you can read your holdings. We don't sell data or use it for advertising.
+            </p>
           </div>
         </div>
       </div>
@@ -626,6 +789,36 @@
           </ul>
           <a href="/signup" class="btn btn-primary">Start with Pro</a>
         </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>Frequently asked questions</h2>
+      </div>
+      <div class="faq-list">
+        <details>
+          <summary>What is WealthLenz?</summary>
+          <p>WealthLenz is a portfolio tracker for Indian investors. You add your stocks and mutual funds once and see
+            live valuations, gains and losses, XIRR and CAGR, and sector and asset allocation in one dashboard.</p>
+        </details>
+        <details>
+          <summary>Is WealthLenz free?</summary>
+          <p>Yes. The Free plan covers up to 10 stocks and 3 mutual funds with no card required. The Pro plan costs Rs
+            199 per month and removes those limits.</p>
+        </details>
+        <details>
+          <summary>Does WealthLenz give investment advice?</summary>
+          <p>No. WealthLenz is a tracking and analytics tool. It shows data about your own holdings and does not
+            recommend that you buy or sell any security. Please read our <a href="/disclaimer">Disclaimer</a> for
+            details.</p>
+        </details>
+        <details>
+          <summary>Is my portfolio data private?</summary>
+          <p>Yes. Your holdings are stored in a database with row-level security, so only your account can read them. We
+            do not sell your data or use it for advertising. See our <a href="/privacy">Privacy Policy</a> for details.
+          </p>
+        </details>
       </div>
     </section>
 
