@@ -1,5 +1,10 @@
-from flask import send_from_directory
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /account
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /upgrade
+Disallow: /api/
 
-@app.route("/robots.txt")
-def robots():
-    return send_from_directory(app.static_folder, "robots.txt")
+Sitemap: https://wealthlenz.in/sitemap.xml
