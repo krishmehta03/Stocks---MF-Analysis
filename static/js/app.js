@@ -2711,6 +2711,27 @@ function evaluateRiskAlerts() {
     return;
   }
 
+  // Live alerts are a Pro feature. Wait until the plan has loaded, then either
+  // show a small locked pill (Free) or continue and build the alerts (Pro).
+  if (!window.planLimits && !window.userPlan) {
+    container.style.display = "none";
+    return; // plan still loading; applyPlanGating() calls this function again
+  }
+  if (!window.planLimits || window.planLimits.alerts === false) {
+    container.style.cssText = 'display:flex; justify-content:flex-end; margin-bottom:0.75rem;';
+    const lock = document.createElement("a");
+    lock.href = "/upgrade";
+    lock.title = "Live alerts are a Pro feature";
+    lock.style.cssText = `
+      display:inline-flex; align-items:center; gap:0.55rem; text-decoration:none;
+      padding:0.45rem 0.9rem; border-radius:999px; font-size:0.85rem; font-weight:600;
+      background:rgba(148,163,184,0.12); border:1px solid rgba(148,163,184,0.35); color:var(--text-secondary);
+    `;
+    lock.innerHTML = '<i class="fa-solid fa-lock"></i><span>Alerts</span><span style="font-size:0.72rem; opacity:0.85;">Pro</span>';
+    container.appendChild(lock);
+    return;
+  }
+
   const rules = appConfig.custom_alerts || { high_concentration_pct: 20, high_loss_pct: 10 };
   const alerts = [];
 
