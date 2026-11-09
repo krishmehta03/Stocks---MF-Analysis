@@ -1,0 +1,39 @@
+{% extends "learn_base.html" %}
+
+{% block title %}Investing Guides for Indian Investors | WealthLenz{% endblock %}
+{% block description %}Plain-English guides on tracking your stocks and mutual funds, understanding XIRR and returns,
+and reading your portfolio.{% endblock %}
+{% block path %}/learn{% endblock %}
+
+{% block jsonld %}
+<script type="application/ld+json">
+  {{ {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "WealthLenz guides",
+    "url": "https://wealthlenz.in/learn",
+    "description": "Plain-English guides on tracking stocks and mutual funds and understanding portfolio returns."
+  } | tojson }}
+  </script>
+{% endblock %}
+
+{% block content %}
+<h1>Guides</h1>
+<p class="lede">Plain-English explanations of how to track and understand your stocks and mutual fund portfolio.</p>
+
+<ul class="article-list">
+    <li>
+        <a class="title" href="/learn/what-is-xirr">What is XIRR? A simple guide for Indian investors</a>
+        <p>Why simple returns mislead for SIPs, how XIRR differs from CAGR, and how to calculate it in Excel or Google
+            Sheets.</p>
+    </li>
+    <li>
+        <a class="title" href="/learn/track-mutual-funds-and-stocks-together">How to track mutual funds and stocks
+            together</a>
+        <p>What to record, how to compare returns fairly across stocks and funds, and the mistakes to avoid.</p>
+    </li>
+</ul>
+
+<p class="note" style="margin-top:1.6rem;">These guides are for general education only and are not investment advice.
+    See our <a href="/disclaimer">Disclaimer</a>.</p>
+{% endblock %}

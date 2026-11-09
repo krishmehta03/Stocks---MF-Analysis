@@ -1,0 +1,140 @@
+{% extends "learn_base.html" %}
+
+{% block title %}What is XIRR? A Simple Guide for Indian Investors | WealthLenz{% endblock %}
+{% block description %}XIRR explained in plain English: why it beats simple returns for SIPs, how it differs from CAGR,
+and how to calculate it in Excel or Google Sheets.{% endblock %}
+{% block path %}/learn/what-is-xirr{% endblock %}
+{% block og_type %}article{% endblock %}
+
+{% block jsonld %}
+<script type="application/ld+json">
+  {{ {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "What is XIRR? A Simple Guide for Indian Investors",
+    "description": "XIRR explained in plain English, with worked examples, a comparison with CAGR, and how to calculate it in Excel or Google Sheets.",
+    "datePublished": "2026-11-02",
+    "dateModified": "2026-11-02",
+    "mainEntityOfPage": "https://wealthlenz.in/learn/what-is-xirr",
+    "author": {"@type": "Organization", "name": "WealthLenz", "url": "https://wealthlenz.in"},
+    "publisher": {"@type": "Organization", "name": "WealthLenz", "logo": {"@type": "ImageObject", "url": "https://wealthlenz.in/static/android-chrome-512x512.png"}}
+  } | tojson }}
+  </script>
+{% endblock %}
+
+{% block content %}
+<article>
+    <h1>What is XIRR? A simple guide for Indian investors</h1>
+    <p class="meta">Updated 2 November 2026 &middot; 6 min read</p>
+
+    <div class="answer">
+        <p><strong>XIRR is your annualised return when you invested money on different dates.</strong> It treats every
+            purchase, SIP instalment or withdrawal as a separate cash flow with its own date, then finds the single
+            yearly rate that explains your final value. It is the fairest way to measure returns on a SIP or on any
+            portfolio you built in stages.</p>
+    </div>
+
+    <h2>Why a simple return can mislead you</h2>
+    <p>Suppose you put in &#8377;1,00,000 and it grew to &#8377;1,20,000. That is a 20% gain. If it took one year, 20% a
+        year is a good result. If it took three years, it is much less impressive. A simple percentage ignores time.</p>
+    <p>It gets worse when you invest in parts. Money you added last month has barely had time to grow, while money added
+        two years ago has had plenty. Adding everything up and dividing by the total invested treats them the same. XIRR
+        fixes this by giving each rupee credit only for the time it was actually invested.</p>
+
+    <h2>A worked example</h2>
+    <p>Two investors each put in a total of &#8377;2,00,000 and each ended up with &#8377;2,30,000 on 1 January 2025.
+        Their simple gain is the same: &#8377;30,000, or 15%. The difference is when they invested.</p>
+
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Investor</th>
+                    <th>When the money went in</th>
+                    <th>Simple gain</th>
+                    <th>XIRR (approx.)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>A</td>
+                    <td>&#8377;1,00,000 on 1 Jan 2024 and &#8377;1,00,000 on 1 Jul 2024</td>
+                    <td>15%</td>
+                    <td>20%</td>
+                </tr>
+                <tr>
+                    <td>B</td>
+                    <td>&#8377;1,00,000 on 1 Jan 2024 and &#8377;1,00,000 on 1 Dec 2024</td>
+                    <td>15%</td>
+                    <td>28%</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p>Investor B put the second &#8377;1,00,000 in only a month before the end, so the same &#8377;30,000 gain came
+        from a much shorter time for that money. That is why B's XIRR is higher. Simple return cannot see this. XIRR
+        can.</p>
+    <p class="note">These figures are illustrative examples for teaching, not real investment results.</p>
+
+    <h2>Why XIRR matters most for SIPs</h2>
+    <p>A SIP is the textbook case. Say you invest &#8377;10,000 on the 1st of every month for 12 months (&#8377;1,20,000
+        in total), and the holding is worth &#8377;1,30,000 on 1 January 2025. The simple gain is &#8377;10,000 on
+        &#8377;1,20,000, which is about 8.3%. That looks low, but most of your money was invested for only a few months.
+        The XIRR works out to roughly 15.7% a year, which reflects how long each instalment was really invested.</p>
+    <p>If you compare a SIP fund to a lump-sum fund using simple returns, the SIP will almost always look worse than it
+        is. XIRR puts them on the same footing.</p>
+
+    <h2>XIRR vs CAGR</h2>
+    <ul>
+        <li><strong>CAGR</strong> (compound annual growth rate) works when there is one starting amount and one ending
+            amount. Use it for a single lump-sum investment, or to compare how two funds performed over the same period.
+        </li>
+        <li><strong>XIRR</strong> works when there are several cash flows on different dates, which is how most real
+            portfolios and every SIP work.</li>
+    </ul>
+    <p>For a single purchase with no further investing, the two give essentially the same number. XIRR is the more
+        general tool, and CAGR is the simpler special case.</p>
+
+    <h2>How to calculate XIRR in Excel or Google Sheets</h2>
+    <ol>
+        <li>In one column, list the dates of every cash flow.</li>
+        <li>In the next column, list the amounts. Enter money you <strong>invested as negative numbers</strong> and
+            money you <strong>received or the current value as a positive number</strong>.</li>
+        <li>Add the current value of the holding as the last row, dated today.</li>
+        <li>Use the formula <code>=XIRR(values, dates)</code>, selecting the amount column first and the date column
+            second.</li>
+    </ol>
+    <p>The result is a yearly rate. Format the cell as a percentage.</p>
+
+    <h3>Common mistakes</h3>
+    <ul>
+        <li><strong>Wrong signs.</strong> If every amount is positive or every amount is negative, XIRR returns an
+            error. You need money out and money in.</li>
+        <li><strong>Forgetting the current value.</strong> XIRR needs a closing positive number to compare against what
+            you invested.</li>
+        <li><strong>Using it on very short periods.</strong> A holding that is up 3% in two weeks will show an XIRR of
+            dozens of percent because the formula scales it to a full year. Treat XIRR on holdings under a year old with
+            caution.</li>
+        <li><strong>Missing dates.</strong> Without accurate buy dates, the number means little. If you do not know the
+            date, an estimate is better than leaving it out, but accept that the result is approximate.</li>
+    </ul>
+
+    <h2>What XIRR does not tell you</h2>
+    <p>XIRR looks backwards. A high XIRR does not mean a holding will keep performing, and a low one does not mean it
+        will not recover. It also does not tell you how risky the ride was. Use it to understand what you have earned so
+        far, not as a prediction.</p>
+
+    <div class="cta">
+        <h3>See your own XIRR without the spreadsheet</h3>
+        <p>WealthLenz calculates XIRR and CAGR from your actual buy dates, alongside your live gains and losses and your
+            sector allocation. It is free for up to 10 stocks and 3 mutual funds.</p>
+        <a class="btn" href="/signup">Get started free</a>
+    </div>
+
+    <p class="note">This article is for general education only and is not investment advice. See our <a
+            href="/disclaimer">Disclaimer</a>.</p>
+
+    <p><a href="/learn/track-mutual-funds-and-stocks-together">Next: How to track mutual funds and stocks together
+            &rarr;</a></p>
+</article>
+{% endblock %}

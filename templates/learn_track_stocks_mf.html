@@ -1,0 +1,140 @@
+{% extends "learn_base.html" %}
+
+{% block title %}How to Track Mutual Funds and Stocks Together | WealthLenz{% endblock %}
+{% block description %}A practical way to see your stocks and mutual funds in one portfolio: what to record, how to
+compare returns fairly, and mistakes to avoid.{% endblock %}
+{% block path %}/learn/track-mutual-funds-and-stocks-together{% endblock %}
+{% block og_type %}article{% endblock %}
+
+{% block jsonld %}
+<script type="application/ld+json">
+  {{ {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "How to Track Mutual Funds and Stocks Together",
+    "description": "A practical way to see your stocks and mutual funds in one portfolio: what to record, how to compare returns fairly, and the mistakes to avoid.",
+    "datePublished": "2026-11-02",
+    "dateModified": "2026-11-02",
+    "mainEntityOfPage": "https://wealthlenz.in/learn/track-mutual-funds-and-stocks-together",
+    "author": {"@type": "Organization", "name": "WealthLenz", "url": "https://wealthlenz.in"},
+    "publisher": {"@type": "Organization", "name": "WealthLenz", "logo": {"@type": "ImageObject", "url": "https://wealthlenz.in/static/android-chrome-512x512.png"}}
+  } | tojson }}
+  </script>
+{% endblock %}
+
+{% block content %}
+<article>
+    <h1>How to track mutual funds and stocks together</h1>
+    <p class="meta">Updated 2 November 2026 &middot; 6 min read</p>
+
+    <div class="answer">
+        <p><strong>To see stocks and mutual funds as one portfolio, record the same few facts for every holding (what
+                you own, how much, what you paid and when), value everything on the same date, and compare returns using
+                one measure such as XIRR.</strong> You can do this in a spreadsheet or with a portfolio tracker. The
+            method matters more than the tool.</p>
+    </div>
+
+    <h2>Why this is harder than it should be</h2>
+    <p>Most investors in India end up with their holdings spread across places. Stocks sit in a demat account with a
+        broker. Mutual funds may sit with the fund houses, on a fund platform, or inside the same broker's app. Each one
+        shows its own numbers in its own format, and none of them shows you the whole picture.</p>
+    <p>The result is that simple questions are hard to answer. How much do I own in total? How much of it is in equity?
+        Am I too heavily invested in one sector? Which of my holdings is actually pulling its weight?</p>
+
+    <h2>Step 1: List every holding in one place</h2>
+    <p>Start with a single list. For each holding, record:</p>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Stocks</th>
+                    <th>Mutual funds</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>What you own</strong></td>
+                    <td>Company name and ticker</td>
+                    <td>Fund name and plan (Direct or Regular, Growth or IDCW)</td>
+                </tr>
+                <tr>
+                    <td><strong>How much</strong></td>
+                    <td>Number of shares</td>
+                    <td>Number of units</td>
+                </tr>
+                <tr>
+                    <td><strong>What you paid</strong></td>
+                    <td>Average buy price</td>
+                    <td>Average NAV, or total amount invested</td>
+                </tr>
+                <tr>
+                    <td><strong>When</strong></td>
+                    <td>Buy date</td>
+                    <td>Date of each purchase or SIP instalment</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p>Do not skip the dates. Without them you cannot measure returns properly later, and they are the first thing
+        people forget to write down.</p>
+
+    <h2>Step 2: Value everything on the same day</h2>
+    <p>Stock prices change every second during market hours, while mutual fund NAVs are published once a day. If you
+        pull your stock values at 2 pm and your fund values from yesterday's NAV, the total is a mix of two different
+        moments. For a quick check this is fine. For comparing holdings against each other, use the same cut-off, such
+        as the previous market close.</p>
+
+    <h2>Step 3: Compare returns on one measure</h2>
+    <p>Stocks are often bought in a single go, while mutual funds are often bought through SIPs spread over months or
+        years. Comparing a stock's simple gain with a SIP fund's simple gain is not a fair match, because the SIP money
+        was invested for much shorter on average.</p>
+    <p>Use <strong>XIRR</strong> for both. It measures an annualised return that accounts for the date of every
+        purchase. We explain how it works, with examples, in <a href="/learn/what-is-xirr">What is XIRR?</a></p>
+
+    <h2>Step 4: Look at the whole portfolio, not just each holding</h2>
+    <p>Once everything is in one place, three views are worth checking regularly:</p>
+    <ul>
+        <li><strong>Asset split.</strong> How much is in direct stocks and how much is in mutual funds? Does the split
+            match what you intended?</li>
+        <li><strong>Sector spread.</strong> If one sector, such as banking or IT, makes up a large share of your stocks,
+            a single bad year for that sector affects you more than you may realise.</li>
+        <li><strong>Biggest positions.</strong> A few large holdings usually drive most of your result, up or down.
+            Knowing which ones they are helps you decide where to pay attention.</li>
+    </ul>
+
+    <h2>Mistakes to watch for</h2>
+    <ul>
+        <li><strong>Hidden overlap.</strong> Many equity mutual funds already hold the large companies you may also own
+            directly. If you hold a popular large-cap stock and also several large-cap funds, your real exposure to that
+            company is higher than it looks. Checking a fund's top holdings on the fund house's factsheet will show you.
+        </li>
+        <li><strong>Ignoring corporate actions.</strong> Stock splits, bonus issues and demergers change your share
+            count and buy price. If you do not update them, your numbers drift away from reality.</li>
+        <li><strong>Mixing up plans.</strong> The Direct and Regular plans of the same fund have different NAVs and
+            different costs. Record the right one.</li>
+        <li><strong>Treating dividends as invisible.</strong> If you hold IDCW (dividend) options, the payouts are part
+            of your return. Leaving them out understates it.</li>
+        <li><strong>Checking too often.</strong> Daily swings are noise. Reviewing monthly or quarterly is usually
+            enough to see what is happening.</li>
+    </ul>
+
+    <h2>Spreadsheet or tracker?</h2>
+    <p>A spreadsheet gives you full control and costs nothing, but you have to type in every holding, refresh prices,
+        and build your own return and allocation formulas. It also needs regular upkeep. A portfolio tracker takes the
+        holdings you enter once and handles the valuation, returns and allocation for you. Either approach works. Pick
+        the one you will actually keep up to date, because a tracker you stop updating is no better than no tracker.</p>
+
+    <div class="cta">
+        <h3>Track stocks and mutual funds together in WealthLenz</h3>
+        <p>Add your holdings once and see live valuations, gains and losses, XIRR and sector allocation for your stocks
+            and mutual funds in one dashboard. Free for up to 10 stocks and 3 mutual funds.</p>
+        <a class="btn" href="/signup">Get started free</a>
+    </div>
+
+    <p class="note">This article is for general education only and is not investment advice. See our <a
+            href="/disclaimer">Disclaimer</a>.</p>
+
+    <p><a href="/learn/what-is-xirr">Also read: What is XIRR? &rarr;</a></p>
+</article>
+{% endblock %}

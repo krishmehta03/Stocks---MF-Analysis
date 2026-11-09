@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Learn | WealthLenz{% endblock %}</title>
+    <meta name="description" content="{% block description %}{% endblock %}">
+    <link rel="canonical" href="https://wealthlenz.in{% block path %}/learn{% endblock %}">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:site_name" content="WealthLenz">
+    <meta property="og:locale" content="en_IN">
+    <meta property="og:url" content="https://wealthlenz.in{{ self.path() }}">
+    <meta property="og:title" content="{{ self.title() }}">
+    <meta property="og:description" content="{{ self.description() }}">
+    <meta property="og:image" content="https://wealthlenz.in/static/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" type="image/png" href="/favicon.png?v=3">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
+    <link rel="apple-touch-icon" href="/favicon.png?v=3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    {% block jsonld %}{% endblock %}
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #ffffff;
+            --card: #f7f9fb;
+            --text: #0f172a;
+            --muted: #5b6472;
+            --border: rgba(15, 23, 42, 0.1);
+            --green: #059669;
+        }
+
+        html,
+        body {
+            background: var(--bg);
+        }
+
+        body {
+            margin: 0;
+            color: var(--text);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            line-height: 1.7;
+        }
+
+        a {
+            color: var(--green);
+        }
+
+        .wrap {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        .site-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.4rem 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 2.5rem;
+        }
+
+        .site-header img {
+            height: 44px;
+            width: auto;
+            display: block;
+        }
+
+        .site-header a.nav {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .site-header a.nav:hover {
+            color: var(--text);
+        }
+
+        h1,
+        h2,
+        h3 {
+            font-family: 'Outfit', sans-serif;
+            line-height: 1.25;
+            letter-spacing: -0.01em;
+        }
+
+        h1 {
+            font-size: 2.25rem;
+            margin: 0 0 0.75rem;
+        }
+
+        h2 {
+            font-size: 1.45rem;
+            margin: 2.4rem 0 0.7rem;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            margin: 1.6rem 0 0.4rem;
+        }
+
+        p,
+        li {
+            font-size: 1.02rem;
+        }
+
+        p {
+            margin: 0 0 1.1rem;
+        }
+
+        ul,
+        ol {
+            padding-left: 1.4rem;
+            margin: 0 0 1.2rem;
+        }
+
+        li {
+            margin-bottom: 0.45rem;
+        }
+
+        .meta {
+            color: var(--muted);
+            font-size: 0.88rem;
+            margin-bottom: 2rem;
+        }
+
+        .lede {
+            font-size: 1.15rem;
+            color: var(--muted);
+            margin-bottom: 1.8rem;
+        }
+
+        .answer {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-left: 4px solid #10b981;
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            margin: 0 0 1.8rem;
+        }
+
+        .answer p {
+            margin: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0 0 1.4rem;
+            font-size: 0.93rem;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 0.65rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-weight: 600;
+            background: var(--card);
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        code {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 0.1rem 0.4rem;
+            font-size: 0.92em;
+        }
+
+        .cta {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.5rem;
+            margin: 2.6rem 0 1.5rem;
+        }
+
+        .cta h3 {
+            margin-top: 0;
+        }
+
+        .cta p {
+            color: var(--muted);
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #04140f;
+        }
+
+        .note {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        .article-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .article-list li {
+            border-top: 1px solid var(--border);
+            padding: 1.4rem 0;
+            margin: 0;
+        }
+
+        .article-list li:last-child {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .article-list a.title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .article-list a.title:hover {
+            color: var(--green);
+        }
+
+        .article-list p {
+            margin: 0.4rem 0 0;
+            color: var(--muted);
+            font-size: 0.97rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            border-top: 1px solid var(--border);
+            margin-top: 3rem;
+        }
+
+        footer a {
+            color: var(--muted);
+            text-decoration: none;
+            margin: 0 0.7rem;
+            font-size: 0.85rem;
+        }
+
+        footer a:hover {
+            color: var(--green);
+        }
+
+        footer p {
+            margin: 1rem 0 0;
+            font-size: 0.75rem;
+            color: var(--muted);
+            opacity: 0.85;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <header class="site-header">
+            <a href="/" title="WealthLenz"><img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}"
+                    alt="WealthLenz"></a>
+            <a href="/learn" class="nav">All guides</a>
+        </header>
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer>
+            <a href="/">Home</a>
+            <a href="/learn">Learn</a>
+            <a href="/terms">Terms of Service</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/disclaimer">Disclaimer</a>
+            <a href="/contact">Contact</a>
+            <p>© 2026 WealthLenz. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+
+</html>

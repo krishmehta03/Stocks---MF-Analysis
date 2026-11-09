@@ -1527,6 +1527,18 @@ def disclaimer_page():
 def contact_page():
     return render_template('contact.html')
 
+@app.route('/learn')
+def learn_index():
+    return render_template('learn_index.html')
+
+@app.route('/learn/what-is-xirr')
+def learn_xirr():
+    return render_template('learn_xirr.html')
+
+@app.route('/learn/track-mutual-funds-and-stocks-together')
+def learn_track_stocks_mf():
+    return render_template('learn_track_stocks_mf.html')
+
 @app.route('/robots.txt')
 def robots_txt():
     body = (
