@@ -1539,6 +1539,11 @@ def learn_xirr():
 def learn_track_stocks_mf():
     return render_template('learn_track_stocks_mf.html')
 
+@app.route('/health')
+def health():
+    return jsonify(status="ok"), 200
+
+
 @app.route('/robots.txt')
 def robots_txt():
     body = (
