@@ -2,18 +2,40 @@
 <html lang="en">
 
 <head>
-  <link rel="icon" type="image/png" href="/favicon.png?v=3">
-  <link rel="apple-touch-icon" href="/favicon.png?v=3">
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
+  <link rel="icon" type="image/png" href="/favicon.png?v=3">
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16.png') }}">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32.png') }}">
   <link rel="icon" type="image/png" sizes="192x192"
     href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
   <link rel="icon" type="image/png" sizes="512x512"
     href="{{ url_for('static', filename='android-chrome-512x512.png') }}">
+  <link rel="apple-touch-icon" sizes="192x192" href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+  <meta name="theme-color" content="#10b981">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign In — WealthLenz</title>
+  <title>Sign In to Your Portfolio — WealthLenz</title>
+  <meta name="description"
+    content="Sign in to WealthLenz to see your stocks and mutual funds in one dashboard: live valuations, gains and losses, XIRR and sector allocation.">
+  <link rel="canonical" href="https://wealthlenz.in/login">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="WealthLenz">
+  <meta property="og:locale" content="en_IN">
+  <meta property="og:url" content="https://wealthlenz.in/login">
+  <meta property="og:title" content="Sign In to Your Portfolio — WealthLenz">
+  <meta property="og:description"
+    content="Sign in to WealthLenz to see your stocks and mutual funds in one dashboard: live valuations, gains and losses, XIRR and sector allocation.">
+  <meta property="og:image" content="https://wealthlenz.in/static/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="WealthLenz: all your stocks and mutual funds in one portfolio">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sign In to Your Portfolio — WealthLenz">
+  <meta name="twitter:description"
+    content="Sign in to WealthLenz to see your stocks and mutual funds in one dashboard: live valuations, gains and losses, XIRR and sector allocation.">
+  <meta name="twitter:image" content="https://wealthlenz.in/static/og-image.png">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
   <script>
@@ -40,7 +62,6 @@
       } catch (e) { }
     })();
   </script>
-  <meta name="description" content="Sign in to your WealthLenz dashboard to manage your investments.">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
 </head>

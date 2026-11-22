@@ -2,18 +2,40 @@
 <html lang="en">
 
 <head>
-  <link rel="icon" type="image/png" href="/favicon.png?v=3">
-  <link rel="apple-touch-icon" href="/favicon.png?v=3">
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
+  <link rel="icon" type="image/png" href="/favicon.png?v=3">
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16.png') }}">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32.png') }}">
   <link rel="icon" type="image/png" sizes="192x192"
     href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
   <link rel="icon" type="image/png" sizes="512x512"
     href="{{ url_for('static', filename='android-chrome-512x512.png') }}">
+  <link rel="apple-touch-icon" sizes="192x192" href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+  <meta name="theme-color" content="#10b981">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Investment Disclaimer — WealthLenz</title>
+  <meta name="description"
+    content="WealthLenz is not a SEBI registered advisor. Read our disclaimer on investment information, data accuracy, AI insights and your own responsibility.">
+  <link rel="canonical" href="https://wealthlenz.in/disclaimer">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="WealthLenz">
+  <meta property="og:locale" content="en_IN">
+  <meta property="og:url" content="https://wealthlenz.in/disclaimer">
+  <meta property="og:title" content="Investment Disclaimer — WealthLenz">
+  <meta property="og:description"
+    content="WealthLenz is not a SEBI registered advisor. Read our disclaimer on investment information, data accuracy, AI insights and your own responsibility.">
+  <meta property="og:image" content="https://wealthlenz.in/static/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="WealthLenz: all your stocks and mutual funds in one portfolio">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Investment Disclaimer — WealthLenz">
+  <meta name="twitter:description"
+    content="WealthLenz is not a SEBI registered advisor. Read our disclaimer on investment information, data accuracy, AI insights and your own responsibility.">
+  <meta name="twitter:image" content="https://wealthlenz.in/static/og-image.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <style>
@@ -166,7 +188,8 @@
   <div class="legal-container">
     <header>
       <a href="/" class="logo" title="WealthLenz">
-        <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz" class="brand-logo-img" style="height: 38px; width: auto;">
+        <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz"
+          class="brand-logo-img" style="height: 38px; width: auto;">
       </a>
       <a href="/dashboard" class="back-link">
         ← Back to Dashboard
