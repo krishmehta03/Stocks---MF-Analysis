@@ -15,10 +15,24 @@
     <meta property="og:title" content="{{ self.title() }}">
     <meta property="og:description" content="{{ self.description() }}">
     <meta property="og:image" content="https://wealthlenz.in/static/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="WealthLenz: all your stocks and mutual funds in one portfolio">
     <meta name="twitter:card" content="summary_large_image">
-    <link rel="icon" type="image/png" href="/favicon.png?v=3">
+    <meta name="twitter:title" content="{{ self.title() }}">
+    <meta name="twitter:description" content="{{ self.description() }}">
+    <meta name="twitter:image" content="https://wealthlenz.in/static/og-image.png">
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
-    <link rel="apple-touch-icon" href="/favicon.png?v=3">
+    <link rel="icon" type="image/png" href="/favicon.png?v=3">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192"
+        href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512"
+        href="{{ url_for('static', filename='android-chrome-512x512.png') }}">
+    <link rel="apple-touch-icon" sizes="192x192" href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+    <meta name="theme-color" content="#10b981">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link

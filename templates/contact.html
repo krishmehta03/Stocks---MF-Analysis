@@ -2,26 +2,51 @@
 <html lang="en">
 
 <head>
-  <link rel="icon" type="image/png" href="/favicon.png?v=3">
-  <link rel="apple-touch-icon" href="/favicon.png?v=3">
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
+  <link rel="icon" type="image/png" href="/favicon.png?v=3">
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16.png') }}">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32.png') }}">
   <link rel="icon" type="image/png" sizes="192x192"
     href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
   <link rel="icon" type="image/png" sizes="512x512"
     href="{{ url_for('static', filename='android-chrome-512x512.png') }}">
+  <link rel="apple-touch-icon" sizes="192x192" href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+  <meta name="theme-color" content="#10b981">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Get in touch with the WealthLenz team.">
-  <title>Contact — WealthLenz</title>
+  <title>Contact WealthLenz — Support and Feedback</title>
+  <meta name="description"
+    content="Contact the WealthLenz team for support, feedback, privacy requests or questions about your portfolio tracker account. We reply to every message by email.">
+  <link rel="canonical" href="https://wealthlenz.in/contact">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="WealthLenz">
+  <meta property="og:locale" content="en_IN">
+  <meta property="og:url" content="https://wealthlenz.in/contact">
+  <meta property="og:title" content="Contact WealthLenz — Support and Feedback">
+  <meta property="og:description"
+    content="Contact the WealthLenz team for support, feedback, privacy requests or questions about your portfolio tracker account. We reply to every message by email.">
+  <meta property="og:image" content="https://wealthlenz.in/static/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="WealthLenz: all your stocks and mutual funds in one portfolio">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Contact WealthLenz — Support and Feedback">
+  <meta name="twitter:description"
+    content="Contact the WealthLenz team for support, feedback, privacy requests or questions about your portfolio tracker account. We reply to every message by email.">
+  <meta name="twitter:image" content="https://wealthlenz.in/static/og-image.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     :root {
       --lp-bg: #ffffff;
@@ -31,7 +56,8 @@
       --lp-border: rgba(15, 23, 42, 0.1);
     }
 
-    html, body {
+    html,
+    body {
       background-color: var(--lp-bg) !important;
     }
 
@@ -45,7 +71,9 @@
       flex-direction: column;
     }
 
-    a { color: inherit; }
+    a {
+      color: inherit;
+    }
 
     .wrap {
       max-width: 820px;
@@ -260,7 +288,8 @@
           <h2>General support</h2>
           <p>Account issues, billing questions, bugs, or anything else about using WealthLenz.</p>
           <div class="email-row">
-            <a class="email-link" href="https://mail.google.com/mail/?view=cm&fs=1&to=support@wealthlenz.in" target="_blank" rel="noopener">
+            <a class="email-link" href="https://mail.google.com/mail/?view=cm&fs=1&to=support@wealthlenz.in"
+              target="_blank" rel="noopener">
               support@wealthlenz.in <i class="fa-solid fa-arrow-right" style="font-size:0.75rem;"></i>
             </a>
             <button type="button" class="copy-btn" data-email="support@wealthlenz.in" aria-label="Copy email address">
@@ -273,7 +302,8 @@
           <h2>Privacy questions</h2>
           <p>Requests about your data — access, correction, export, or deletion.</p>
           <div class="email-row">
-            <a class="email-link" href="https://mail.google.com/mail/?view=cm&fs=1&to=privacy@wealthlenz.in" target="_blank" rel="noopener">
+            <a class="email-link" href="https://mail.google.com/mail/?view=cm&fs=1&to=privacy@wealthlenz.in"
+              target="_blank" rel="noopener">
               privacy@wealthlenz.in <i class="fa-solid fa-arrow-right" style="font-size:0.75rem;"></i>
             </a>
             <button type="button" class="copy-btn" data-email="privacy@wealthlenz.in" aria-label="Copy email address">

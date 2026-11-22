@@ -2,18 +2,40 @@
 <html lang="en">
 
 <head>
-  <link rel="icon" type="image/png" href="/favicon.png?v=3">
-  <link rel="apple-touch-icon" href="/favicon.png?v=3">
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
+  <link rel="icon" type="image/png" href="/favicon.png?v=3">
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16.png') }}">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32.png') }}">
   <link rel="icon" type="image/png" sizes="192x192"
     href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
   <link rel="icon" type="image/png" sizes="512x512"
     href="{{ url_for('static', filename='android-chrome-512x512.png') }}">
+  <link rel="apple-touch-icon" sizes="192x192" href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+  <meta name="theme-color" content="#10b981">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy — WealthLenz</title>
+  <meta name="description"
+    content="How WealthLenz collects, uses and protects your account details and portfolio data, how payments are handled, and the choices you have over your data.">
+  <link rel="canonical" href="https://wealthlenz.in/privacy">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="WealthLenz">
+  <meta property="og:locale" content="en_IN">
+  <meta property="og:url" content="https://wealthlenz.in/privacy">
+  <meta property="og:title" content="Privacy Policy — WealthLenz">
+  <meta property="og:description"
+    content="How WealthLenz collects, uses and protects your account details and portfolio data, how payments are handled, and the choices you have over your data.">
+  <meta property="og:image" content="https://wealthlenz.in/static/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="WealthLenz: all your stocks and mutual funds in one portfolio">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Privacy Policy — WealthLenz">
+  <meta name="twitter:description"
+    content="How WealthLenz collects, uses and protects your account details and portfolio data, how payments are handled, and the choices you have over your data.">
+  <meta name="twitter:image" content="https://wealthlenz.in/static/og-image.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <style>
@@ -174,7 +196,8 @@
   <div class="legal-container">
     <header>
       <a href="/" class="logo" title="WealthLenz">
-        <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz" class="brand-logo-img" style="height: 38px; width: auto;">
+        <img src="{{ url_for('static', filename='images/wealthlenz-logo.png') }}" alt="WealthLenz"
+          class="brand-logo-img" style="height: 38px; width: auto;">
       </a>
       <a href="/dashboard" class="back-link">
         ← Back to Dashboard
@@ -183,7 +206,7 @@
 
     <main class="legal-content">
       <h1>Privacy Policy</h1>
-      <p style="opacity: 0.7; margin-bottom: 2rem;">Last updated: July 2026</p>
+      <p style="opacity: 0.7; margin-bottom: 2rem;">Last updated: October 2026</p>
 
       <h2>1. INFORMATION WE COLLECT</h2>
 
@@ -250,13 +273,14 @@
         <li>Withdraw consent at any time</li>
       </ul>
 
-      <h2>6. COOKIES</h2>
-      <p>We use minimal cookies for:</p>
+      <h2>6. COOKIES &amp; LOCAL STORAGE</h2>
+      <p>We use your browser's local storage (not advertising cookies) for:</p>
       <ul>
         <li>Authentication (keeping you logged in)</li>
         <li>Session management</li>
+        <li>Remembering your display preferences (e.g. theme)</li>
       </ul>
-      <p>We do not use advertising cookies.</p>
+      <p>We do not use advertising cookies or trackers.</p>
 
       <h2>7. DATA RETENTION</h2>
       <ul>
