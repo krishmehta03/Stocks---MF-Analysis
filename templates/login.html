@@ -288,6 +288,43 @@
       }, 5000);
     }
 
+    /* ── Unverified email ────────────────── */
+    function escapeHtml(t) {
+      return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function showUnverified(email) {
+      showAlert(
+        'Please verify your email address before signing in. We sent a confirmation link to <strong>' +
+        escapeHtml(email) + '</strong>. Check your inbox and spam folder. ' +
+        '<a href="#" id="resend-link" style="color:inherit;text-decoration:underline;">Resend email</a>',
+        'error'
+      );
+      const link = document.getElementById('resend-link');
+      if (link) {
+        link.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          resendConfirmation(email, link);
+        });
+      }
+    }
+
+    async function resendConfirmation(email, link) {
+      link.textContent = 'Sending...';
+      link.style.pointerEvents = 'none';
+      try {
+        const { error } = await window.supabaseClient.auth.resend({ type: 'signup', email: email });
+        if (error) {
+          showAlert('We could not send the email right now. Please wait a minute and try again.', 'error');
+        } else {
+          showAlert('Confirmation email sent to <strong>' + escapeHtml(email) +
+            '</strong>. Check your inbox and spam folder.', 'success');
+        }
+      } catch (e) {
+        showAlert('We could not send the email right now. Please try again shortly.', 'error');
+      }
+    }
+
     /* ── Form submit ─────────────────────── */
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -342,6 +379,15 @@
         });
 
         if (error) {
+          // Account exists but the email link has not been clicked yet.
+          // This is not a wrong password, so it must not count towards the lockout.
+          const errMsg = (error.message || '').toLowerCase();
+          const errCode = (error.code || '').toLowerCase();
+          if (errCode === 'email_not_confirmed' || errMsg.includes('email not confirmed')) {
+            showUnverified(email);
+            setLoading(false);
+            return;
+          }
           failedAttempts++;
           if (failedAttempts >= 5) {
             const lockoutTime = Date.now() + (15 * 60 * 1000);
