@@ -1,0 +1,104 @@
+{% extends "learn_base.html" %}
+
+{% block title %}CAGR vs XIRR vs Absolute Return: Which to Use? | WealthLenz{% endblock %}
+{% block description %}What absolute return, CAGR and XIRR each measure, when to use which, and the mistakes that make returns look better or worse than they are.{% endblock %}
+{% block path %}/learn/cagr-vs-xirr-vs-absolute-return{% endblock %}
+{% block og_type %}article{% endblock %}
+
+{% block jsonld %}
+  <script type="application/ld+json">
+  {{ {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "CAGR vs XIRR vs Absolute Return: Which Should You Use?",
+    "description": "What absolute return, CAGR and XIRR each measure, when to use each one, and the common mistakes when comparing investments.",
+    "datePublished": "2026-11-17",
+    "dateModified": "2026-11-17",
+    "mainEntityOfPage": "https://wealthlenz.in/learn/cagr-vs-xirr-vs-absolute-return",
+    "author": {"@type": "Organization", "name": "WealthLenz", "url": "https://wealthlenz.in"},
+    "publisher": {"@type": "Organization", "name": "WealthLenz", "logo": {"@type": "ImageObject", "url": "https://wealthlenz.in/static/android-chrome-512x512.png"}}
+  } | tojson }}
+  </script>
+{% endblock %}
+
+{% block content %}
+<article>
+  <h1>CAGR vs XIRR vs absolute return: which should you use?</h1>
+  <p class="meta">Updated 17 November 2026 &middot; 6 min read</p>
+
+  <div class="answer">
+    <p><strong>Use absolute return for a quick, short-term check, CAGR for a single investment held over a year or more, and XIRR whenever you added or withdrew money on different dates, as with a SIP.</strong> They are not rivals. Each one answers a different question, and using the wrong one is the most common reason returns look better or worse than they really are.</p>
+  </div>
+
+  <h2>Absolute return: how much did I make in total?</h2>
+  <p>Absolute return is the simplest measure. It is the gain as a percentage of what you put in, with no regard for how long it took.</p>
+  <p><code>Absolute return = (current value &minus; amount invested) &divide; amount invested</code></p>
+  <p>If &#8377;1,00,000 became &#8377;1,50,000, the absolute return is 50%. That tells you how much you gained, but not whether it took six months or ten years. Absolute return is a good fit for holdings you bought recently, because there has been little time to distort the picture. It is a poor way to compare two investments held for different lengths of time.</p>
+
+  <h2>CAGR: what steady yearly rate would give the same result?</h2>
+  <p>CAGR stands for compound annual growth rate. It answers the question: if this investment had grown at one steady rate every year, what would that rate have been?</p>
+  <p><code>CAGR = (ending value &divide; starting value) ^ (1 &divide; number of years) &minus; 1</code></p>
+  <p>In Excel or Google Sheets, with the start value in A1, the end value in B1 and the years in C1, that is <code>=(B1/A1)^(1/C1)-1</code>. CAGR needs exactly one starting amount and one ending amount, with nothing added or withdrawn in between.</p>
+
+  <h3>Why absolute return can mislead: two examples</h3>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Investment</th><th>Held for</th><th>Absolute return</th><th>CAGR</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>&#8377;1,00,000 grew to &#8377;1,50,000</td><td>3 years</td><td>50%</td><td>about 14.5% a year</td></tr>
+        <tr><td>&#8377;1,00,000 grew to &#8377;1,80,000</td><td>5 years</td><td>80%</td><td>about 12.5% a year</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>The second investment looks far better on absolute return (80% against 50%). But it took two extra years to get there. On a yearly basis, the first one grew faster. CAGR makes the two comparable because it brings both onto the same one-year scale.</p>
+  <p class="note">These figures are illustrative examples for teaching, not real investment results.</p>
+
+  <h2>XIRR: what is my yearly return when I invested on different dates?</h2>
+  <p>CAGR breaks down as soon as you invest in more than one go, because the money has not been invested for the same length of time. XIRR solves this by treating every payment and withdrawal as its own cash flow with its own date, then finding the single yearly rate that fits them all.</p>
+  <p>Take a SIP of &#8377;10,000 a month for 12 months, worth &#8377;1,30,000 at the end:</p>
+  <ul>
+    <li><strong>Absolute return:</strong> &#8377;10,000 gained on &#8377;1,20,000 invested, which is about 8.3%.</li>
+    <li><strong>CAGR:</strong> not usable, because there is no single starting amount.</li>
+    <li><strong>XIRR:</strong> about 15.7% a year, because most of the money was invested for only part of the year.</li>
+  </ul>
+  <p>We walk through this in more detail, including how to calculate it in a spreadsheet, in <a href="/learn/what-is-xirr">What is XIRR?</a></p>
+
+  <h2>Which one should you use?</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Your situation</th><th>Best measure</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Bought recently, held for under a year</td><td>Absolute return</td></tr>
+        <tr><td>One purchase, held for a year or more</td><td>CAGR</td></tr>
+        <tr><td>SIP, or several purchases on different dates</td><td>XIRR</td></tr>
+        <tr><td>Partial withdrawals or dividends along the way</td><td>XIRR</td></tr>
+        <tr><td>Comparing two funds over the same fixed period</td><td>CAGR</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Mistakes that distort the numbers</h2>
+  <ul>
+    <li><strong>Comparing absolute returns over different periods.</strong> As the example above shows, a bigger percentage can simply mean a longer wait.</li>
+    <li><strong>Using CAGR on a SIP.</strong> If you pick the first instalment as the start and the final value as the end, the answer is wrong, because the later instalments were not invested for the full period.</li>
+    <li><strong>Annualising a short period.</strong> A 20% gain in six months works out to a CAGR of about 44% a year. That number only holds if the same pace continued for a full year, which is rarely the case. Treat annualised figures on holdings under a year old with caution.</li>
+    <li><strong>Mixing measures in one comparison.</strong> Do not compare one fund's CAGR with another's absolute return. Put everything on the same measure first.</li>
+    <li><strong>Treating any of them as a forecast.</strong> All three describe what already happened. They do not predict what comes next, and they say nothing about how risky the ride was.</li>
+  </ul>
+
+  <div class="cta">
+    <h3>See all three for your own portfolio</h3>
+    <p>WealthLenz shows your gains, plus XIRR and CAGR calculated from your actual buy dates, for your stocks and mutual funds in one dashboard. Free for up to 10 stocks and 3 mutual funds.</p>
+    <a class="btn" href="/signup">Get started free</a>
+  </div>
+
+  <p class="note">This article is for general education only and is not investment advice. See our <a href="/disclaimer">Disclaimer</a>.</p>
+
+  <p><a href="/learn/what-is-xirr">Also read: What is XIRR? &rarr;</a><br>
+  <a href="/learn/how-to-read-mutual-fund-statement">Also read: How to read your mutual fund statement &rarr;</a></p>
+</article>
+{% endblock %}

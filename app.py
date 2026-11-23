@@ -1539,6 +1539,14 @@ def learn_xirr():
 def learn_track_stocks_mf():
     return render_template('learn_track_stocks_mf.html')
 
+@app.route('/learn/cagr-vs-xirr-vs-absolute-return')
+def learn_cagr_xirr_absolute():
+    return render_template('learn_cagr_xirr_absolute.html')
+
+@app.route('/learn/how-to-read-mutual-fund-statement')
+def learn_mf_statement():
+    return render_template('learn_mf_statement.html')
+
 @app.route('/health')
 def health():
     return jsonify(status="ok"), 200
