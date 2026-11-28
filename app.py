@@ -1547,6 +1547,22 @@ def learn_cagr_xirr_absolute():
 def learn_mf_statement():
     return render_template('learn_mf_statement.html')
 
+@app.after_request
+def add_storage_notice(response):
+    """Adds the small browser-storage notice script to every HTML page."""
+    try:
+        if (response.status_code == 200 and response.mimetype == 'text/html'
+                and not response.direct_passthrough):
+            body = response.get_data(as_text=True)
+            tag = '<script src="/static/js/cookie-notice.js" defer></script>'
+            i = body.rfind('</body>')
+            if i != -1 and 'cookie-notice.js' not in body:
+                response.set_data(body[:i] + tag + body[i:])
+    except Exception:
+        pass
+    return response
+
+
 @app.route('/health')
 def health():
     return jsonify(status="ok"), 200
