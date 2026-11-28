@@ -130,6 +130,12 @@
       </svg>
       Continue with Google
     </button>
+    <p class="auth-terms-note"
+      style="margin:0.85rem 0 0;font-size:12px;line-height:1.5;text-align:center;opacity:0.75;">
+      By continuing with Google, you agree to our <a href="/terms" target="_blank"
+        style="color:inherit;text-decoration:underline;">Terms of Service</a>
+      and <a href="/privacy" target="_blank" style="color:inherit;text-decoration:underline;">Privacy Policy</a>.
+    </p>
     <div class="auth-bottom-link">
       Already have an account? <a href="/login">Sign in</a>
     </div>
@@ -239,11 +245,18 @@
         });
 
         if (error) {
-          const msg = error.message.toLowerCase();
+          const msg = (error.message || '').toLowerCase();
+          const code = (error.code || '').toLowerCase();
           if (msg.includes('already registered') || msg.includes('already been registered')) {
             showAlert('This email is already registered. <a href="/login" style="color:inherit;text-decoration:underline;">Sign in instead?</a>', 'error');
-          } else if (msg.includes('password')) {
+          } else if (error.status === 429 || code.includes('rate_limit') || msg.includes('rate limit') || msg.includes('too many')) {
+            showAlert('Too many sign-up attempts right now. Please wait a few minutes and try again.', 'error');
+          } else if (code === 'email_address_invalid' || (msg.includes('email') && msg.includes('invalid'))) {
+            showAlert('This email address cannot be used. Please check it for typing mistakes or try a different address.', 'error');
+          } else if (code === 'weak_password' || msg.includes('password')) {
             showAlert('Password must be at least 8 characters with one number', 'error');
+          } else if (msg.includes('sending') && msg.includes('email')) {
+            showAlert('We could not send the verification email. Please try again in a few minutes.', 'error');
           } else {
             showAlert('Something went wrong. Please try again.', 'error');
           }

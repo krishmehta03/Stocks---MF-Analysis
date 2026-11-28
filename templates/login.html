@@ -144,6 +144,12 @@
       </svg>
       Continue with Google
     </button>
+    <p class="auth-terms-note"
+      style="margin:0.85rem 0 0;font-size:12px;line-height:1.5;text-align:center;opacity:0.75;">
+      By continuing with Google, you agree to our <a href="/terms" target="_blank"
+        style="color:inherit;text-decoration:underline;">Terms of Service</a>
+      and <a href="/privacy" target="_blank" style="color:inherit;text-decoration:underline;">Privacy Policy</a>.
+    </p>
 
     <!-- Bottom link -->
     <div class="auth-bottom-link">
@@ -385,6 +391,12 @@
           const errCode = (error.code || '').toLowerCase();
           if (errCode === 'email_not_confirmed' || errMsg.includes('email not confirmed')) {
             showUnverified(email);
+            setLoading(false);
+            return;
+          }
+          // Server-side rate limit: not a wrong password, so do not count it towards the lockout.
+          if (error.status === 429 || errCode.includes('rate_limit') || errMsg.includes('rate limit')) {
+            showAlert('Too many attempts right now. Please wait a few minutes and try again.', 'error');
             setLoading(false);
             return;
           }
